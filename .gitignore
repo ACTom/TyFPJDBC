@@ -1,0 +1,19 @@
+# FPC / Lazarus
+*.ppu
+*.o
+*.exe
+*.compiled
+*.lps
+lib/
+backup/
+
+# Java / Gradle
+build/
+.gradle/
+out/
+
+# Local runtimes / drivers caches (downloaded, never committed)
+drivers/
+runtimes/
+jre-*/
+.tyfpjdbc/

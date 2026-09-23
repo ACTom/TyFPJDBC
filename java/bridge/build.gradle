@@ -1,0 +1,11 @@
+plugins { id 'java' }
+repositories { mavenCentral() }
+dependencies {
+  implementation 'com.zaxxer:HikariCP:5.1.0'
+  implementation 'org.slf4j:slf4j-api:2.0.9'
+  testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+  testImplementation 'com.h2database:h2:2.2.224'
+  testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+tasks.withType<Test> { useJUnitPlatform() }
+java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }

@@ -1,0 +1,40 @@
+{
+  "drivers": [
+    {
+      "id": "h2",
+      "displayName": "H2",
+      "maven": "com.h2database:h2:2.2.224",
+      "driverClass": "org.h2.Driver",
+      "urlTemplate": "jdbc:h2:mem:{database}",
+      "defaultPort": 0,
+      "testQuery": "SELECT 1",
+      "extraParams": {},
+      "license": "MPL-2.0",
+      "upstreamSyncVersion": "2026-09-01"
+    },
+    {
+      "id": "sqlite",
+      "displayName": "SQLite",
+      "maven": "org.xerial:sqlite-jdbc:3.46.1.0",
+      "driverClass": "org.sqlite.JDBC",
+      "urlTemplate": "jdbc:sqlite:{database}",
+      "defaultPort": 0,
+      "testQuery": "SELECT 1",
+      "extraParams": {},
+      "license": "Apache-2.0",
+      "upstreamSyncVersion": "2026-09-01"
+    },
+    {
+      "id": "postgresql",
+      "displayName": "PostgreSQL",
+      "maven": "org.postgresql:postgresql:42.7.4",
+      "driverClass": "org.postgresql.Driver",
+      "urlTemplate": "jdbc:postgresql://{host}:{port}/{database}",
+      "defaultPort": 5432,
+      "testQuery": "SELECT 1",
+      "extraParams": {},
+      "license": "BSD-2-Clause",
+      "upstreamSyncVersion": "2026-09-01"
+    }
+  ]
+}

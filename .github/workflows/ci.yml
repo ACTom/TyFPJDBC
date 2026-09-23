@@ -1,0 +1,9 @@
+name: ci
+on: [push]
+jobs:
+  guard:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: core guard
+        run: powershell -ExecutionPolicy Bypass -File scripts/guard.ps1
