@@ -10,7 +10,8 @@
       "testQuery": "SELECT 1",
       "extraParams": {},
       "license": "MPL-2.0",
-      "upstreamSyncVersion": "2026-09-01"
+      "sha1": "7bdade27d8cd197d9b5ce9dc251f41d2edc5f7ad",
+      "upstreamSyncVersion": "2026-09-23"
     },
     {
       "id": "sqlite",
@@ -22,7 +23,8 @@
       "testQuery": "SELECT 1",
       "extraParams": {},
       "license": "Apache-2.0",
-      "upstreamSyncVersion": "2026-09-01"
+      "sha1": "97ca06712e2afa8c0e551245da72280fca5474cf",
+      "upstreamSyncVersion": "2026-09-23"
     },
     {
       "id": "postgresql",
@@ -34,7 +36,8 @@
       "testQuery": "SELECT 1",
       "extraParams": {},
       "license": "BSD-2-Clause",
-      "upstreamSyncVersion": "2026-09-01"
+      "sha1": "264310fd7b2cd76738787dc0b9f7ea2e3b11adc1",
+      "upstreamSyncVersion": "2026-09-23"
     }
   ]
 }

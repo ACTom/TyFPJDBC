@@ -95,6 +95,8 @@ begin
       raise Exception.Create('must pass headless=true');
     if Pos('file.encoding=UTF-8', ExtraArgs) = 0 then
       raise Exception.Create('must pass file.encoding=UTF-8');
+    if not FileExists(LibJvm) then
+      raise Exception.Create('libjvm not found: ' + LibJvm);
     FLibJvm := LibJvm;
     FArgs := ExtraArgs;
     FStarted := True;

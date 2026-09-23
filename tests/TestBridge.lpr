@@ -1,8 +1,8 @@
 program TestBridge;
 {$mode objfpc}{$H+}
 uses
-  SysUtils, TyFPJDBC.Bridge.Intf, TyFPJDBC.JVM.Manager, TyFPJDBC.Connection,
-  TyFPJDBC.Statement, TyFPJDBC.Hikari.Pool;
+  SysUtils, Classes, TyFPJDBC.Bridge.Intf, TyFPJDBC.JVM.Manager,
+  TyFPJDBC.Connection, TyFPJDBC.Statement, TyFPJDBC.Hikari.Pool;
 
 var
   Fails: Integer = 0;
@@ -11,6 +11,9 @@ procedure Ok(const N: string; C: Boolean);
 begin
   if C then WriteLn('PASS ', N) else begin Inc(Fails); WriteLn('FAIL ', N); end;
 end;
+
+const
+  REAL_JVM = 'C:\Tools\jdk25\jdk-25.0.4.1+1\bin\server\jvm.dll';
 
 var
   c1, c2: TJDBCConnection;
@@ -30,15 +33,49 @@ begin
   Inc(statsCalls);
 end;
 
+type
+  TExecThread = class(TThread)
+    St: TJDBCStatement;
+    GotState: string;
+    GotCode: Integer;
+    procedure Execute; override;
+  end;
+
+procedure TExecThread.Execute;
+begin
+  try
+    St.ExecUpdate(1);
+    GotState := 'NO-RAISE';
+  except
+    on E: EJDBCError do
+    begin
+      GotState := E.SQLState;
+      GotCode := E.VendorCode;
+    end;
+    on E: Exception do
+      GotState := 'WRONG:' + E.ClassName;
+  end;
+end;
+
 var
   sink: TStatsSink;
+  th: TExecThread;
+  raised: Boolean;
 
 begin
   Ok('bridge-version', BRIDGE_VERSION = '1.0.0');
   Ok('fetch-default', FETCH_BATCH_DEFAULT = 1000);
 
   TJVMManager.ResetForTests;
-  TJVMManager.EnsureStarted('C:/fake/jvm.dll', TJVMManager.BuildDesktopArgs);
+  raised := False;
+  try
+    TJVMManager.EnsureStarted('C:/fake/jvm.dll', TJVMManager.BuildDesktopArgs);
+  except
+    raised := True;
+  end;
+  Ok('jvm-fake-path-rejected', raised and not TJVMManager.IsStarted);
+  Ok('real-jvm-present', FileExists(REAL_JVM));
+  TJVMManager.EnsureStarted(REAL_JVM, TJVMManager.BuildDesktopArgs);
   Ok('jvm-started', TJVMManager.IsStarted);
   TJVMManager.AttachThread;
   Ok('attach', TJVMManager.AttachedCount = 1);
@@ -96,7 +133,9 @@ begin
   try
     st.SetQueryTimeout(5);
     Ok('timeout-set', st.QueryTimeoutSecs = 5);
+    st.SimulateSlowMs := 0;
     Ok('exec-update', st.ExecUpdate(3) = 3);
+    st.BatchItemMs := 0;
     Ok('exec-batch', st.ExecBatch(1000) = 1000);
     st.Cancel;
     try
@@ -105,9 +144,9 @@ begin
     except
       on E: EJDBCError do Ok('cancel-observed', E.SQLState = 'HY008');
     end;
-    st.Cancelled := False;
+    st.ResetCancel;
     st.SetQueryTimeout(1);
-    st.SimulateSlowMs := 2000;
+    st.SimulateSlowMs := 1500;
     try
       st.ExecUpdate(1);
       Ok('timeout-observed', False);
@@ -116,6 +155,22 @@ begin
     end;
     b := st.FetchBatch(0, 10, tot);
     Ok('fetch-no-hook', (tot = 0) and (Length(b) = 0));
+  finally
+    st.Free;
+  end;
+
+  st := TJDBCStatement.Create;
+  try
+    st.SetQueryTimeout(30);
+    st.SimulateSlowMs := 10000;
+    th := TExecThread.Create(True);
+    th.St := st;
+    th.Start;
+    Sleep(300);
+    st.Cancel;
+    th.WaitFor;
+    Ok('cross-thread-cancel', th.GotState = 'HY008');
+    th.Free;
   finally
     st.Free;
   end;

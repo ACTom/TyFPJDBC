@@ -125,13 +125,16 @@ begin
       try
         q.LoadRowsBuffered(['id', 'name'], ['INTEGER', 'NVARCHAR'], rows);
         q.CachedUpdates := True;
+        q.UpdateOptions.ReadOnly := False;
+        q.UpdateOptions.AutoIncField := 'id';
         q.Append;
-        q.Fields[0].AsString := '9';
         q.Fields[1].AsString := 'srv-row';
         q.Post;
-        q.SetGeneratedKey(1001);
+        Ok('pending-one', q.PendingInserts = 1);
         q.ApplyUpdates;
-        Ok('edit-genkey', q.GetGeneratedKeys = 1001);
+        Ok('edit-genkey', q.GetGeneratedKeys = 1000);
+        Ok('edit-genkey-in-row', q.Fields[0].AsString = '1000');
+        Ok('edit-applied', (q.AppliedInserts = 1) and (q.PendingInserts = 0));
       finally
         rows.Free;
       end;

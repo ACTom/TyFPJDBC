@@ -54,10 +54,20 @@ public class Bridge {
   }
 
   public int execUpdate(long connId, String sql) throws SQLException {
+    return execUpdateTimeout(connId, sql, 0);
+  }
+
+  public int execUpdateTimeout(long connId, String sql, int timeoutSecs) throws SQLException {
     Connection c = conns.get(connId);
     if (c == null) throw new SQLException("no conn", "08000", 32);
     try (Statement s = c.createStatement()) {
-      return s.executeUpdate(sql);
+      if (timeoutSecs > 0) s.setQueryTimeout(timeoutSecs);
+      stmts.put(connId, s);
+      try {
+        return s.executeUpdate(sql);
+      } finally {
+        stmts.remove(connId);
+      }
     } catch (SQLException e) {
       recordChain(e);
       throw e;

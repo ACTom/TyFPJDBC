@@ -22,6 +22,7 @@ var
   parts: TStringList;
   ms: TMemoryStream;
   blobVal: string;
+  raised: Boolean;
 begin
   eng := TMockEngine.Create(20000);
   try
@@ -82,15 +83,39 @@ begin
         q.LoadRowsBuffered(['id', 'name'], ['INTEGER', 'NVARCHAR'], rows);
         q.CachedUpdates := True;
         q.UpdateOptions.ReadOnly := False;
+        q.UpdateOptions.AutoIncField := 'id';
         Ok('can-apply', q.CanApplyUpdates);
+        Ok('genkey-none-yet', q.GetGeneratedKeys = 0);
+        Ok('pending-zero', q.PendingInserts = 0);
         q.Append;
-        q.Fields[0].AsString := '4';
         q.Fields[1].AsString := 'a'' OR ''1''=''1';
         q.Post;
         Ok('injection-as-value', q.Fields[1].AsString = 'a'' OR ''1''=''1');
-        q.SetGeneratedKey(42);
+        Ok('pending-one', q.PendingInserts = 1);
         q.ApplyUpdates;
-        Ok('genkey', q.GetGeneratedKeys = 42);
+        Ok('genkey-first', q.GetGeneratedKeys = 1000);
+        Ok('genkey-in-row', q.Fields[0].AsString = '1000');
+        Ok('applied-one', (q.AppliedInserts = 1) and (q.PendingInserts = 0));
+        q.Append;
+        q.Fields[1].AsString := 'second-row';
+        q.Post;
+        q.ApplyUpdates;
+        Ok('genkey-sequence', q.GetGeneratedKeys = 1001);
+        Ok('genkey-second-in-row', q.Fields[0].AsString = '1001');
+        Ok('applied-two', q.AppliedInserts = 2);
+        q.UpdateOptions.ReadOnly := True;
+        Ok('can-apply-readonly', not q.CanApplyUpdates);
+        raised := False;
+        try
+          q.Append;
+          q.Fields[1].AsString := 'x';
+          q.Post;
+          q.ApplyUpdates;
+        except
+          raised := True;
+          q.Cancel;
+        end;
+        Ok('readonly-apply-raises', raised);
       finally
         rows.Free;
       end;
