@@ -286,8 +286,11 @@ Savepoint(name) / RollbackToSavepoint / ReleaseSavepoint
 ### 6.3 分发两仓
 
 - 主仓 `TyFPJDBC`：代码加 `configs/*.json` 加下载器。
-- 独立仓 `TyFPJDBC-Runtimes`：只发 `Release`，命名 `jre-25-tyfpjdbc-win64.zip` 等 `5` 个包。`CI` 矩阵在 `5` 种 `runner` 上拉官方 `Temurin 25` 再 `jlink --strip-debug --no-man-pages --no-header-files --compress=zip-9`。
-- 体积预期：裁后 `45-80MB`，压成 `zip` 约 `30-50MB`。
+- 独立仓 `TyFPJDBC-Runtimes`：只发 `Release`，命名 `jre-25-tyfpjdbc-win64.zip` 等 `5` 个包。
+- 运行时分两档（`runtimes.json` 的 `build` 字段区分，下载器按档校验体积预算）：
+  - `jlink-trimmed-9-modules`：在目标平台原生主机上拉官方 `Temurin 25` 再 `jlink --strip-debug --no-man-pages --no-header-files --compress=zip-9`（见 `scripts/build-jlink.ps1`）。体积预算：解包不超 `80MB`，`zip` 约 `20-50MB`。`win64` 已按此档交付并实测启动。
+  - `upstream-jre-plus-bridge`：上游归档不带 `jmods` 且 `java.base` 记录 `ModuleHashes`，异机 `jlink` 会被拒绝（已实测 `Unable to compute the hash / Hash ... differs to expected hash`），故该档直接采用上游 `Temurin 25.0.4.1 JRE` 原包加 `bridge/ + drivers/` 布局（见 `scripts/build-runtime-jre.ps1`，`mac` 展平 `Contents/Home`）。体积预算：解包不超 `256MB`（实测 `linux` 约 `200MB`、`macos-x64` 约 `132MB`、`macos-arm64` 约 `190MB`），`zip` 约 `40-65MB`。每个字节均来自上游，可启动性由上游保证；布局已做结构验证（启动器魔数、`libjvm` 后缀、`release` 的 `OS_ARCH`、零异平台二进制）。
+  - 升级路径：`CI` 在原生 `runner` 上按 `jlink` 档重建任一平台后，只需替换该条目的 `asset + packedBytes + unpackedBytes + sha256 + build`，其余字段不动；`V1` 接受两档并存。
 - 客户端缓存 `~/.tyfpjdbc/runtimes` 和 `~/.tyfpjdbc/drivers`，支持断点续传和离线复用。
 - 服务端 `Docker` 直接用 `eclipse-temurin:25-jre` 基础镜像，不用这份 `zip`。
 

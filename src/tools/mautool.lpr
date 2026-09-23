@@ -379,7 +379,8 @@ var
   i: Integer;
   o: TJSONObject;
   hx, c: Integer;
-  s: string;
+  s, b: string;
+  up, pk: Int64;
 begin
   j := LoadJSON(Cfg);
   try
@@ -412,6 +413,30 @@ begin
       end
       else
         Fail('runtime[' + o.Strings['platform'] + '] sha256 must be 64 hex chars or a _SHA256_FROM_RELEASE token: ' + s);
+      b := ReqStr(o, 'build');
+      if o.Find('unpackedBytes') = nil then
+        Fail('runtime[' + o.Strings['platform'] + '] missing unpackedBytes');
+      if o.Find('packedBytes') = nil then
+        Fail('runtime[' + o.Strings['platform'] + '] missing packedBytes');
+      up := o.Int64s['unpackedBytes'];
+      pk := o.Int64s['packedBytes'];
+      if b = 'jlink-trimmed-9-modules' then
+      begin
+        if up > 83886080 then
+          Fail('runtime[' + o.Strings['platform'] + '] trimmed unpackedBytes over 80MB budget');
+        if pk > 52428800 then
+          Fail('runtime[' + o.Strings['platform'] + '] trimmed packedBytes over 50MB budget');
+      end
+      else if b = 'upstream-jre-plus-bridge' then
+      begin
+        if up > 268435456 then
+          Fail('runtime[' + o.Strings['platform'] + '] jre unpackedBytes over 256MB budget');
+        if pk > 96468992 then
+          Fail('runtime[' + o.Strings['platform'] + '] jre packedBytes over 92MB budget');
+      end
+      else
+        Fail('runtime[' + o.Strings['platform'] + '] unknown build tier: ' + b);
+      ReqStr(o, 'verifiedNote');
     end;
     WriteLn('runtimes ok: ', arr.Count);
   finally
@@ -438,7 +463,7 @@ begin
     else if ParamStr(i) = '--out' then begin Inc(i); outd := ParamStr(i); end
     else if ParamStr(i) = '--sha1' then begin Inc(i); sha := ParamStr(i); end
     else if ParamStr(i) = '--sha256' then begin Inc(i); sha := ParamStr(i); end
-    else if ParamStr(i) = '--config' then begin Inc(i); cfg := ParamStr(i); end
+    else if ParamStr(i) = '--config' then begin Inc(i); cfg := ParamStr(i); rcfg := ExtractFilePath(cfg) + 'runtimes.json'; end
     else if ParamStr(i) = '--verify-manifests' then mode := 'verify'
     else if ParamStr(i) = '--verify-file' then mode := 'verifyfile'
     else if ParamStr(i) = '--verify-runtime' then mode := 'verifyruntime'
