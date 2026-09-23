@@ -390,7 +390,7 @@ begin
     begin
       o := arr.Objects[i];
       ReqStr(o, 'platform');
-      ReqStr(o, 'temurinVersion');
+      ReqStr(o, 'jdkVersion');
       if o.Strings['bridgeVersion'] <> '1.0.0' then
         Fail('bridgeVersion mismatch');
       ReqStr(o, 'url');
@@ -420,22 +420,12 @@ begin
         Fail('runtime[' + o.Strings['platform'] + '] missing packedBytes');
       up := o.Int64s['unpackedBytes'];
       pk := o.Int64s['packedBytes'];
-      if b = 'jlink-trimmed-9-modules' then
-      begin
-        if up > 83886080 then
-          Fail('runtime[' + o.Strings['platform'] + '] trimmed unpackedBytes over 80MB budget');
-        if pk > 52428800 then
-          Fail('runtime[' + o.Strings['platform'] + '] trimmed packedBytes over 50MB budget');
-      end
-      else if b = 'upstream-jre-plus-bridge' then
-      begin
-        if up > 268435456 then
-          Fail('runtime[' + o.Strings['platform'] + '] jre unpackedBytes over 256MB budget');
-        if pk > 96468992 then
-          Fail('runtime[' + o.Strings['platform'] + '] jre packedBytes over 92MB budget');
-      end
-      else
-        Fail('runtime[' + o.Strings['platform'] + '] unknown build tier: ' + b);
+      if b <> 'jlink-trimmed-9-modules' then
+        Fail('runtime[' + o.Strings['platform'] + '] build must be jlink-trimmed-9-modules, got: ' + b);
+      if up > 83886080 then
+        Fail('runtime[' + o.Strings['platform'] + '] trimmed unpackedBytes over 80MB budget');
+      if pk > 52428800 then
+        Fail('runtime[' + o.Strings['platform'] + '] trimmed packedBytes over 50MB budget');
       ReqStr(o, 'verifiedNote');
     end;
     WriteLn('runtimes ok: ', arr.Count);

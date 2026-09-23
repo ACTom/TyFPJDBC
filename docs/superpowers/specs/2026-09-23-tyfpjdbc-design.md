@@ -286,11 +286,14 @@ Savepoint(name) / RollbackToSavepoint / ReleaseSavepoint
 ### 6.3 分发两仓
 
 - 主仓 `TyFPJDBC`：代码加 `configs/*.json` 加下载器。
-- 独立仓 `TyFPJDBC-Runtimes`：只发 `Release`，命名 `jre-25-tyfpjdbc-win64.zip` 等 `5` 个包。
-- 运行时分两档（`runtimes.json` 的 `build` 字段区分，下载器按档校验体积预算）：
-  - `jlink-trimmed-9-modules`：在目标平台原生主机上拉官方 `Temurin 25` 再 `jlink --strip-debug --no-man-pages --no-header-files --compress=zip-9`（见 `scripts/build-jlink.ps1`）。体积预算：解包不超 `80MB`，`zip` 约 `20-50MB`。`win64` 已按此档交付并实测启动。
-  - `upstream-jre-plus-bridge`：上游归档不带 `jmods` 且 `java.base` 记录 `ModuleHashes`，异机 `jlink` 会被拒绝（已实测 `Unable to compute the hash / Hash ... differs to expected hash`），故该档直接采用上游 `Temurin 25.0.4.1 JRE` 原包加 `bridge/ + drivers/` 布局（见 `scripts/build-runtime-jre.ps1`，`mac` 展平 `Contents/Home`）。体积预算：解包不超 `256MB`（实测 `linux` 约 `200MB`、`macos-x64` 约 `132MB`、`macos-arm64` 约 `190MB`），`zip` 约 `40-65MB`。每个字节均来自上游，可启动性由上游保证；布局已做结构验证（启动器魔数、`libjvm` 后缀、`release` 的 `OS_ARCH`、零异平台二进制）。
-  - 升级路径：`CI` 在原生 `runner` 上按 `jlink` 档重建任一平台后，只需替换该条目的 `asset + packedBytes + unpackedBytes + sha256 + build`，其余字段不动；`V1` 接受两档并存。
+- 独立仓 `TyFPJDBC-Runtimes`：只发 `Release`，命名 `jre-25-tyfpjdbc-win64.zip` 等 `5` 个包，全部为单档 `jlink-trimmed-9-modules`，不设第二档。
+- `jlink` 做法（见 `scripts/build-jlink.ps1`，本机与跨机统一参数）：
+  - 模块：`java.base, java.sql, java.naming, java.logging, java.management, java.xml, java.security.sasl, jdk.unsupported, java.transaction.xa`（`jdeps` 实测 floor 为 `java.base, java.management, java.naming, java.sql`，其余为 `HikariCP` 日志与驱动 `SASL / XA` 预留）。
+  - 参数：`--disable-plugin generate-jli-classes --vm server --strip-debug --no-man-pages --no-header-files --compress=zip-9 --exclude-resources "**/classes*.jsa"`。其中 `generate-jli-classes` 在跨机模块集上必须禁用（否则报同名类已存在），`exclude-resources classes*.jsa` 去掉各平台自带的 `CDS` 归档（约 `45MB`）以满足预算。
+  - `jmods` 来源：`win64` 用 `Temurin 25.0.4.1` 自带；其余 `4` 平台用 `Microsoft Build of OpenJDK 25.0.4.1` 的目标平台 `jmods`。上游 `Temurin` 归档不带 `jmods` 且 `java.base` 记录 `ModuleHashes`，异机 `jlink` 会被拒绝（已实测 `Unable to compute the hash / Hash ... differs to expected hash`），故跨机必须用带目标 `jmods` 的发行版，这是唯一改动点；模块清单与参数不变。
+- 体积预算（下载器按此档强制执行）：解包不超 `80MB`，`zip` 不超 `50MB`。实测（`runtimes.json`）：`win64 38.9MB / 25.0MB`、`linux-x64 48.6MB / 27.2MB`、`linux-arm64 47.0MB / 26.5MB`、`macos-x64 41.3MB / 24.2MB`、`macos-arm64 39.1MB / 23.2MB`。
+- 结构验证：`Linux` 启动器与 `libjvm.so` 为 `ELF`（`7F-45-4C-46`），`mac` 启动器与 `libjvm.dylib` 为 `Mach-O 64`（`CF-FA-ED-FE`），`win64` 为 `MZ`；每包零异平台二进制；`release` 的 `MODULES` 为 9 模块集。
+- 镜像里只有 `JDK` 模块加 `bridge/ (Bridge.class, HikariCP, slf4j-api)`，驱动放 `drivers/` 运行时用 `URLClassLoader` 加载（`drivers/README.txt`）。
 - 客户端缓存 `~/.tyfpjdbc/runtimes` 和 `~/.tyfpjdbc/drivers`，支持断点续传和离线复用。
 - 服务端 `Docker` 直接用 `eclipse-temurin:25-jre` 基础镜像，不用这份 `zip`。
 
