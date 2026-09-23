@@ -6,42 +6,52 @@
       "modules": ["java.base", "java.sql", "java.naming", "java.logging", "java.management", "java.xml", "java.security.sasl", "jdk.unsupported", "java.transaction.xa"],
       "jdepsModules": ["java.base", "java.management", "java.naming", "java.sql"],
       "bridgeVersion": "1.0.0",
-      "verifiedBytes": 38655396,
-      "verifiedNote": "jlink probe run locally 2026-09-23 on Temurin 25.0.4.1 win64: 303473214 -> 38655396 bytes (12.7%). Live H2 probe passed on trimmed image.",
+      "asset": "jre-25-tyfpjdbc-win64.zip",
+      "unpackedBytes": 38655396,
+      "packedBytes": 24996764,
+      "verifiedNote": "Built locally 2026-09-23 from Temurin 25.0.4.1 win64 via scripts/build-jlink.ps1 plus bridge/ and drivers/ layout. Zip smoke-tested (java -version) and live H2 probe passed on the unpacked image.",
       "url": "TyFPJDBC-Runtimes Release asset: jre-25-tyfpjdbc-win64.zip",
-      "sha256": "per-Release SHA256 published alongside jre-25-tyfpjdbc-win64.zip (verify after download with mautool)"
+      "sha256": "945767d7a671f61974d9bf0b1a628602df5c2ba0ab2fb7b4165ca24aedda1282"
     },
     {
       "platform": "linux-x64",
       "temurinVersion": "25",
       "modules": ["java.base", "java.sql", "java.naming", "java.logging", "java.management", "java.xml", "java.security.sasl", "jdk.unsupported", "java.transaction.xa"],
       "bridgeVersion": "1.0.0",
+      "asset": "jre-25-tyfpjdbc-linux-x64.zip",
+      "verifiedNote": "Not built on this machine (no linux runner here). Build via scripts/build-jlink.ps1 on a linux-x64 runner, then replace url/sha256 with the published Release values.",
       "url": "TyFPJDBC-Runtimes Release asset: jre-25-tyfpjdbc-linux-x64.zip",
-      "sha256": "per-Release SHA256 published alongside jre-25-tyfpjdbc-linux-x64.zip (verify after download with mautool)"
+      "sha256": "LINUX_X64_SHA256_FROM_RELEASE"
     },
     {
       "platform": "linux-arm64",
       "temurinVersion": "25",
       "modules": ["java.base", "java.sql", "java.naming", "java.logging", "java.management", "java.xml", "java.security.sasl", "jdk.unsupported", "java.transaction.xa"],
       "bridgeVersion": "1.0.0",
+      "asset": "jre-25-tyfpjdbc-linux-arm64.zip",
+      "verifiedNote": "Not built on this machine (no linux runner here). Build via scripts/build-jlink.ps1 on a linux-arm64 runner, then replace url/sha256 with the published Release values.",
       "url": "TyFPJDBC-Runtimes Release asset: jre-25-tyfpjdbc-linux-arm64.zip",
-      "sha256": "per-Release SHA256 published alongside jre-25-tyfpjdbc-linux-arm64.zip (verify after download with mautool)"
+      "sha256": "LINUX_ARM64_SHA256_FROM_RELEASE"
     },
     {
       "platform": "macos-x64",
       "temurinVersion": "25",
       "modules": ["java.base", "java.sql", "java.naming", "java.logging", "java.management", "java.xml", "java.security.sasl", "jdk.unsupported", "java.transaction.xa"],
       "bridgeVersion": "1.0.0",
+      "asset": "jre-25-tyfpjdbc-macos-x64.zip",
+      "verifiedNote": "Not built on this machine (no macos runner here). Build via scripts/build-jlink.ps1 on a macos-x64 runner, then replace url/sha256 with the published Release values.",
       "url": "TyFPJDBC-Runtimes Release asset: jre-25-tyfpjdbc-macos-x64.zip",
-      "sha256": "per-Release SHA256 published alongside jre-25-tyfpjdbc-macos-x64.zip (verify after download with mautool)"
+      "sha256": "MACOS_X64_SHA256_FROM_RELEASE"
     },
     {
       "platform": "macos-arm64",
       "temurinVersion": "25",
       "modules": ["java.base", "java.sql", "java.naming", "java.logging", "java.management", "java.xml", "java.security.sasl", "jdk.unsupported", "java.transaction.xa"],
       "bridgeVersion": "1.0.0",
+      "asset": "jre-25-tyfpjdbc-macos-arm64.zip",
+      "verifiedNote": "Not built on this machine (no macos runner here). Build via scripts/build-jlink.ps1 on a macos-arm64 runner, then replace url/sha256 with the published Release values.",
       "url": "TyFPJDBC-Runtimes Release asset: jre-25-tyfpjdbc-macos-arm64.zip",
-      "sha256": "per-Release SHA256 published alongside jre-25-tyfpjdbc-macos-arm64.zip (verify after download with mautool)"
+      "sha256": "MACOS_ARM64_SHA256_FROM_RELEASE"
     }
   ]
 }

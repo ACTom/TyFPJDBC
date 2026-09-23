@@ -1,7 +1,7 @@
 program mautool;
 {$mode objfpc}{$H+}
 uses
-  SysUtils, Classes, fpjson, jsonparser, sha1;
+  SysUtils, Classes, process, fpjson, jsonparser, sha1;
 
 procedure Fail(const M: string);
 begin
@@ -83,15 +83,68 @@ begin
   Result := 'curl.exe';
 end;
 
-function RunGet(const Exe, Args, OutFile: string): Boolean;
+function RunCapture(const Exe, Args: string; out Output: string): Boolean;
 var
-  code: Integer;
+  P: TProcess;
+  sl: TStringList;
+begin
+  Result := False;
+  Output := '';
+  P := TProcess.Create(nil);
+  try
+    P.Executable := Exe;
+    P.Parameters.DelimitedText := Args;
+    P.Options := [poWaitOnExit, poUsePipes];
+    P.Execute;
+    sl := TStringList.Create;
+    try
+      sl.LoadFromStream(P.Output);
+      Output := sl.Text;
+    finally
+      sl.Free;
+    end;
+    Result := P.ExitStatus = 0;
+  finally
+    P.Free;
+  end;
+end;
+
+function RunToFile(const Exe, Args, OutFile: string): Boolean;
+var
+  P: TProcess;
+  fs: TFileStream;
+  buf: array[0..8191] of Byte;
+  n: Integer;
+begin
+  Result := False;
+  P := TProcess.Create(nil);
+  try
+    P.Executable := Exe;
+    P.Parameters.DelimitedText := Args;
+    P.Options := [poWaitOnExit, poUsePipes];
+    P.Execute;
+    fs := TFileStream.Create(OutFile, fmCreate);
+    try
+      repeat
+        n := P.Output.Read(buf, SizeOf(buf));
+        if n > 0 then
+          fs.WriteBuffer(buf, n);
+      until n <= 0;
+    finally
+      fs.Free;
+    end;
+    Result := P.ExitStatus = 0;
+  finally
+    P.Free;
+  end;
+end;
+
+function RunGet(const Exe, Args, OutFile: string): Boolean;
 begin
   if OutFile = '' then
-    code := ExecuteProcess(Exe, Args, [])
+    Result := RunToFile(Exe, Args, GetTempFileName('', 'mauout'))
   else
-    code := ExecuteProcess(Exe, Args + ' -o "' + OutFile + '"', []);
-  Result := code = 0;
+    Result := RunToFile(Exe, Args + ' -o "' + OutFile + '"', OutFile + '.tmp');
 end;
 
 function FetchText(const URL: string): string;
@@ -231,12 +284,102 @@ begin
   end;
 end;
 
+function CertHashLine(const P: string): string;
+var
+  outp: string;
+  sl: TStringList;
+  i: Integer;
+  line: string;
+begin
+  Result := '';
+  if not RunCapture('certutil', '-hashfile "' + P + '" SHA256', outp) then
+    Exit;
+  sl := TStringList.Create;
+  try
+    sl.Text := outp;
+    for i := 0 to sl.Count - 1 do
+    begin
+      line := LowerCase(StringReplace(Trim(sl[i]), ' ', '', [rfReplaceAll]));
+      if (Length(line) = 64) then
+      begin
+        Result := line;
+        Exit;
+      end;
+    end;
+  finally
+    sl.Free;
+  end;
+end;
+
+function PowerShellHashLine(const Shell, P: string): string;
+var
+  outp: string;
+begin
+  Result := '';
+  if not RunCapture(Shell,
+    '-NoProfile -Command "(Get-FileHash -LiteralPath ''' + P +
+    ''' -Algorithm SHA256).Hash.ToLower()"', outp) then
+    Exit;
+  Result := LowerCase(Trim(outp));
+end;
+
+function Sha256OfFile(const P: string): string;
+begin
+  Result := CertHashLine(P);
+  if Length(Result) = 64 then
+    Exit;
+  Result := PowerShellHashLine(
+    'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe', P);
+  if Length(Result) = 64 then
+    Exit;
+  Result := PowerShellHashLine('pwsh', P);
+  if Length(Result) = 64 then
+    Exit;
+  Fail('sha256 failed for ' + P);
+end;
+
+procedure CmdVerifyRuntime(const Cfg, Platform, Dir, ExpectSha: string);
+var
+  j: TJSONData;
+  arr: TJSONArray;
+  i: Integer;
+  o: TJSONObject;
+  asset, target, gotSha: string;
+begin
+  j := LoadJSON(Cfg);
+  try
+    arr := TJSONObject(j).Arrays['runtimes'];
+    o := nil;
+    for i := 0 to arr.Count - 1 do
+      if arr.Objects[i].Strings['platform'] = Platform then
+        o := arr.Objects[i];
+    if o = nil then
+      Fail('unknown platform ' + Platform);
+    asset := 'jre-25-tyfpjdbc-' + Platform + '.zip';
+    target := IncludeTrailingPathDelimiter(Dir) + asset;
+    if not FileExists(target) then
+      Fail('runtime zip not present: ' + target);
+    gotSha := Sha256OfFile(target);
+    WriteLn('runtime: ', asset);
+    WriteLn('file: ', target);
+    WriteLn('manifest-sha256: ', LowerCase(Trim(ExpectSha)));
+    WriteLn('actual-sha256: ', gotSha);
+    if gotSha <> LowerCase(Trim(ExpectSha)) then
+      Fail('checksum MISMATCH');
+    WriteLn('checksum: VERIFIED');
+  finally
+    j.Free;
+  end;
+end;
+
 procedure CheckRuntimes(const Cfg: string);
 var
   j: TJSONData;
   arr: TJSONArray;
   i: Integer;
   o: TJSONObject;
+  hx, c: Integer;
+  s: string;
 begin
   j := LoadJSON(Cfg);
   try
@@ -250,7 +393,25 @@ begin
       if o.Strings['bridgeVersion'] <> '1.0.0' then
         Fail('bridgeVersion mismatch');
       ReqStr(o, 'url');
-      ReqStr(o, 'sha256');
+      s := ReqStr(o, 'sha256');
+      if (Length(s) = 64) then
+      begin
+        s := LowerCase(Trim(s));
+        for hx := 1 to Length(s) do
+        begin
+          c := Ord(s[hx]);
+          if not (((c >= Ord('0')) and (c <= Ord('9'))) or ((c >= Ord('a')) and (c <= Ord('f')))) then
+            Fail('runtime[' + o.Strings['platform'] + '] sha256 must be hex');
+        end;
+      end
+      else if (Pos('_SHA256_FROM_RELEASE', UpperCase(s)) > 0) then
+      begin
+        if o.Find('verifiedNote') = nil then
+          Fail('runtime[' + o.Strings['platform'] + '] pending sha256 needs verifiedNote');
+        WriteLn('runtime[' + o.Strings['platform'] + '] sha256 pending CI build (token kept)');
+      end
+      else
+        Fail('runtime[' + o.Strings['platform'] + '] sha256 must be 64 hex chars or a _SHA256_FROM_RELEASE token: ' + s);
     end;
     WriteLn('runtimes ok: ', arr.Count);
   finally
@@ -259,7 +420,7 @@ begin
 end;
 
 var
-  mode, cfg, id, outd, rcfg, sha: string;
+  mode, cfg, id, outd, rcfg, sha, plat: string;
   i: Integer;
 begin
   mode := '';
@@ -268,6 +429,7 @@ begin
   id := '';
   outd := 'drivers';
   sha := '';
+  plat := '';
   i := 1;
   while i <= ParamCount do
   begin
@@ -275,9 +437,12 @@ begin
     else if ParamStr(i) = '--driver' then begin Inc(i); id := ParamStr(i); if mode = '' then mode := 'driver'; end
     else if ParamStr(i) = '--out' then begin Inc(i); outd := ParamStr(i); end
     else if ParamStr(i) = '--sha1' then begin Inc(i); sha := ParamStr(i); end
+    else if ParamStr(i) = '--sha256' then begin Inc(i); sha := ParamStr(i); end
     else if ParamStr(i) = '--config' then begin Inc(i); cfg := ParamStr(i); end
     else if ParamStr(i) = '--verify-manifests' then mode := 'verify'
-    else if ParamStr(i) = '--verify-file' then mode := 'verifyfile';
+    else if ParamStr(i) = '--verify-file' then mode := 'verifyfile'
+    else if ParamStr(i) = '--verify-runtime' then mode := 'verifyruntime'
+    else if ParamStr(i) = '--platform' then begin Inc(i); plat := ParamStr(i); end;
     Inc(i);
   end;
   if mode = 'list' then CmdList(cfg)
@@ -288,5 +453,10 @@ begin
     if (id = '') or (sha = '') then Fail('--verify-file needs --driver <id> --sha1 <hex>');
     CmdVerifyFile(cfg, id, outd, sha);
   end
-  else begin WriteLn('usage: mautool --list | --driver <id> --out <dir> | --verify-file --driver <id> --sha1 <hex> --out <dir> | --verify-manifests'); Halt(2); end;
+  else if mode = 'verifyruntime' then
+  begin
+    if (plat = '') or (sha = '') then Fail('--verify-runtime needs --platform <p> --sha256 <hex> [--out <dir>]');
+    CmdVerifyRuntime(rcfg, plat, outd, sha);
+  end
+  else begin WriteLn('usage: mautool --list | --driver <id> --out <dir> | --verify-file --driver <id> --sha1 <hex> --out <dir> | --verify-runtime --platform <p> --sha256 <hex> --out <dir> | --verify-manifests'); Halt(2); end;
 end.
