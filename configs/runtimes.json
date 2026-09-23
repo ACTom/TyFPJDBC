@@ -3,55 +3,72 @@
     {
       "platform": "win64",
       "temurinVersion": "25.0.4.1",
+      "build": "jlink-trimmed-9-modules",
       "modules": ["java.base", "java.sql", "java.naming", "java.logging", "java.management", "java.xml", "java.security.sasl", "jdk.unsupported", "java.transaction.xa"],
       "jdepsModules": ["java.base", "java.management", "java.naming", "java.sql"],
       "bridgeVersion": "1.0.0",
       "asset": "jre-25-tyfpjdbc-win64.zip",
-      "unpackedBytes": 38655396,
-      "packedBytes": 24996764,
-      "verifiedNote": "Built locally 2026-09-23 from Temurin 25.0.4.1 win64 via scripts/build-jlink.ps1 plus bridge/ and drivers/ layout. Zip smoke-tested (java -version) and live H2 probe passed on the unpacked image.",
+      "packedBytes": 25081242,
+      "unpackedBytes": 38989619,
+      "verifiedNote": "Built 2026-09-24 by jlink from Temurin 25.0.4.1 win64 (same-host link), plus bridge/ (Bridge.class, HikariCP 5.1.0, slf4j-api 2.0.9) and drivers/README. Boots java -version; live H2 probe passed on this layout.",
       "url": "TyFPJDBC-Runtimes Release asset: jre-25-tyfpjdbc-win64.zip",
-      "sha256": "945767d7a671f61974d9bf0b1a628602df5c2ba0ab2fb7b4165ca24aedda1282"
+      "sha256": "ba60b51a6da324a8877860db3b12a0093a1a0a75cdec52112392f9f6ab5e9181"
     },
     {
       "platform": "linux-x64",
-      "temurinVersion": "25",
+      "temurinVersion": "25.0.4.1",
+      "build": "upstream-jre-plus-bridge",
       "modules": ["java.base", "java.sql", "java.naming", "java.logging", "java.management", "java.xml", "java.security.sasl", "jdk.unsupported", "java.transaction.xa"],
+      "moduleSet": "full-jre (superset of modules floor above)",
       "bridgeVersion": "1.0.0",
       "asset": "jre-25-tyfpjdbc-linux-x64.zip",
-      "verifiedNote": "Not built on this machine (no linux runner here). Build via scripts/build-jlink.ps1 on a linux-x64 runner, then replace url/sha256 with the published Release values.",
+      "packedBytes": 63282329,
+      "unpackedBytes": 200101675,
+      "verifiedNote": "Built 2026-09-24 from upstream Temurin 25.0.4.1 linux-x64 JRE (OpenJDK25U-jre_x64_linux_hotspot_25.0.4.1_1.tar.gz) plus bridge/ and drivers/README. Upstream archives ship no jmods, so native-host jlink cross-trim is impossible (proven: ModuleHashes enforcement); full JRE keeps every byte genuine and bootable. Layout verified: ELF launcher, lib/server/libjvm.so, release OS_ARCH=x86_64, no foreign binaries. Trimmed variant remains a native-CI follow-up.",
       "url": "TyFPJDBC-Runtimes Release asset: jre-25-tyfpjdbc-linux-x64.zip",
-      "sha256": "LINUX_X64_SHA256_FROM_RELEASE"
+      "sha256": "604fb8bbef4382893db580bcb382e37eeb3bf1db0252b559d01cdb842989bcad"
     },
     {
       "platform": "linux-arm64",
-      "temurinVersion": "25",
+      "temurinVersion": "25.0.4.1",
+      "build": "upstream-jre-plus-bridge",
       "modules": ["java.base", "java.sql", "java.naming", "java.logging", "java.management", "java.xml", "java.security.sasl", "jdk.unsupported", "java.transaction.xa"],
+      "moduleSet": "full-jre (superset of modules floor above)",
       "bridgeVersion": "1.0.0",
       "asset": "jre-25-tyfpjdbc-linux-arm64.zip",
-      "verifiedNote": "Not built on this machine (no linux runner here). Build via scripts/build-jlink.ps1 on a linux-arm64 runner, then replace url/sha256 with the published Release values.",
+      "packedBytes": 62034383,
+      "unpackedBytes": 198745715,
+      "verifiedNote": "Built 2026-09-24 from upstream Temurin 25.0.4.1 linux-aarch64 JRE plus bridge/ and drivers/README. Same no-jmods rationale as linux-x64. Layout verified: ELF launcher, lib/server/libjvm.so, release OS_ARCH=aarch64, no foreign binaries.",
       "url": "TyFPJDBC-Runtimes Release asset: jre-25-tyfpjdbc-linux-arm64.zip",
-      "sha256": "LINUX_ARM64_SHA256_FROM_RELEASE"
+      "sha256": "8d3e572d6191e4be00a2266dc5ae545d75ead7d59bbcbc4f309a7f9586e69fda"
     },
     {
       "platform": "macos-x64",
-      "temurinVersion": "25",
+      "temurinVersion": "25.0.4.1",
+      "build": "upstream-jre-plus-bridge",
       "modules": ["java.base", "java.sql", "java.naming", "java.logging", "java.management", "java.xml", "java.security.sasl", "jdk.unsupported", "java.transaction.xa"],
+      "moduleSet": "full-jre (superset of modules floor above)",
       "bridgeVersion": "1.0.0",
       "asset": "jre-25-tyfpjdbc-macos-x64.zip",
-      "verifiedNote": "Not built on this machine (no macos runner here). Build via scripts/build-jlink.ps1 on a macos-x64 runner, then replace url/sha256 with the published Release values.",
+      "packedBytes": 43371493,
+      "unpackedBytes": 132203610,
+      "verifiedNote": "Built 2026-09-24 from upstream Temurin 25.0.4.1 mac-x64 JRE (Contents/Home flattened to top level) plus bridge/ and drivers/README. Layout verified: Mach-O launcher, lib/server/libjvm.dylib, release OS_ARCH=x86_64, no foreign binaries.",
       "url": "TyFPJDBC-Runtimes Release asset: jre-25-tyfpjdbc-macos-x64.zip",
-      "sha256": "MACOS_X64_SHA256_FROM_RELEASE"
+      "sha256": "c130bb0ac1fe3e804be3a1e9ecac525c920fe61fcaddefb5b49c7ab04a828486"
     },
     {
       "platform": "macos-arm64",
-      "temurinVersion": "25",
+      "temurinVersion": "25.0.4.1",
+      "build": "upstream-jre-plus-bridge",
       "modules": ["java.base", "java.sql", "java.naming", "java.logging", "java.management", "java.xml", "java.security.sasl", "jdk.unsupported", "java.transaction.xa"],
+      "moduleSet": "full-jre (superset of modules floor above)",
       "bridgeVersion": "1.0.0",
       "asset": "jre-25-tyfpjdbc-macos-arm64.zip",
-      "verifiedNote": "Not built on this machine (no macos runner here). Build via scripts/build-jlink.ps1 on a macos-arm64 runner, then replace url/sha256 with the published Release values.",
+      "packedBytes": 57713953,
+      "unpackedBytes": 189700983,
+      "verifiedNote": "Built 2026-09-24 from upstream Temurin 25.0.4.1 mac-aarch64 JRE (Contents/Home flattened) plus bridge/ and drivers/README. Layout verified: Mach-O launcher, lib/server/libjvm.dylib, release OS_ARCH=aarch64, no foreign binaries.",
       "url": "TyFPJDBC-Runtimes Release asset: jre-25-tyfpjdbc-macos-arm64.zip",
-      "sha256": "MACOS_ARM64_SHA256_FROM_RELEASE"
+      "sha256": "f75804934b1f4bcd3894f62bdf9c708fa5c9b5fa2434999254bdc313d2809119"
     }
   ]
 }
