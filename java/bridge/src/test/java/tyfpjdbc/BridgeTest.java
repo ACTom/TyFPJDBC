@@ -30,6 +30,33 @@ public class BridgeTest {
     b.destroyPool(pool);
   }
 
+  @Test public void batchedFetchPagesLargeResult() throws Exception {
+    Bridge b = new Bridge();
+    long pool = b.createPool("jdbc:h2:mem:pg" + System.nanoTime() + ";DB_CLOSE_DELAY=-1", "sa", "", 2, 1);
+    long c = b.borrowConnection(pool);
+    b.execUpdate(c, "CREATE TABLE big(id INT PRIMARY KEY, name VARCHAR(100))");
+    for (int i = 1; i <= 2500; i++) {
+      b.execUpdate(c, "INSERT INTO big VALUES(" + i + ",'row-" + i + "')");
+    }
+    int off = 0, total = 0, maxPage = 0, pages = 0, nonEmpty = 0;
+    while (true) {
+      String[][] page = b.fetchBatch(c, "SELECT id,name FROM big ORDER BY id", off, 1000, 1000);
+      if (page.length > maxPage) maxPage = page.length;
+      total += page.length;
+      off += page.length;
+      pages++;
+      if (page.length == 0) break;
+      nonEmpty++;
+      assertEquals(String.valueOf(off - page.length + 1), page[0][0]);
+    }
+    assertEquals(2500, total);
+    assertTrue(maxPage <= 1000, "pages must be bounded, max=" + maxPage);
+    assertEquals(3, nonEmpty);
+    assertEquals(4, pages);
+    b.releaseConnection(c);
+    b.destroyPool(pool);
+  }
+
   @Test public void concurrentBorrowDistinct() throws Exception {
     Bridge b = new Bridge();
     long pool = b.createPool("jdbc:h2:mem:cc" + System.nanoTime() + ";DB_CLOSE_DELAY=-1", "sa", "", 4, 1);
