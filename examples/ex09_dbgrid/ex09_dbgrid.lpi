@@ -44,7 +44,7 @@
   <CompilerOptions>
     <Version Value="11"/>
     <SearchPaths>
-      <OtherUnitFiles Value="D:\Projects\TyFPJDBC\src\core;D:\Projects\TyFPJDBC\src\db"/>
+      <OtherUnitFiles Value="D:\Projects\TyFPJDBC\src\core;D:\Projects\TyFPJDBC\src\db;."/>
       <UnitOutputDirectory Value="..\..\test-results\bin\ex09"/>
     </SearchPaths>
     <Linking>

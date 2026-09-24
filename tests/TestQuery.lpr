@@ -1,5 +1,6 @@
 program TestQuery;
 {$mode objfpc}{$H+}
+{$codepage UTF8}
 uses
   SysUtils, Classes, DB, TyFPJDBC.Options, TyFPJDBC.Query,
   TyFPJDBC.Mock.Engine, TyFPJDBC.StoredProc, TyFPJDBC.Script,
@@ -43,7 +44,7 @@ begin
         Ok('small-count', q.RecordCount = 3);
         q.First;
         q.Next;
-        Ok('chinese-verbatim', q.Fields[1].AsString = '中文测试');
+        Ok('chinese-verbatim', q.FieldToUTF8(q.Fields[1]) = UTF8String('中文测试'));
       finally
         rows.Free;
       end;

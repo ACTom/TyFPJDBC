@@ -1,5 +1,6 @@
 unit TyFPJDBC.Mock.Engine;
 {$mode objfpc}{$H+}
+{$codepage UTF8}
 interface
 uses
   SysUtils, Classes;

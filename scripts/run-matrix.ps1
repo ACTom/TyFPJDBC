@@ -26,14 +26,31 @@ fpc "-o$bin\mautool.exe" "$ws\src\tools\mautool.lpr" 2>&1
 Check "mautool-compile" ($LASTEXITCODE -eq 0)
 $mautool = Join-Path $bin "mautool.exe"
 
+Section "bridge-classes-first"
+# Live FPC tests drive real JNI into tyfpjdbc.Bridge, so the classes must
+# exist before the fpc-tests section runs. The java section reuses $jm.
+$jm = Join-Path $work "jmain"
+New-Item -ItemType Directory -Force -Path $jm | Out-Null
+$cp0 = "$libs\HikariCP-5.1.0.jar;$libs\slf4j-api-2.0.9.jar;$libs\h2-2.2.224.jar;$libs\sqlite-jdbc-3.46.1.0.jar"
+& "$jh\bin\javac.exe" -encoding UTF-8 -cp $cp0 -d $jm "$ws\java\bridge\src\main\java\tyfpjdbc\Bridge.java" 2>&1
+Check "javac-main-first" ($LASTEXITCODE -eq 0)
+
 Section "fpc-tests-compile-run"
-foreach ($t in @("TestParser","TestTypeMap","TestQuery","TestBridge","TestPoolDataset","TestRealWorld")) {
+foreach ($t in @("TestParser","TestTypeMap","TestQuery","TestBridge","TestPoolDataset","TestRealWorld","TestLiveBridge","TestLiveGrid")) {
   Write-Output ("--- " + $t + " ---")
   $exe = Join-Path $bin ($t.ToLower() + ".exe")
   $lpr = Join-Path $ws ("tests\" + $t + ".lpr")
-  fpc "-Fu$ws\src\core" "-Fu$ws\src\db" "-o$exe" $lpr 2>&1
+  $extraFu = @()
+  if ($t -eq "TestLiveGrid") { $extraFu = @("-Fu$ws\examples\ex09_dbgrid") }
+  fpc "-Fu$ws\src\core" "-Fu$ws\src\db" @extraFu "-o$exe" $lpr 2>&1
   Check "$t-compile" ($LASTEXITCODE -eq 0)
-  $out = & $exe 2>&1 | Out-String
+  if (($t -eq "TestLiveBridge") -or ($t -eq "TestLiveGrid")) {
+    $liveOut = Join-Path $work ($t.ToLower() + ".dbdir")
+    New-Item -ItemType Directory -Force -Path $liveOut | Out-Null
+    $out = & $exe $jm $liveOut 2>&1 | Out-String
+  } else {
+    $out = & $exe 2>&1 | Out-String
+  }
   Write-Output $out
   if ($t -eq "TestParser") { Check "$t-37-0" ($out -match "TOTAL pass=37 fail=0") }
   if ($t -eq "TestTypeMap") { Check "$t-50-0" ($out -match "TOTAL pass=50 fail=0") }
@@ -41,12 +58,16 @@ foreach ($t in @("TestParser","TestTypeMap","TestQuery","TestBridge","TestPoolDa
   if ($t -eq "TestBridge") { Check "$t-fails-0" ($out -match "fails=0") }
   if ($t -eq "TestQuery") { Check "$t-fails-0" ($out -match "fails=0") }
   if ($t -eq "TestPoolDataset") { Check "$t-fails-0" ($out -match "fails=0") }
+  if ($t -eq "TestLiveBridge") { Check "$t-fails-0" ($out -match "fails=0") }
+  if ($t -eq "TestLiveGrid") { Check "$t-fails-0" ($out -match "fails=0") }
+  if ($t -eq "TestLiveBridge") { Check "$t-bulk" ($out -match "PERF live-bulk-10k") }
+  if ($t -eq "TestLiveBridge") { Check "$t-cancel" (($out -match "cancel-raised") -and ($out -match "timeout-raised")) }
+  if ($t -eq "TestLiveGrid") { Check "$t-reread" (($out -match "grid-reread") -and ($out -match "grid-edit")) }
   if ($t -eq "TestQuery") { Check "$t-perf" (($out -match "PERF 10k") -and ($out -match "perf-100k-bounded")) }
   if ($out -cmatch "FAIL") { Check "$t-no-fail-lines" $false } else { Check "$t-no-fail-lines" $true }
 }
 
-Section "java-bridge-14-tests"
-$jm = Join-Path $work "jmain"
+Section "java-bridge-18-tests"
 $jt = Join-Path $work "jtest"
 New-Item -ItemType Directory -Force -Path $jm,$jt | Out-Null
 $cp = "$libs\HikariCP-5.1.0.jar;$libs\slf4j-api-2.0.9.jar;$libs\h2-2.2.224.jar;$libs\sqlite-jdbc-3.46.1.0.jar"
@@ -74,6 +95,21 @@ Check "java-tx-present" ($jout -match "complexTransactionPartialRollback")
 Check "java-ddl-present" ($jout -match "ddlMigrateAddColumnAndIndex")
 Check "java-hostile-present" ($jout -match "hostileValuesStayData")
 
+Section "perf-tiers-shipped-live-path"
+# Tiers on the SHIPPED live path (Pascal -> JNI -> Bridge -> sqlite file DB).
+# 10k/100k run in-matrix; the 1M tier is covered by the 3x scratch perf.log
+# runs (acceptance evidence) because a single 1M scan already takes ~2min.
+$tiersExe = Join-Path $bin "testperftiers.exe"
+fpc "-Fu$ws\src\core" "-Fu$ws\src\db" "-o$tiersExe" "$ws\tests\TestPerfTiers.lpr" 2>&1
+Check "perf-tiers-compile" ($LASTEXITCODE -eq 0)
+$tout = & $tiersExe $jm (Join-Path $work "tiers") 1 skip1M 2>&1 | Out-String
+Write-Output $tout
+Check "perf-tiers-pass" ($tout -match "fails=0")
+Check "perf-tier-10k" ($tout -match "PERF tier=10000 insert")
+Check "perf-tier-100k" ($tout -match "PERF tier=100000 insert")
+Check "perf-tier-checksum" (($tout -match "checksum=500000") -and ($tout -match "checksum=5000000"))
+Check "perf-tier-heap" ($tout -match "heap-used=")
+
 Section "perf-compare-sqlite-vs-bridge-20k"
 # Same workload, same 20k rows, separate file DBs. Pool/connect + warmup run
 # BEFORE the timers on both sides, so JVM/Hikari startup is never counted.
@@ -98,13 +134,25 @@ Write-Output ("PERF-TABLE update-10k | " + $fu + " | " + $bu)
 Check "perf-table-complete" (($fi -ge 0) -and ($fs -ge 0) -and ($fp -ge 0) -and ($fu -ge 0) -and ($bi -ge 0) -and ($bs -ge 0) -and ($bp -ge 0) -and ($bu -ge 0))
 
 Section "examples-compile-run"
-foreach ($e in @("ex01_connect_select","ex02_named_params","ex03_batch_fetch","ex04_edit_apply","ex05_transaction","ex06_blob_stream","ex07_script_migrate","ex08_pool_stats")) {
+foreach ($e in @("ex01_connect_select","ex02_named_params","ex03_batch_fetch","ex04_edit_apply","ex05_transaction","ex06_blob_stream","ex07_script_migrate","ex08_pool_stats","ex10_json_config")) {
   $exe = Join-Path $bin ($e + ".exe")
-  fpc "-Fu$ws\src\core" "-Fu$ws\src\db" "-o$exe" (Join-Path $ws ("examples\" + $e + ".lpr")) 2>&1
+  if ($e -eq "ex10_json_config") {
+    fpc "-o$exe" (Join-Path $ws ("examples\" + $e + ".lpr")) 2>&1
+  } else {
+    fpc "-Fu$ws\src\core" "-Fu$ws\src\db" "-o$exe" (Join-Path $ws ("examples\" + $e + ".lpr")) 2>&1
+  }
   Check "$e-compile" ($LASTEXITCODE -eq 0)
-  $o = & $exe 2>&1 | Out-String
+  if ($e -eq "ex10_json_config") {
+    $o = & $exe "$ws\configs" 2>&1 | Out-String
+  } else {
+    $o = & $exe 2>&1 | Out-String
+  }
   Write-Output $o
-  Check "$e-run" ($o -match ($e.Substring(0,4) + " ok"))
+  if ($e -eq "ex10_json_config") {
+    Check "$e-run" (($o -match "PASS json-reuse") -and ($o -match "ex10 ok"))
+  } else {
+    Check "$e-run" ($o -match ($e.Substring(0,4) + " ok"))
+  }
 }
 $jd = Join-Path $work "jdemo"
 New-Item -ItemType Directory -Force -Path $jd | Out-Null

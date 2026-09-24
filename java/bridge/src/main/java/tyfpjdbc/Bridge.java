@@ -151,6 +151,83 @@ public class Bridge {
     if (s != null) s.cancel();
   }
 
+  // ---- transactions (explicit, observable on the real DB) ----
+  public void setAutoCommit(long connId, boolean auto) throws SQLException {
+    Connection c = conns.get(connId);
+    if (c == null) throw new SQLException("no conn", "08000", 32);
+    c.setAutoCommit(auto);
+  }
+
+  public void commit(long connId) throws SQLException {
+    Connection c = conns.get(connId);
+    if (c == null) throw new SQLException("no conn", "08000", 32);
+    c.commit();
+  }
+
+  public void rollback(long connId) throws SQLException {
+    Connection c = conns.get(connId);
+    if (c == null) throw new SQLException("no conn", "08000", 32);
+    c.rollback();
+  }
+
+  // Named SQL savepoints (portable across H2/SQLite/PG).
+  public void savepoint(long connId, String name) throws SQLException {
+    execUpdate(connId, "SAVEPOINT " + name);
+  }
+
+  public void rollbackToSavepoint(long connId, String name) throws SQLException {
+    execUpdate(connId, "ROLLBACK TO SAVEPOINT " + name);
+  }
+
+  public void releaseSavepoint(long connId, String name) throws SQLException {
+    execUpdate(connId, "RELEASE SAVEPOINT " + name);
+  }
+
+  // ---- BLOB bytes (single-? statements; binary-safe, stream-free V1) ----
+  public int writeBlob(long connId, String sql, byte[] data) throws SQLException {
+    Connection c = conns.get(connId);
+    if (c == null) throw new SQLException("no conn", "08000", 32);
+    try (PreparedStatement ps = c.prepareStatement(sql)) {
+      stmts.put(connId, ps);
+      try {
+        ps.setBytes(1, data);
+        return ps.executeUpdate();
+      } finally {
+        stmts.remove(connId);
+      }
+    } catch (SQLException e) {
+      recordChain(e);
+      throw e;
+    }
+  }
+
+  public byte[] fetchBlob(long connId, String sql) throws SQLException {
+    Connection c = conns.get(connId);
+    if (c == null) throw new SQLException("no conn", "08000", 32);
+    try (Statement s = c.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)) {
+      stmts.put(connId, s);
+      try (ResultSet rs = s.executeQuery(sql)) {
+        if (!rs.next()) return null;
+        return rs.getBytes(1);
+      } finally {
+        stmts.remove(connId);
+      }
+    } catch (SQLException e) {
+      recordChain(e);
+      throw e;
+    }
+  }
+
+  public long heapUsedBytes() {
+    return java.lang.management.ManagementFactory.getMemoryMXBean()
+      .getHeapMemoryUsage().getUsed();
+  }
+
+  public long heapMaxBytes() {
+    return java.lang.management.ManagementFactory.getMemoryMXBean()
+      .getHeapMemoryUsage().getMax();
+  }
+
   public String poolStats(long poolId) {
     HikariDataSource ds = pools.get(poolId);
     if (ds == null) return "active=0 idle=0 wait=0";

@@ -14,7 +14,8 @@ Java 示例用 `javac -cp <bridge jars>` 编译。
 | BLOB 流式 | `ex06_blob_stream.lpr` | `NeedStream` + `TMemoryStream` |
 | 多语句迁移脚本切分 | `ex07_script_migrate.lpr` | `TJDBCScript.Split` |
 | 池监控 + 慢查询回调 | `ex08_pool_stats.lpr` | `OnPoolStats/OnSlowQuery` |
-| 图形化 DBGrid/DBEdit/DBNavigator | `ex09_dbgrid/` | `lazbuild` 工程，界面全画在 `unit1.lfm`，`TJDBCQuery` 直绑 `TDataSource` |
+| 图形化 DBGrid/DBEdit/DBNavigator | `ex09_dbgrid/` | `lazbuild` 工程，界面全画在 `unit1.lfm`，`TJDBCQuery` 直绑 `TDataSource`；`GridData.TryLoadLive` 走真实 JNI+sqlite 文件库取数（`TestLiveGrid` 无头覆盖），JVM 不可用时回退内置行 |
+| 配置复用只读演示 | `ex10_json_config.lpr` | 读同一份 `configs/drivers.json` + `configs/runtimes.json`，列出驱动/运行时并解析 sqlite 条目到本地 jar |
 | Java 桥端到端 | `BridgeDemo.java` | `Bridge` 经 H2 跑通读写 |
 
 ```powershell

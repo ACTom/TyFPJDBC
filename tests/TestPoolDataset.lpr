@@ -1,5 +1,6 @@
 program TestPoolDataset;
 {$mode objfpc}{$H+}
+{$codepage UTF8}
 uses
   SysUtils, Classes, TyFPJDBC.Connection, TyFPJDBC.Statement,
   TyFPJDBC.Hikari.Pool, TyFPJDBC.Options, TyFPJDBC.Query, TyFPJDBC.Mock.Engine;
@@ -96,7 +97,7 @@ begin
         q.LoadRowsBuffered(['id', 'name'], ['INTEGER', 'NVARCHAR'], rows);
         Ok('small-full', (tot = 3) and (q.RecordCount = 3));
         q.First; q.Next;
-        Ok('small-chinese', q.Fields[1].AsString = '中文测试');
+        Ok('small-chinese', q.FieldToUTF8(q.Fields[1]) = UTF8String('中文测试'));
       finally
         rows.Free;
       end;

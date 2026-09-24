@@ -1,17 +1,21 @@
 unit Unit1;
 
 {$mode objfpc}{$H+}
+{$codepage UTF8}
 
 { ex09: DBGrid + DBEdit + DBNavigator bound to TJDBCQuery.
   All visual layout lives in unit1.lfm (drawn form, no code-built UI).
-  Data is loaded via LoadRowsBuffered; edit/append goes through
-  CachedUpdates + ApplyUpdates with generated-keys回取. }
+  FormCreate loads REAL rows via GridData.TryLoadLive (Pascal -> JNI ->
+  Bridge -> sqlite file DB); if the JVM/jars are unavailable it falls
+  back to bundled rows and says so in the status line. Edit/append goes
+  through CachedUpdates + ApplyUpdates; on the live path ApplyUpdates
+  writes to the same real table. }
 
 interface
 
 uses
   Classes, SysUtils, Forms, Controls, Graphics, Dialogs, DBGrids, DBCtrls,
-  StdCtrls, DB, TyFPJDBC.Query, TyFPJDBC.Options;
+  StdCtrls, DB, TyFPJDBC.Query, TyFPJDBC.Options, GridData;
 
 type
   TForm1 = class(TForm)
@@ -25,9 +29,15 @@ type
     ApplyBtn: TButton;
     StatusLabel: TLabel;
     procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
     procedure AddBtnClick(Sender: TObject);
     procedure ApplyBtnClick(Sender: TObject);
     procedure RefreshStatus;
+  private
+    FLive: TObject;
+    FPool: Int64;
+    FConn: Int64;
+    FLiveNote: string;
   end;
 
 var
@@ -37,29 +47,49 @@ implementation
 
 {$R *.lfm}
 
+function ClassesDir: string;
+begin
+  Result := GetEnvironmentVariable('TYFPJDBC_CLASSES');
+  if Result = '' then
+    Result := ExtractFilePath(ParamStr(0)) + '..' + PathDelim + 'jmain';
+end;
+
 procedure TForm1.FormCreate(Sender: TObject);
 var
   rows: TStringList;
 begin
-  rows := TStringList.Create;
-  try
-    rows.Add('1|hello');
-    rows.Add('2|中文测试');
-    rows.Add('3|jdbc-bridge');
-    Q.LoadRowsBuffered(['id', 'name'], ['INTEGER', 'NVARCHAR'], rows);
-    Q.CachedUpdates := True;
-    Q.UpdateOptions.ReadOnly := False;
-    Q.UpdateOptions.AutoIncField := 'id';
-  finally
-    rows.Free;
+  FLive := nil;
+  FPool := 0;
+  FConn := 0;
+  if TryLoadLive(Q, ClassesDir, GetTempDir(False), FLive, FPool, FConn,
+    FLiveNote) then
+    StatusLabel.Caption := 'live OK; ' + FLiveNote
+  else
+  begin
+    rows := GridSeedRows;
+    try
+      Q.LoadRowsBuffered(['id', 'name'], ['INTEGER', 'NVARCHAR'], rows);
+      Q.CachedUpdates := True;
+      Q.UpdateOptions.ReadOnly := False;
+      Q.UpdateOptions.AutoIncField := 'id';
+    finally
+      rows.Free;
+    end;
+    StatusLabel.Caption := 'fallback rows; ' + FLiveNote;
   end;
   RefreshStatus;
+end;
+
+procedure TForm1.FormDestroy(Sender: TObject);
+begin
+  FreeLive(FLive, FPool);
+  FLive := nil;
 end;
 
 procedure TForm1.AddBtnClick(Sender: TObject);
 begin
   Q.Append;
-  Q.Fields[1].AsString := '新增-中文测试';
+  Q.FieldFromUTF8(Q.Fields[1], UTF8String('新增-中文测试'));
   Q.Post;
   RefreshStatus;
 end;
@@ -73,8 +103,8 @@ end;
 
 procedure TForm1.RefreshStatus;
 begin
-  StatusLabel.Caption := '共 ' + IntToStr(Q.RecordCount) + ' 行 待提交=' +
-    IntToStr(Q.PendingInserts);
+  StatusLabel.Caption := StatusLabel.Caption + ' | 共 ' +
+    IntToStr(Q.RecordCount) + ' 行 待提交=' + IntToStr(Q.PendingInserts);
 end;
 
 end.
