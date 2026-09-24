@@ -56,12 +56,9 @@ begin
     if inStr then
     begin
       outp := outp + ch;
-      if (q = '''') and (ch = '\') and (i < n) then
-      begin
-        outp := outp + SQL[i + 1];
-        Inc(i, 2);
-        Continue;
-      end;
+      { Standard SQL strings end only on a lone quote ('' doubles).
+        Backslash is a literal char here (ESCAPE '\' must not swallow
+        the closing quote); E'' escapes are out of scope for V1. }
       if ch = q then
       begin
         if (i < n) and (SQL[i + 1] = q) then

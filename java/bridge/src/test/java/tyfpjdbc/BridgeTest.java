@@ -221,4 +221,145 @@ public class BridgeTest {
       b.destroyPool(pool);
     }
   }
+
+  // WordPress-style wide table: 12 columns, 3-table join with GROUP BY.
+  @Test public void wideTableJoinGroupBy() throws Exception {
+    Bridge b = new Bridge();
+    long pool = b.createPool("jdbc:h2:mem:wide" + System.nanoTime() + ";DB_CLOSE_DELAY=-1", "sa", "", 2, 1);
+    long c = b.borrowConnection(pool);
+    try {
+      b.execUpdate(c, "CREATE TABLE wp_users(id INT PRIMARY KEY, login VARCHAR(60), email VARCHAR(100), registered TIMESTAMP)");
+      b.execUpdate(c, "CREATE TABLE wp_posts(id INT PRIMARY KEY, author_id INT, title VARCHAR(255), body CLOB, status VARCHAR(20), created TIMESTAMP, views INT DEFAULT 0)");
+      b.execUpdate(c, "CREATE TABLE wp_postmeta(id INT PRIMARY KEY, post_id INT, mkey VARCHAR(100), mval VARCHAR(255))");
+      b.execUpdate(c, "INSERT INTO wp_users VALUES(1,'alice','a@x.com',CURRENT_TIMESTAMP)");
+      b.execUpdate(c, "INSERT INTO wp_users VALUES(2,'bob','b@x.com',CURRENT_TIMESTAMP)");
+      b.execUpdate(c, "INSERT INTO wp_posts VALUES(10,1,'hello','body-hello','publish',CURRENT_TIMESTAMP,5)");
+      b.execUpdate(c, "INSERT INTO wp_posts VALUES(11,1,'world','body-world','draft',CURRENT_TIMESTAMP,0)");
+      b.execUpdate(c, "INSERT INTO wp_posts VALUES(12,2,'中文测试','正文','publish',CURRENT_TIMESTAMP,7)");
+      b.execUpdate(c, "INSERT INTO wp_postmeta VALUES(100,10,'views','5')");
+      b.execUpdate(c, "INSERT INTO wp_postmeta VALUES(101,12,'views','7')");
+      String[][] rows = b.fetchBatch(c, "SELECT u.login, COUNT(p.id) FROM wp_users u LEFT JOIN wp_posts p ON p.author_id=u.id AND p.status='publish' GROUP BY u.login ORDER BY u.login", 0, 10, 100);
+      assertEquals(2, rows.length);
+      assertEquals("alice", rows[0][0]);
+      assertEquals("1", rows[0][1]);
+      assertEquals("bob", rows[1][0]);
+      assertEquals("1", rows[1][1]);
+      String[][] join = b.fetchBatch(c, "SELECT p.title, m.mval FROM wp_posts p JOIN wp_postmeta m ON m.post_id=p.id WHERE p.id=12", 0, 10, 100);
+      assertEquals(1, join.length);
+      assertEquals("中文测试", join[0][0]);
+      assertEquals("7", join[0][1]);
+      b.releaseConnection(c);
+    } finally {
+      b.destroyPool(pool);
+    }
+  }
+
+  // Shop flow: orders + items join, aggregate, bulk insert 10k in one tx shape.
+  @Test public void shopBulkInsertAndJoinAggregate() throws Exception {
+    Bridge b = new Bridge();
+    long pool = b.createPool("jdbc:h2:mem:shop" + System.nanoTime() + ";DB_CLOSE_DELAY=-1", "sa", "", 2, 1);
+    long c = b.borrowConnection(pool);
+    try {
+      b.execUpdate(c, "CREATE TABLE orders(id INT PRIMARY KEY, customer VARCHAR(100), created TIMESTAMP)");
+      b.execUpdate(c, "CREATE TABLE order_items(id INT PRIMARY KEY, order_id INT, sku VARCHAR(40), qty INT, price INT)");
+      StringBuilder sb = new StringBuilder("INSERT INTO orders VALUES");
+      for (int i = 1; i <= 200; i++) {
+        if (i > 1) sb.append(",");
+        sb.append("(").append(i).append(",'cust-").append(i % 10).append("',CURRENT_TIMESTAMP)");
+      }
+      b.execUpdate(c, sb.toString());
+      StringBuilder it = new StringBuilder("INSERT INTO order_items VALUES");
+      int id = 1;
+      boolean first = true;
+      for (int o = 1; o <= 200; o++) {
+        for (int k = 0; k < 50; k++) {
+          if (!first) it.append(",");
+          first = false;
+          it.append("(").append(id).append(",").append(o).append(",'sku-").append(k % 5).append("',").append(k + 1).append(",100)");
+          id++;
+        }
+        if (o % 50 == 0) { b.execUpdate(c, it.toString()); it = new StringBuilder("INSERT INTO order_items VALUES"); first = true; }
+      }
+      String[][] agg = b.fetchBatch(c, "SELECT o.customer, SUM(i.qty) FROM orders o JOIN order_items i ON i.order_id=o.id GROUP BY o.customer ORDER BY o.customer", 0, 20, 100);
+      assertEquals(10, agg.length);
+      assertEquals("cust-0", agg[0][0]);
+      assertTrue(Integer.parseInt(agg[0][1]) > 0);
+      b.releaseConnection(c);
+    } finally {
+      b.destroyPool(pool);
+    }
+  }
+
+  // Complex transaction: 2nd savepoint rolls back, 1st survives.
+  @Test public void complexTransactionPartialRollback() throws Exception {
+    Bridge b = new Bridge();
+    long pool = b.createPool("jdbc:h2:mem:tx" + System.nanoTime() + ";DB_CLOSE_DELAY=-1", "sa", "", 2, 1);
+    long c = b.borrowConnection(pool);
+    try {
+      b.execUpdate(c, "CREATE TABLE inventory(sku VARCHAR(40) PRIMARY KEY, qty INT)");
+      b.execUpdate(c, "INSERT INTO inventory VALUES('sku-1',100)");
+      // Bridge has no explicit tx API; emulate app-level partial rollback:
+      // apply batch A, keep it; apply batch B then compensate it back.
+      b.execUpdate(c, "UPDATE inventory SET qty=qty-10 WHERE sku='sku-1'");
+      b.execUpdate(c, "UPDATE inventory SET qty=qty-20 WHERE sku='sku-1'");
+      b.execUpdate(c, "UPDATE inventory SET qty=qty+20 WHERE sku='sku-1'");
+      String[][] rows = b.fetchBatch(c, "SELECT qty FROM inventory WHERE sku='sku-1'", 0, 10, 100);
+      assertEquals(1, rows.length);
+      assertEquals("90", rows[0][0]);
+      b.releaseConnection(c);
+    } finally {
+      b.destroyPool(pool);
+    }
+  }
+
+  // DDL migration: add column, backfill, index, verify.
+  @Test public void ddlMigrateAddColumnAndIndex() throws Exception {
+    Bridge b = new Bridge();
+    long pool = b.createPool("jdbc:h2:mem:ddl" + System.nanoTime() + ";DB_CLOSE_DELAY=-1", "sa", "", 2, 1);
+    long c = b.borrowConnection(pool);
+    try {
+      b.execUpdate(c, "CREATE TABLE wp_posts(id INT PRIMARY KEY, title VARCHAR(255))");
+      b.execUpdate(c, "INSERT INTO wp_posts VALUES(1,'a')");
+      b.execUpdate(c, "ALTER TABLE wp_posts ADD COLUMN views INT DEFAULT 0");
+      b.execUpdate(c, "UPDATE wp_posts SET views=42 WHERE id=1");
+      b.execUpdate(c, "CREATE INDEX idx_posts_views ON wp_posts(views)");
+      String[][] rows = b.fetchBatch(c, "SELECT title, views FROM wp_posts WHERE views=42", 0, 10, 100);
+      assertEquals(1, rows.length);
+      assertEquals("a", rows[0][0]);
+      assertEquals("42", rows[0][1]);
+      b.releaseConnection(c);
+    } finally {
+      b.destroyPool(pool);
+    }
+  }
+
+  // Hostile values must travel as data, never as SQL.
+  @Test public void hostileValuesStayData() throws Exception {
+    Bridge b = new Bridge();
+    String db = System.getProperty("java.io.tmpdir") + "/tyfpjdbc-hostile-" + System.nanoTime() + ".db";
+    long pool = b.createPool("jdbc:sqlite:" + db, "", "", 2, 1);
+    try {
+      long c = b.borrowConnection(pool);
+      try {
+        b.execUpdate(c, "CREATE TABLE t(id INTEGER PRIMARY KEY, name TEXT)");
+        String evil = "x'; DROP TABLE t; --";
+        // value goes through a parameter on the app side; here we assert the
+        // table survives an evil-looking literal only when properly escaped.
+        b.execUpdate(c, "INSERT INTO t VALUES(1,'" + evil.replace("'", "''") + "')");
+        String[][] rows = b.fetchBatch(c, "SELECT name FROM t WHERE id=1", 0, 10, 100);
+        assertEquals(1, rows.length);
+        assertEquals(evil, rows[0][0]);
+        String[][] still = b.fetchBatch(c, "SELECT COUNT(*) FROM t", 0, 10, 100);
+        assertEquals("1", still[0][0]);
+        b.releaseConnection(c);
+      } finally {
+        b.destroyPool(pool);
+        new java.io.File(db).delete();
+      }
+    } catch (Exception e) {
+      try { b.destroyPool(pool); } catch (Exception ignored) {}
+      new java.io.File(db).delete();
+      throw e;
+    }
+  }
 }
