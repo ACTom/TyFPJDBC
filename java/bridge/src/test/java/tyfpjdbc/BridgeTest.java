@@ -362,4 +362,98 @@ public class BridgeTest {
       throw e;
     }
   }
+
+  // True batch DML: 2500 rows via one PreparedStatement, NULL survives.
+  @Test public void execBatchBulkInsert() throws Exception {
+    Bridge b = new Bridge();
+    long pool = b.createPool("jdbc:h2:mem:batch" + System.nanoTime() + ";DB_CLOSE_DELAY=-1", "sa", "", 2, 1);
+    long c = b.borrowConnection(pool);
+    try {
+      b.execUpdate(c, "CREATE TABLE t(id INT PRIMARY KEY, name VARCHAR(100))");
+      String[][] rows = new String[2500][2];
+      for (int i = 0; i < 2500; i++) {
+        rows[i][0] = String.valueOf(i + 1);
+        rows[i][1] = (i == 1250) ? null : "row-" + (i + 1);
+      }
+      int n = b.execBatch(c, "INSERT INTO t VALUES(?,?)", rows);
+      assertEquals(2500, n);
+      String[][] cnt = b.fetchBatch(c, "SELECT COUNT(*) FROM t", 0, 10, 100);
+      assertEquals("2500", cnt[0][0]);
+      String[][] nul = b.fetchBatch(c, "SELECT COUNT(*) FROM t WHERE name IS NULL", 0, 10, 100);
+      assertEquals("1", nul[0][0]);
+      b.releaseConnection(c);
+    } finally {
+      b.destroyPool(pool);
+    }
+  }
+
+  // Odoo-style sales funnel: 4-table join + CASE bucket + GROUP BY + HAVING.
+  @Test public void odooSalesFunnel() throws Exception {    Bridge b = new Bridge();
+    long pool = b.createPool("jdbc:h2:mem:odoo" + System.nanoTime() + ";DB_CLOSE_DELAY=-1", "sa", "", 2, 1);
+    long c = b.borrowConnection(pool);
+    try {
+      b.execUpdate(c, "CREATE TABLE res_partner(id INT PRIMARY KEY, name VARCHAR(100))");
+      b.execUpdate(c, "CREATE TABLE product_product(id INT PRIMARY KEY, default_code VARCHAR(40))");
+      b.execUpdate(c, "CREATE TABLE sale_order(id INT PRIMARY KEY, partner_id INT, state VARCHAR(20), amount_total INT)");
+      b.execUpdate(c, "CREATE TABLE sale_order_line(id INT PRIMARY KEY, order_id INT, product_id INT, price_subtotal INT)");
+      b.execUpdate(c, "INSERT INTO res_partner VALUES(1,'Acme'),(2,'中文客户')");
+      b.execUpdate(c, "INSERT INTO product_product VALUES(10,'SKU-1'),(11,'SKU-2')");
+      b.execUpdate(c, "INSERT INTO sale_order VALUES(100,1,'sale',1500),(101,2,'sale',300),(102,1,'draft',900)");
+      b.execUpdate(c, "INSERT INTO sale_order_line VALUES(1000,100,10,1000),(1001,100,11,500),(1002,101,10,300),(1003,102,11,900)");
+      String[][] rows = b.fetchBatch(c, "SELECT p.default_code, CASE WHEN SUM(l.price_subtotal)>1000 THEN 'VIP' ELSE 'SMB' END AS seg, SUM(l.price_subtotal) AS amt FROM sale_order o JOIN sale_order_line l ON l.order_id=o.id JOIN product_product p ON p.id=l.product_id JOIN res_partner r ON r.id=o.partner_id WHERE o.state='sale' GROUP BY p.default_code HAVING SUM(l.price_subtotal)>400 ORDER BY p.default_code", 0, 10, 100);
+      assertEquals(2, rows.length);
+      assertEquals("SKU-1", rows[0][0]);
+      assertEquals("VIP", rows[0][1]);
+      assertEquals("1300", rows[0][2]);
+      assertEquals("SKU-2", rows[1][0]);
+      assertEquals("SMB", rows[1][1]);
+      assertEquals("500", rows[1][2]);
+      b.releaseConnection(c);
+    } finally {
+      b.destroyPool(pool);
+    }
+  }
+
+  // Odoo MRP BOM explosion: recursive CTE.
+  @Test public void erpRecursiveBom() throws Exception {
+    Bridge b = new Bridge();
+    long pool = b.createPool("jdbc:h2:mem:bom" + System.nanoTime() + ";DB_CLOSE_DELAY=-1", "sa", "", 2, 1);
+    long c = b.borrowConnection(pool);
+    try {
+      b.execUpdate(c, "CREATE TABLE mrp_bom_line(id INT PRIMARY KEY, bom_id INT, product_qty INT)");
+      b.execUpdate(c, "INSERT INTO mrp_bom_line VALUES(1,0,2),(2,0,3),(3,1,4),(4,2,5)");
+      String[][] rows = b.fetchBatch(c, "WITH RECURSIVE bom(id, parent, qty) AS (SELECT id, 0, product_qty FROM mrp_bom_line WHERE bom_id=0 UNION ALL SELECT l.id, b.id, l.product_qty*b.qty FROM mrp_bom_line l JOIN bom b ON b.id=l.bom_id) SELECT COUNT(*), SUM(qty) FROM bom", 0, 10, 100);
+      assertEquals(1, rows.length);
+      assertEquals("4", rows[0][0]);
+      assertEquals("28", rows[0][1]);
+      b.releaseConnection(c);
+    } finally {
+      b.destroyPool(pool);
+    }
+  }
+
+  // Odoo trial balance: UNION ALL + aggregate + ordering.
+  @Test public void erpUnionTrialBalance() throws Exception {
+    Bridge b = new Bridge();
+    long pool = b.createPool("jdbc:h2:mem:ledger" + System.nanoTime() + ";DB_CLOSE_DELAY=-1", "sa", "", 2, 1);
+    long c = b.borrowConnection(pool);
+    try {
+      b.execUpdate(c, "CREATE TABLE account_account(id INT PRIMARY KEY, code VARCHAR(20))");
+      b.execUpdate(c, "CREATE TABLE account_move_line(id INT PRIMARY KEY, account_id INT, debit INT, credit INT)");
+      b.execUpdate(c, "INSERT INTO account_account VALUES(1,'1000'),(2,'2000')");
+      b.execUpdate(c, "INSERT INTO account_move_line VALUES(1,1,500,0),(2,1,300,0),(3,2,0,400),(4,2,0,100)");
+      String[][] rows = b.fetchBatch(c, "SELECT a.code, SUM(l.debit) AS dr, SUM(l.credit) AS cr FROM account_move_line l JOIN account_account a ON a.id=l.account_id GROUP BY a.code UNION ALL SELECT 'TOTAL', SUM(debit), SUM(credit) FROM account_move_line ORDER BY 1", 0, 10, 100);
+      assertEquals(3, rows.length);
+      assertEquals("1000", rows[0][0]);
+      assertEquals("800", rows[0][1]);
+      assertEquals("2000", rows[1][0]);
+      assertEquals("500", rows[1][2]);
+      assertEquals("TOTAL", rows[2][0]);
+      assertEquals("800", rows[2][1]);
+      assertEquals("500", rows[2][2]);
+      b.releaseConnection(c);
+    } finally {
+      b.destroyPool(pool);
+    }
+  }
 }

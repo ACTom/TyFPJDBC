@@ -14,6 +14,7 @@ Java 示例用 `javac -cp <bridge jars>` 编译。
 | BLOB 流式 | `ex06_blob_stream.lpr` | `NeedStream` + `TMemoryStream` |
 | 多语句迁移脚本切分 | `ex07_script_migrate.lpr` | `TJDBCScript.Split` |
 | 池监控 + 慢查询回调 | `ex08_pool_stats.lpr` | `OnPoolStats/OnSlowQuery` |
+| 图形化 DBGrid/DBEdit/DBNavigator | `ex09_dbgrid/` | `lazbuild` 工程，界面全画在 `unit1.lfm`，`TJDBCQuery` 直绑 `TDataSource` |
 | Java 桥端到端 | `BridgeDemo.java` | `Bridge` 经 H2 跑通读写 |
 
 ```powershell
@@ -21,6 +22,9 @@ Java 示例用 `javac -cp <bridge jars>` 编译。
 fpc -Fusrc/core -Fusrc/db -oex01.exe examples/ex01_connect_select.lpr
 Copy-Item C:\Tools\sqlite3.dll . -Force  # 仅 ex01 需要
 .\ex01.exe
+# 图形化示例（LCL 工程）
+lazbuild examples/ex09_dbgrid/ex09_dbgrid.lpi
+.\test-results\bin\ex09\ex09_dbgrid.exe
 # Java
 $cp="C:\Tools\tyfpjdbc-libs\HikariCP-5.1.0.jar;C:\Tools\tyfpjdbc-libs\slf4j-api-2.0.9.jar;C:\Tools\tyfpjdbc-libs\h2-2.2.224.jar"
 & "$jh\bin\javac.exe" -cp $cp -d out examples/BridgeDemo.java java/bridge/src/main/java/tyfpjdbc/Bridge.java

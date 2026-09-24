@@ -37,7 +37,7 @@ foreach ($t in @("TestParser","TestTypeMap","TestQuery","TestBridge","TestPoolDa
   Write-Output $out
   if ($t -eq "TestParser") { Check "$t-37-0" ($out -match "TOTAL pass=37 fail=0") }
   if ($t -eq "TestTypeMap") { Check "$t-50-0" ($out -match "TOTAL pass=50 fail=0") }
-  if ($t -eq "TestRealWorld") { Check "$t-55-0" ($out -match "TOTAL pass=55 fail=0") }
+  if ($t -eq "TestRealWorld") { Check "$t-88-0" ($out -match "TOTAL pass=88 fail=0") }
   if ($t -eq "TestBridge") { Check "$t-fails-0" ($out -match "fails=0") }
   if ($t -eq "TestQuery") { Check "$t-fails-0" ($out -match "fails=0") }
   if ($t -eq "TestPoolDataset") { Check "$t-fails-0" ($out -match "fails=0") }
@@ -58,14 +58,18 @@ Check "javac-test" ($LASTEXITCODE -eq 0)
 $cpRun = "$jm;$jt;$libs\HikariCP-5.1.0.jar;$libs\slf4j-api-2.0.9.jar;$libs\slf4j-simple-2.0.9.jar;$libs\h2-2.2.224.jar;$libs\sqlite-jdbc-3.46.1.0.jar;$libs\junit-platform-console-standalone-1.10.2.jar"
 $jout = & "$jh\bin\java.exe" "-Dfile.encoding=UTF-8" -jar "$libs\junit-platform-console-standalone-1.10.2.jar" --class-path "$cpRun" --select-class tyfpjdbc.BridgeTest 2>&1 | Out-String
 Write-Output $jout
-Check "java-14-found" ($jout -match "14 tests found")
-Check "java-14-ok" ($jout -match "14 tests successful")
+Check "java-18-found" ($jout -match "18 tests found")
+Check "java-18-ok" ($jout -match "18 tests successful")
 Check "java-0-failed" ($jout -match "0 tests failed")
 Check "java-sqlite-present" ($jout -match "sqliteRoundTrip")
 Check "java-pg-present" ($jout -match "postgresDialectRoundTrip")
 Check "java-perf-present" ($jout -match "perfSmoke10kFetch")
 Check "java-wide-present" ($jout -match "wideTableJoinGroupBy")
 Check "java-shop-present" ($jout -match "shopBulkInsertAndJoinAggregate")
+Check "java-batch-present" ($jout -match "execBatchBulkInsert")
+Check "java-odoo-present" ($jout -match "odooSalesFunnel")
+Check "java-bom-present" ($jout -match "erpRecursiveBom")
+Check "java-ledger-present" ($jout -match "erpUnionTrialBalance")
 Check "java-tx-present" ($jout -match "complexTransactionPartialRollback")
 Check "java-ddl-present" ($jout -match "ddlMigrateAddColumnAndIndex")
 Check "java-hostile-present" ($jout -match "hostileValuesStayData")
@@ -109,6 +113,22 @@ Check "bridgedemo-compile" ($LASTEXITCODE -eq 0)
 $dout = & "$jh\bin\java.exe" "-Dfile.encoding=UTF-8" -cp "$jd;$cpRun" tyfpjdbc.BridgeDemo 2>&1 | Out-String
 Write-Output $dout
 Check "bridgedemo-run" ($dout -match "demo ok")
+
+Section "example-lcl-dbgrid"
+# LCL graphical example: full lazbuild (lfm resources linked). No GUI
+# interaction in CI; smoke-run proves the form creates without exceptions.
+& lazbuild "$ws\examples\ex09_dbgrid\ex09_dbgrid.lpi" 2>&1
+Check "ex09-compile" ($LASTEXITCODE -eq 0)
+$exe09 = Join-Path $bin "ex09\ex09_dbgrid.exe"
+Check "ex09-exe" (Test-Path $exe09)
+if (Test-Path $exe09) {
+  $gp = Start-Process -FilePath $exe09 -PassThru
+  Start-Sleep -Seconds 4
+  $gAlive = -not $gp.HasExited
+  Write-Output ("ex09-alive-4s=" + $gAlive)
+  Check "ex09-smoke-run" $gAlive
+  try { Stop-Process -Id $gp.Id -Force -ErrorAction SilentlyContinue } catch {}
+}
 
 Section "mautool-manifests"
 $mout = & $mautool --verify-manifests 2>&1 | Out-String

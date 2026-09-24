@@ -1,0 +1,76 @@
+object Form1: TForm1
+  Left = 320
+  Height = 480
+  Top = 160
+  Width = 640
+  Caption = 'TyFPJDBC DBGrid 演示'
+  ClientHeight = 480
+  ClientWidth = 640
+  object Q: TJDBCQuery
+    left = 24
+    top = 16
+  end
+  object DS: TDataSource
+    DataSet = Q
+    left = 96
+    top = 16
+  end
+  object Grid: TDBGrid
+    Left = 8
+    Height = 300
+    Top = 8
+    Width = 624
+    Align = alTop
+    DataSource = DS
+    TabOrder = 0
+  end
+  object Nav: TDBNavigator
+    Left = 8
+    Height = 32
+    Top = 316
+    Width = 240
+    DataSource = DS
+    TabOrder = 1
+  end
+  object NameLabel: TLabel
+    Left = 8
+    Height = 16
+    Top = 360
+    Width = 64
+    Caption = '名称 name'
+  end
+  object NameEdit: TDBEdit
+    Left = 88
+    Height = 24
+    Top = 356
+    Width = 280
+    DataField = 'name'
+    DataSource = DS
+    TabOrder = 2
+  end
+  object AddBtn: TButton
+    Left = 384
+    Height = 28
+    Top = 354
+    Width = 120
+    Caption = '新增中文行'
+    OnClick = AddBtnClick
+    TabOrder = 3
+  end
+  object ApplyBtn: TButton
+    Left = 512
+    Height = 28
+    Top = 354
+    Width = 120
+    Caption = 'ApplyUpdates'
+    OnClick = ApplyBtnClick
+    TabOrder = 4
+  end
+  object StatusLabel: TLabel
+    Left = 8
+    Height = 16
+    Top = 396
+    Width = 624
+    Caption = 'StatusLabel'
+  end
+end

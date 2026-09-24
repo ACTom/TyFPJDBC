@@ -57,6 +57,46 @@ public class Bridge {
     return execUpdateTimeout(connId, sql, 0);
   }
 
+  /** True batch DML: one PreparedStatement, addBatch per row, single
+   *  executeBatch inside one transaction (restores prior autoCommit).
+   *  All values travel as setString bindings; the driver converts types.
+   *  Returns the total affected-row count. */
+  public int execBatch(long connId, String sql, String[][] batchParams) throws SQLException {
+    Connection c = conns.get(connId);
+    if (c == null) throw new SQLException("no conn", "08000", 32);
+    boolean prevAuto = c.getAutoCommit();
+    try (PreparedStatement ps = c.prepareStatement(sql)) {
+      if (prevAuto) c.setAutoCommit(false);
+      stmts.put(connId, ps);
+      try {
+        for (String[] row : batchParams) {
+          for (int i = 0; i < row.length; i++) {
+            if (row[i] == null) ps.setNull(i + 1, Types.VARCHAR);
+            else ps.setString(i + 1, row[i]);
+          }
+          ps.addBatch();
+        }
+        int total = 0;
+        for (int n : ps.executeBatch()) {
+          if (n >= 0) total += n;
+          else if (n == Statement.SUCCESS_NO_INFO) total += 1;
+        }
+        c.commit();
+        return total;
+      } finally {
+        stmts.remove(connId);
+      }
+    } catch (SQLException e) {
+      try { c.rollback(); } catch (SQLException ignored) {}
+      recordChain(e);
+      throw e;
+    } finally {
+      if (prevAuto) {
+        try { c.setAutoCommit(true); } catch (SQLException ignored) {}
+      }
+    }
+  }
+
   public int execUpdateTimeout(long connId, String sql, int timeoutSecs) throws SQLException {
     Connection c = conns.get(connId);
     if (c == null) throw new SQLException("no conn", "08000", 32);

@@ -5,7 +5,12 @@ program TestRealWorld;
 { Real-world SQL shapes modeled on large open-source projects:
   WordPress (wp_users / wp_posts / wp_postmeta / wp_comments),
   shop order/inventory flow (customers / orders / order_items / products),
-  RBAC (app_users / roles / user_roles).
+  RBAC (app_users / roles / user_roles),
+  Odoo 16 (sale_order / sale_order_line / product_product / res_partner /
+    stock_quant / account_move_line / mrp_bom_line / crm_lead),
+  ERPNext v15 (`tabSales Order` / `tabSales Order Item` / tabCustomer),
+  Saleor 3.x (order_order / order_orderline / discount_voucher),
+  SuiteCRM (opportunities / opportunities_contacts / contacts).
   Parser-level: every value must become a ? binding, identifiers stay inline. }
 
 uses
@@ -177,6 +182,75 @@ begin
   finally
     Free;
   end;
+
+  { 19. Odoo sales funnel: 4-table join + aggregate bucket + GROUP BY + HAVING.
+    NOTE: the bucket CASE must sit on an aggregate (SUM), not on a bare
+    non-grouped column -- H2/PostgreSQL strict GROUP BY rejects the latter,
+    and reports bucket on the aggregated measure, not on a source row. }
+  CheckParse('odoo-funnel',
+    'SELECT p.name, CASE WHEN SUM(l.price_subtotal)>:big THEN ''VIP'' WHEN SUM(l.price_subtotal)>:mid THEN ''STD'' ELSE ''SMB'' END AS seg, COUNT(l.id) AS lines, SUM(l.price_subtotal) AS amt FROM sale_order o JOIN sale_order_line l ON l.order_id=o.id JOIN product_product p ON p.id=l.product_id JOIN res_partner r ON r.id=o.partner_id WHERE o.state=:st AND o.date_order BETWEEN :d1 AND :d2 GROUP BY p.name HAVING SUM(l.price_subtotal)>:min',
+    'SELECT p.name, CASE WHEN SUM(l.price_subtotal)>? THEN ''VIP'' WHEN SUM(l.price_subtotal)>? THEN ''STD'' ELSE ''SMB'' END AS seg, COUNT(l.id) AS lines, SUM(l.price_subtotal) AS amt FROM sale_order o JOIN sale_order_line l ON l.order_id=o.id JOIN product_product p ON p.id=l.product_id JOIN res_partner r ON r.id=o.partner_id WHERE o.state=? AND o.date_order BETWEEN ? AND ? GROUP BY p.name HAVING SUM(l.price_subtotal)>?',
+    ['big', 'mid', 'st', 'd1', 'd2', 'min']);
+
+  { 20. Odoo on-hand stock: correlated EXISTS + NOT EXISTS }
+  CheckParse('odoo-stock',
+    'SELECT p.default_code FROM product_product p WHERE EXISTS(SELECT 1 FROM stock_quant q WHERE q.product_id=p.id AND q.location_id=:loc AND q.quantity>:zero) AND NOT EXISTS(SELECT 1 FROM stock_move m WHERE m.product_id=p.id AND m.state=:cancelled)',
+    'SELECT p.default_code FROM product_product p WHERE EXISTS(SELECT 1 FROM stock_quant q WHERE q.product_id=p.id AND q.location_id=? AND q.quantity>?) AND NOT EXISTS(SELECT 1 FROM stock_move m WHERE m.product_id=p.id AND m.state=?)',
+    ['loc', 'zero', 'cancelled']);
+
+  { 21. Odoo trial balance: UNION ALL + aggregate }
+  CheckParse('odoo-trial',
+    'SELECT a.code, SUM(l.debit) AS dr, SUM(l.credit) AS cr FROM account_move_line l JOIN account_account a ON a.id=l.account_id WHERE l.date BETWEEN :d1 AND :d2 GROUP BY a.code UNION ALL SELECT ''TOTAL'', SUM(debit), SUM(credit) FROM account_move_line WHERE date BETWEEN :d1 AND :d2',
+    'SELECT a.code, SUM(l.debit) AS dr, SUM(l.credit) AS cr FROM account_move_line l JOIN account_account a ON a.id=l.account_id WHERE l.date BETWEEN ? AND ? GROUP BY a.code UNION ALL SELECT ''TOTAL'', SUM(debit), SUM(credit) FROM account_move_line WHERE date BETWEEN ? AND ?',
+    ['d1', 'd2', 'd1', 'd2']);
+
+  { 22. Odoo MRP BOM explosion: recursive CTE }
+  CheckParse('odoo-bom',
+    'WITH RECURSIVE bom(id, parent, qty) AS (SELECT id, 0, product_qty FROM mrp_bom_line WHERE bom_id=:top UNION ALL SELECT l.id, b.id, l.product_qty*b.qty FROM mrp_bom_line l JOIN bom b ON b.id=l.bom_id) SELECT id, SUM(qty) FROM bom GROUP BY id',
+    'WITH RECURSIVE bom(id, parent, qty) AS (SELECT id, 0, product_qty FROM mrp_bom_line WHERE bom_id=? UNION ALL SELECT l.id, b.id, l.product_qty*b.qty FROM mrp_bom_line l JOIN bom b ON b.id=l.bom_id) SELECT id, SUM(qty) FROM bom GROUP BY id',
+    ['top']);
+
+  { 23. Odoo CRM stage funnel: self-join team + date bucket }
+  CheckParse('odoo-crm',
+    'SELECT s.name AS stage, u.login AS owner, COUNT(l.id) AS n, AVG(l.expected_revenue) AS avgrev FROM crm_lead l JOIN crm_stage s ON s.id=l.stage_id LEFT JOIN res_users ou ON ou.id=l.user_id LEFT JOIN res_users m ON m.id=ou.manager_id JOIN wp_users u ON u.id=ou.id WHERE l.type=:tp AND l.create_date>=:since GROUP BY s.name, u.login ORDER BY n DESC',
+    'SELECT s.name AS stage, u.login AS owner, COUNT(l.id) AS n, AVG(l.expected_revenue) AS avgrev FROM crm_lead l JOIN crm_stage s ON s.id=l.stage_id LEFT JOIN res_users ou ON ou.id=l.user_id LEFT JOIN res_users m ON m.id=ou.manager_id JOIN wp_users u ON u.id=ou.id WHERE l.type=? AND l.create_date>=? GROUP BY s.name, u.login ORDER BY n DESC',
+    ['tp', 'since']);
+
+  { 24. ERPNext: backtick DocTypes + status + window rank }
+  CheckParse('erpnext-rank',
+    'SELECT o.customer, o.grand_total, RANK() OVER (PARTITION BY o.customer ORDER BY o.grand_total DESC) AS rk FROM `tabSales Order` o JOIN `tabSales Order Item` i ON i.parent=o.name WHERE o.docstatus=:ds AND o.transaction_date>=:since',
+    'SELECT o.customer, o.grand_total, RANK() OVER (PARTITION BY o.customer ORDER BY o.grand_total DESC) AS rk FROM `tabSales Order` o JOIN `tabSales Order Item` i ON i.parent=o.name WHERE o.docstatus=? AND o.transaction_date>=?',
+    ['ds', 'since']);
+
+  { 25. ERPNext stock ledger: 5-table join + IN list shape }
+  CheckParse('erpnext-ledger',
+    'SELECT b.item_code, b.warehouse, SUM(b.actual_qty) FROM `tabStock Ledger Entry` b JOIN tabItem i ON i.name=b.item_code JOIN tabWarehouse w ON w.name=b.warehouse JOIN tabCompany c ON c.name=b.company JOIN tabUOM u ON u.name=i.stock_uom WHERE b.posting_date BETWEEN :d1 AND :d2 AND b.is_cancelled=:no GROUP BY b.item_code, b.warehouse',
+    'SELECT b.item_code, b.warehouse, SUM(b.actual_qty) FROM `tabStock Ledger Entry` b JOIN tabItem i ON i.name=b.item_code JOIN tabWarehouse w ON w.name=b.warehouse JOIN tabCompany c ON c.name=b.company JOIN tabUOM u ON u.name=i.stock_uom WHERE b.posting_date BETWEEN ? AND ? AND b.is_cancelled=? GROUP BY b.item_code, b.warehouse',
+    ['d1', 'd2', 'no']);
+
+  { 26. Saleor: order + voucher LEFT JOIN + currency CASE }
+  CheckParse('saleor-voucher',
+    'SELECT o.number, o.total_gross_amount, CASE WHEN v.id IS NULL THEN 0 ELSE v.discount_value END AS disc FROM order_order o LEFT JOIN order_orderdiscounts d ON d.order_id=o.id LEFT JOIN discount_voucher v ON v.id=d.voucher_id WHERE o.status=:st AND o.created_at>=:since ORDER BY o.created_at DESC LIMIT :lim',
+    'SELECT o.number, o.total_gross_amount, CASE WHEN v.id IS NULL THEN 0 ELSE v.discount_value END AS disc FROM order_order o LEFT JOIN order_orderdiscounts d ON d.order_id=o.id LEFT JOIN discount_voucher v ON v.id=d.voucher_id WHERE o.status=? AND o.created_at>=? ORDER BY o.created_at DESC LIMIT ?',
+    ['st', 'since', 'lim']);
+
+  { 27. SuiteCRM: m2m bridge + DISTINCT }
+  CheckParse('suitecrm-m2m',
+    'SELECT DISTINCT o.id, o.name, o.amount, c.first_name FROM opportunities o JOIN opportunities_contacts oc ON oc.opportunity_id=o.id JOIN contacts c ON c.id=oc.contact_id WHERE o.sales_stage=:stage AND o.date_closed BETWEEN :d1 AND :d2',
+    'SELECT DISTINCT o.id, o.name, o.amount, c.first_name FROM opportunities o JOIN opportunities_contacts oc ON oc.opportunity_id=o.id JOIN contacts c ON c.id=oc.contact_id WHERE o.sales_stage=? AND o.date_closed BETWEEN ? AND ?',
+    ['stage', 'd1', 'd2']);
+
+  { 28. INSERT..SELECT stock move (ERP posting shape) }
+  CheckParse('insert-select',
+    'INSERT INTO stock_move(product_id, qty, state) SELECT product_id, :qty, :st FROM product_product WHERE default_code=:code',
+    'INSERT INTO stock_move(product_id, qty, state) SELECT product_id, ?, ? FROM product_product WHERE default_code=?',
+    ['qty', 'st', 'code']);
+
+  { 29. 5-table order detail page }
+  CheckParse('five-join',
+    'SELECT o.id, r.name, p.default_code, l.qty, w.name FROM sale_order o JOIN res_partner r ON r.id=o.partner_id JOIN sale_order_line l ON l.order_id=o.id JOIN product_product p ON p.id=l.product_id JOIN stock_warehouse w ON w.id=:wh WHERE o.state=:st ORDER BY o.id LIMIT :lim OFFSET :off',
+    'SELECT o.id, r.name, p.default_code, l.qty, w.name FROM sale_order o JOIN res_partner r ON r.id=o.partner_id JOIN sale_order_line l ON l.order_id=o.id JOIN product_product p ON p.id=l.product_id JOIN stock_warehouse w ON w.id=? WHERE o.state=? ORDER BY o.id LIMIT ? OFFSET ?',
+    ['wh', 'st', 'lim', 'off']);
 
   WriteLn('TOTAL pass=', PassCount, ' fail=', FailCount);
   if FailCount > 0 then

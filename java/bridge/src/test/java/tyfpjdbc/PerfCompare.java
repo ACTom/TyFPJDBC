@@ -25,26 +25,31 @@ public class PerfCompare {
       b.fetchBatch(c, "SELECT COUNT(*) FROM bench", 0, 10, 100);
       b.execUpdate(c, "DELETE FROM bench");
 
-      // phase 1: bulk insert, 500-row multi-value batches
+      // phase 1: bulk insert via ONE PreparedStatement batch in ONE transaction,
+      // mirroring the FPC side (single transaction, parameterized rows).
+      // Production code should chunk huge loads (bounded memory); each
+      // execBatch call is one transaction, so chunk count = commit count.
       long t0 = System.currentTimeMillis();
-      for (int i = 1; i <= rows; i += 500) {
-        StringBuilder sb = new StringBuilder("INSERT INTO bench VALUES");
-        int last = Math.min(i + 499, rows);
-        for (int j = i; j <= last; j++) {
-          if (j > i) sb.append(",");
-          sb.append("(").append(j).append(",'row-").append(j).append("','payload-中文-").append(j).append("',").append(j % 100).append(")");
+      {
+        String[][] batch = new String[rows][4];
+        for (int j = 1; j <= rows; j++) {
+          batch[j - 1][0] = String.valueOf(j);
+          batch[j - 1][1] = "row-" + j;
+          batch[j - 1][2] = "payload-中文-" + j;
+          batch[j - 1][3] = String.valueOf(j % 100);
         }
-        b.execUpdate(c, sb.toString());
+        int n = b.execBatch(c, "INSERT INTO bench VALUES(?,?,?,?)", batch);
+        if (n != rows) throw new RuntimeException("batch-count want " + rows + " got " + n);
       }
       long msIns = System.currentTimeMillis() - t0;
       System.out.println("PERF bridge-insert ms=" + msIns + " rows=" + rows + " rows_per_sec=" + (rows * 1000L / (msIns + 1)));
 
-      // phase 2: full scan in 1000-row pages, touch every field
+      // phase 2: full scan, SQL-level paging (no O(n^2) client-side skip).
       t0 = System.currentTimeMillis();
       int off = 0, cnt = 0;
       long sum = 0;
       while (true) {
-        String[][] page = b.fetchBatch(c, "SELECT id, name, payload, qty FROM bench ORDER BY id", off, 1000, 1000);
+        String[][] page = b.fetchBatch(c, "SELECT id, name, payload, qty FROM bench ORDER BY id LIMIT 1000 OFFSET " + off, 0, 1000, 1000);
         if (page.length == 0) break;
         for (String[] r : page) {
           cnt++;
@@ -56,11 +61,11 @@ public class PerfCompare {
       if (cnt != rows) throw new RuntimeException("scan-count want " + rows + " got " + cnt);
       System.out.println("PERF bridge-scan ms=" + msScan + " rows=" + cnt + " rows_per_sec=" + (cnt * 1000L / (msScan + 1)));
 
-      // phase 3: paged fetch, 2 cols
+      // phase 3: paged fetch, 2 cols, SQL-level paging.
       t0 = System.currentTimeMillis();
       off = 0; cnt = 0; int pages = 0;
       while (off < rows) {
-        String[][] page = b.fetchBatch(c, "SELECT id, name FROM bench ORDER BY id", off, 1000, 1000);
+        String[][] page = b.fetchBatch(c, "SELECT id, name FROM bench ORDER BY id LIMIT 1000 OFFSET " + off, 0, 1000, 1000);
         if (page.length == 0) break;
         cnt += page.length;
         off += page.length;

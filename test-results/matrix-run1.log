@@ -133,7 +133,7 @@ Target OS: Win64 for x64
 Compiling D:\Projects\TyFPJDBC\tests\TestQuery.lpr
 TestQuery.lpr(31,32) Warning: Constructing a class "TJDBCQuery" with abstract method "LoadBlobIntoBuffer"
 Linking D:\Projects\TyFPJDBC\test-results\bin\testquery.exe
-191 lines compiled, 0.5 sec, 457584 bytes code, 16532 bytes data
+191 lines compiled, 0.6 sec, 457584 bytes code, 16532 bytes data
 1 warning(s) issued
 PASS-MATRIX: TestQuery-compile
 PASS jdbc-sql
@@ -184,7 +184,7 @@ PASS proc-out
 PASS script-count
 PASS script-semi-in-str
 PASS perf-10k-count
-PERF 10k rows ms=0
+PERF 10k rows ms=16
 PASS perf-100k-count
 PERF 100k rows ms=31
 PASS perf-10k-bounded
@@ -235,7 +235,7 @@ Target OS: Win64 for x64
 Compiling D:\Projects\TyFPJDBC\tests\TestPoolDataset.lpr
 TestPoolDataset.lpr(91,32) Warning: Constructing a class "TJDBCQuery" with abstract method "LoadBlobIntoBuffer"
 Linking D:\Projects\TyFPJDBC\test-results\bin\testpooldataset.exe
-152 lines compiled, 0.5 sec, 455968 bytes code, 16564 bytes data
+152 lines compiled, 0.6 sec, 455968 bytes code, 16564 bytes data
 1 warning(s) issued
 PASS-MATRIX: TestPoolDataset-compile
 PASS distinct-connections
@@ -262,7 +262,7 @@ Copyright (c) 1993-2021 by Florian Klaempfl and others
 Target OS: Win64 for x64
 Compiling D:\Projects\TyFPJDBC\tests\TestRealWorld.lpr
 Linking D:\Projects\TyFPJDBC\test-results\bin\testrealworld.exe
-184 lines compiled, 0.4 sec, 174368 bytes code, 9540 bytes data
+258 lines compiled, 0.4 sec, 175168 bytes code, 9540 bytes data
 PASS-MATRIX: TestRealWorld-compile
 PASS: wide-ddl-sql
 PASS: wide-ddl-count
@@ -319,9 +319,42 @@ PASS: macro-inject-reject
 PASS: macro-slash-reject
 PASS: macro-table-ok
 PASS: script-migrate-count
-TOTAL pass=55 fail=0
+PASS: odoo-funnel-sql
+PASS: odoo-funnel-count
+PASS: odoo-funnel-order
+PASS: odoo-stock-sql
+PASS: odoo-stock-count
+PASS: odoo-stock-order
+PASS: odoo-trial-sql
+PASS: odoo-trial-count
+PASS: odoo-trial-order
+PASS: odoo-bom-sql
+PASS: odoo-bom-count
+PASS: odoo-bom-order
+PASS: odoo-crm-sql
+PASS: odoo-crm-count
+PASS: odoo-crm-order
+PASS: erpnext-rank-sql
+PASS: erpnext-rank-count
+PASS: erpnext-rank-order
+PASS: erpnext-ledger-sql
+PASS: erpnext-ledger-count
+PASS: erpnext-ledger-order
+PASS: saleor-voucher-sql
+PASS: saleor-voucher-count
+PASS: saleor-voucher-order
+PASS: suitecrm-m2m-sql
+PASS: suitecrm-m2m-count
+PASS: suitecrm-m2m-order
+PASS: insert-select-sql
+PASS: insert-select-count
+PASS: insert-select-order
+PASS: five-join-sql
+PASS: five-join-count
+PASS: five-join-order
+TOTAL pass=88 fail=0
 
-PASS-MATRIX: TestRealWorld-55-0
+PASS-MATRIX: TestRealWorld-88-0
 PASS-MATRIX: TestRealWorld-no-fail-lines
 
 === java-bridge-14-tests ===
@@ -331,9 +364,9 @@ PASS-MATRIX: javac-test
 Thanks for using JUnit! Support its development at https://junit.org/sponsoring
 
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
-[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection conn0: url=jdbc:h2:mem:cx1082120218346745 user=SA
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection conn0: url=jdbc:h2:mem:cx1083831874316707 user=SA
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
-[pool-1-thread-1] WARN com.zaxxer.hikari.pool.ProxyConnection - HikariPool-1 - Connection conn0: url=jdbc:h2:mem:cx1082120218346745 user=SA marked as broken because of SQLSTATE(57014), ErrorCode(57014)
+[pool-1-thread-1] WARN com.zaxxer.hikari.pool.ProxyConnection - HikariPool-1 - Connection conn0: url=jdbc:h2:mem:cx1083831874316707 user=SA marked as broken because of SQLSTATE(57014), ErrorCode(57014)
 org.h2.jdbc.JdbcSQLTimeoutException: Statement was canceled or the session timed out; SQL statement:
 SELECT COUNT(*) FROM SYSTEM_RANGE(1,200000) A, SYSTEM_RANGE(1,200) B [57014-224]
 	at org.h2.message.DbException.getJdbcSQLException(DbException.java:572)
@@ -355,7 +388,7 @@ SELECT COUNT(*) FROM SYSTEM_RANGE(1,200000) A, SYSTEM_RANGE(1,200) B [57014-224]
 	at org.h2.jdbc.JdbcStatement.executeQuery(JdbcStatement.java:101)
 	at com.zaxxer.hikari.pool.ProxyStatement.executeQuery(ProxyStatement.java:110)
 	at com.zaxxer.hikari.pool.HikariProxyStatement.executeQuery(HikariProxyStatement.java)
-	at tyfpjdbc.Bridge.fetchBatch(Bridge.java:83)
+	at tyfpjdbc.Bridge.fetchBatch(Bridge.java:123)
 	at tyfpjdbc.BridgeTest.lambda$cancelInterruptsLongQuery$0(BridgeTest.java:118)
 	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:328)
 	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090)
@@ -364,11 +397,11 @@ SELECT COUNT(*) FROM SYSTEM_RANGE(1,200000) A, SYSTEM_RANGE(1,200) B [57014-224]
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown initiated...
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-2 - Starting...
-[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-2 - Added connection conn2: url=jdbc:h2:mem:to1082122344007967 user=SA
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-2 - Added connection conn2: url=jdbc:h2:mem:to1083834003978997 user=SA
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-2 - Start completed.
-[main] WARN com.zaxxer.hikari.pool.ProxyConnection - HikariPool-2 - Connection conn2: url=jdbc:h2:mem:to1082122344007967 user=SA marked as broken because of SQLSTATE(57014), ErrorCode(57014)
+[main] WARN com.zaxxer.hikari.pool.ProxyConnection - HikariPool-2 - Connection conn2: url=jdbc:h2:mem:to1083834003978997 user=SA marked as broken because of SQLSTATE(57014), ErrorCode(57014)
 org.h2.jdbc.JdbcSQLTimeoutException: Statement was canceled or the session timed out; SQL statement:
-CREATE TABLE big_t1082122349658685 AS SELECT A.X AS a, B.X AS b FROM SYSTEM_RANGE(1,300000) A, SYSTEM_RANGE(1,300) B [57014-224]
+CREATE TABLE big_t1083834008877664 AS SELECT A.X AS a, B.X AS b FROM SYSTEM_RANGE(1,300000) A, SYSTEM_RANGE(1,300) B [57014-224]
 	at org.h2.message.DbException.getJdbcSQLException(DbException.java:572)
 	at org.h2.message.DbException.getJdbcSQLException(DbException.java:489)
 	at org.h2.message.DbException.get(DbException.java:223)
@@ -395,7 +428,7 @@ CREATE TABLE big_t1082122349658685 AS SELECT A.X AS a, B.X AS b FROM SYSTEM_RANG
 	at org.h2.jdbc.JdbcStatement.executeUpdate(JdbcStatement.java:147)
 	at com.zaxxer.hikari.pool.ProxyStatement.executeUpdate(ProxyStatement.java:119)
 	at com.zaxxer.hikari.pool.HikariProxyStatement.executeUpdate(HikariProxyStatement.java)
-	at tyfpjdbc.Bridge.execUpdateTimeout(Bridge.java:67)
+	at tyfpjdbc.Bridge.execUpdateTimeout(Bridge.java:107)
 	at tyfpjdbc.BridgeTest.queryTimeoutAbortsLongUpdate(BridgeTest.java:150)
 	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104)
 	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
@@ -501,93 +534,117 @@ WARNING: java.lang.System::load has been called by org.sqlite.SQLiteJDBCLoader i
 WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
 WARNING: Restricted methods will be blocked in a future release unless native access is enabled
 
-[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-3 - Added connection org.sqlite.jdbc4.JDBC4Connection@3fa2213
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-3 - Added connection org.sqlite.jdbc4.JDBC4Connection@1a7288a3
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-3 - Start completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-3 - Shutdown initiated...
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-3 - Shutdown completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-4 - Starting...
-[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-4 - Added connection conn4: url=jdbc:h2:mem:perf1082123819048510 user=SA
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-4 - Added connection conn4: url=jdbc:h2:mem:odoo1083835473292834 user=SA
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-4 - Start completed.
-PERF 10k fetch ms=53
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-4 - Shutdown initiated...
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-4 - Shutdown completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-5 - Starting...
-[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-5 - Added connection conn6: url=jdbc:h2:mem:t1082124013416230 user=SA
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-5 - Added connection conn5: url=jdbc:h2:mem:bom1083835531063305 user=SA
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-5 - Start completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-5 - Shutdown initiated...
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-5 - Shutdown completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-6 - Starting...
-[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-6 - Added connection conn7: url=jdbc:h2:mem:wide1082124028041832 user=SA
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-6 - Added connection conn6: url=jdbc:h2:mem:perf1083835554427727 user=SA
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-6 - Start completed.
+PERF 10k fetch ms=46
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-6 - Shutdown initiated...
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-6 - Shutdown completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-7 - Starting...
-[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-7 - Added connection conn8: url=jdbc:h2:mem:shop1082124058449328 user=SA
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-7 - Added connection conn8: url=jdbc:h2:mem:t1083835713367201 user=SA
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-7 - Start completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-7 - Shutdown initiated...
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-7 - Shutdown completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-8 - Starting...
-[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-8 - Added connection conn10: url=jdbc:h2:mem:pg1082124200452012 user=SA
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-8 - Added connection conn9: url=jdbc:h2:mem:wide1083835731344905 user=SA
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-8 - Start completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-8 - Shutdown initiated...
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-8 - Shutdown completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-9 - Starting...
-[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-9 - Added connection conn12: url=jdbc:h2:mem:pg1082124366553011 user=SA
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-9 - Added connection conn10: url=jdbc:h2:mem:shop1083835757539855 user=SA
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-9 - Start completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-9 - Shutdown initiated...
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-9 - Shutdown completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-10 - Starting...
-[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-10 - Added connection conn13: url=jdbc:h2:mem:tx1082124386732112 user=SA
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-10 - Added connection conn12: url=jdbc:h2:mem:batch1083835903241613 user=SA
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-10 - Start completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-10 - Shutdown initiated...
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-10 - Shutdown completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-11 - Starting...
-[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-11 - Added connection conn14: url=jdbc:h2:mem:cc1082124412128077 user=SA
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-11 - Added connection conn13: url=jdbc:h2:mem:pg1083835980140772 user=SA
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-11 - Start completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-11 - Shutdown initiated...
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-11 - Shutdown completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-12 - Starting...
-[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-12 - Added connection org.sqlite.jdbc4.JDBC4Connection@6cbcf243
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-12 - Added connection conn15: url=jdbc:h2:mem:pg1083836137630341 user=SA
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-12 - Start completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-12 - Shutdown initiated...
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-12 - Shutdown completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-13 - Starting...
-[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-13 - Added connection conn16: url=jdbc:h2:mem:ddl1082124491323059 user=SA
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-13 - Added connection conn16: url=jdbc:h2:mem:tx1083836154999029 user=SA
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-13 - Start completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-13 - Shutdown initiated...
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-13 - Shutdown completed.
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-14 - Starting...
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-14 - Added connection conn17: url=jdbc:h2:mem:cc1083836180440530 user=SA
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-14 - Start completed.
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-14 - Shutdown initiated...
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-14 - Shutdown completed.
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-15 - Starting...
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-15 - Added connection org.sqlite.jdbc4.JDBC4Connection@71ae31b0
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-15 - Start completed.
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-15 - Shutdown initiated...
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-15 - Shutdown completed.
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-16 - Starting...
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-16 - Added connection conn19: url=jdbc:h2:mem:ledger1083836297001993 user=SA
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-16 - Start completed.
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-16 - Shutdown initiated...
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-16 - Shutdown completed.
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-17 - Starting...
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-17 - Added connection conn20: url=jdbc:h2:mem:ddl1083836305779086 user=SA
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-17 - Start completed.
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-17 - Shutdown initiated...
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-17 - Shutdown completed.
 ?
 ├─ JUnit Jupiter ?
 │  └─ BridgeTest ?
 │     ├─ cancelInterruptsLongQuery() ?
 │     ├─ queryTimeoutAbortsLongUpdate() ?
 │     ├─ hostileValuesStayData() ?
+│     ├─ odooSalesFunnel() ?
+│     ├─ erpRecursiveBom() ?
 │     ├─ perfSmoke10kFetch() ?
 │     ├─ h2RoundTrip() ?
 │     ├─ wideTableJoinGroupBy() ?
 │     ├─ shopBulkInsertAndJoinAggregate() ?
+│     ├─ execBatchBulkInsert() ?
 │     ├─ batchedFetchPagesLargeResult() ?
 │     ├─ postgresDialectRoundTrip() ?
 │     ├─ complexTransactionPartialRollback() ?
 │     ├─ concurrentBorrowDistinct() ?
 │     ├─ sqliteRoundTrip() ?
+│     ├─ erpUnionTrialBalance() ?
 │     ├─ ddlMigrateAddColumnAndIndex() ?
 │     └─ versionMatchesSpec() ?
 ├─ JUnit Vintage ?
 └─ JUnit Platform Suite ?
 
-Test run finished after 4454 ms
+Test run finished after 4612 ms
 [         4 containers found      ]
 [         0 containers skipped    ]
 [         4 containers started    ]
 [         0 containers aborted    ]
 [         4 containers successful ]
 [         0 containers failed     ]
-[        14 tests found           ]
+[        18 tests found           ]
 [         0 tests skipped         ]
-[        14 tests started         ]
+[        18 tests started         ]
 [         0 tests aborted         ]
-[        14 tests successful      ]
+[        18 tests successful      ]
 [         0 tests failed          ]
 
 
@@ -595,14 +652,18 @@ WARNING: Delegated to the 'execute' command.
          This behaviour has been deprecated and will be removed in a future release.
          Please use the 'execute' command directly.
 
-PASS-MATRIX: java-14-found
-PASS-MATRIX: java-14-ok
+PASS-MATRIX: java-18-found
+PASS-MATRIX: java-18-ok
 PASS-MATRIX: java-0-failed
 PASS-MATRIX: java-sqlite-present
 PASS-MATRIX: java-pg-present
 PASS-MATRIX: java-perf-present
 PASS-MATRIX: java-wide-present
 PASS-MATRIX: java-shop-present
+PASS-MATRIX: java-batch-present
+PASS-MATRIX: java-odoo-present
+PASS-MATRIX: java-bom-present
+PASS-MATRIX: java-ledger-present
 PASS-MATRIX: java-tx-present
 PASS-MATRIX: java-ddl-present
 PASS-MATRIX: java-hostile-present
@@ -613,15 +674,15 @@ Copyright (c) 1993-2021 by Florian Klaempfl and others
 Target OS: Win64 for x64
 Compiling D:\Projects\TyFPJDBC\tests\TestPerfCompare.lpr
 Linking D:\Projects\TyFPJDBC\test-results\bin\testperfcompare.exe
-168 lines compiled, 0.7 sec, 533712 bytes code, 26372 bytes data
+168 lines compiled, 0.6 sec, 533712 bytes code, 26372 bytes data
 PASS-MATRIX: perf-fpc-compile
 PERF fpc-insert ms=78 rows=20000 rows_per_sec=253164
 PASS scan-count
-PERF fpc-scan ms=79 rows=20000 rows_per_sec=250000
+PERF fpc-scan ms=78 rows=20000 rows_per_sec=253164
 PASS paged-count
 PASS paged-pages
-PERF fpc-paged ms=46 rows=20000 pages=20 rows_per_sec=425531
-PERF fpc-update ms=32 checksum=1000000
+PERF fpc-paged ms=47 rows=20000 pages=20 rows_per_sec=416666
+PERF fpc-update ms=47 checksum=1000000
 PASS update-checksum
 --- fails=0
 
@@ -634,10 +695,10 @@ WARNING: Restricted methods will be blocked in a future release unless native ac
 
 [main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection org.sqlite.jdbc4.JDBC4Connection@1cd072a9
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
-PERF bridge-insert ms=463 rows=20000 rows_per_sec=43103
-PERF bridge-scan ms=179 rows=20000 rows_per_sec=111111
-PERF bridge-paged ms=69 rows=20000 pages=20 rows_per_sec=285714
-PERF bridge-update ms=26 checksum=1000000
+PERF bridge-insert ms=144 rows=20000 rows_per_sec=137931
+PERF bridge-scan ms=150 rows=20000 rows_per_sec=132450
+PERF bridge-paged ms=45 rows=20000 pages=20 rows_per_sec=434782
+PERF bridge-update ms=38 checksum=1000000
 PERF-DONE rows=20000
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown initiated...
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown completed.
@@ -645,10 +706,10 @@ PERF-DONE rows=20000
 PASS-MATRIX: perf-bridge-pass
 PASS-MATRIX: perf-checksum-agree
 PERF-TABLE phase | sqlite3conn-direct-ms | bridge-jdbc-ms
-PERF-TABLE insert-20k | 78 | 463
-PERF-TABLE scan-20k | 79 | 179
-PERF-TABLE paged-20k | 46 | 69
-PERF-TABLE update-10k | 32 | 26
+PERF-TABLE insert-20k | 78 | 144
+PERF-TABLE scan-20k | 78 | 150
+PERF-TABLE paged-20k | 47 | 45
+PERF-TABLE update-10k | 47 | 38
 PASS-MATRIX: perf-table-complete
 
 === examples-compile-run ===
@@ -657,7 +718,7 @@ Copyright (c) 1993-2021 by Florian Klaempfl and others
 Target OS: Win64 for x64
 Compiling D:\Projects\TyFPJDBC\examples\ex01_connect_select.lpr
 Linking D:\Projects\TyFPJDBC\test-results\bin\ex01_connect_select.exe
-61 lines compiled, 0.7 sec, 522640 bytes code, 26244 bytes data
+61 lines compiled, 0.6 sec, 522640 bytes code, 26244 bytes data
 PASS-MATRIX: ex01_connect_select-compile
 SELECT 1 => 1
 row => hello
@@ -701,7 +762,7 @@ Target OS: Win64 for x64
 Compiling D:\Projects\TyFPJDBC\examples\ex04_edit_apply.lpr
 ex04_edit_apply.lpr(18,30) Warning: Constructing a class "TJDBCQuery" with abstract method "LoadBlobIntoBuffer"
 Linking D:\Projects\TyFPJDBC\test-results\bin\ex04_edit_apply.exe
-42 lines compiled, 0.6 sec, 447360 bytes code, 16484 bytes data
+42 lines compiled, 0.5 sec, 447360 bytes code, 16484 bytes data
 1 warning(s) issued
 PASS-MATRIX: ex04_edit_apply-compile
 stored value => a' OR '1'='1
@@ -741,7 +802,7 @@ Copyright (c) 1993-2021 by Florian Klaempfl and others
 Target OS: Win64 for x64
 Compiling D:\Projects\TyFPJDBC\examples\ex07_script_migrate.lpr
 Linking D:\Projects\TyFPJDBC\test-results\bin\ex07_script_migrate.exe
-32 lines compiled, 0.4 sec, 171488 bytes code, 9524 bytes data
+32 lines compiled, 0.3 sec, 171488 bytes code, 9524 bytes data
 PASS-MATRIX: ex07_script_migrate-compile
 statements=4
 --- [0] params=0 CREATE TABLE wp_posts(id INT PRIMARY KEY, title VARCHAR(255))
@@ -769,7 +830,7 @@ PASS-MATRIX: ex08_pool_stats-run
 PASS-MATRIX: bridgedemo-compile
 bridge=1.0.0
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
-[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection conn0: url=jdbc:h2:mem:demo1082135108800699 user=SA
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection conn0: url=jdbc:h2:mem:demo1083846587333865 user=SA
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
 row 1 => hello
 row 2 => 中文测试
@@ -780,6 +841,51 @@ errorChain=
 demo ok
 
 PASS-MATRIX: bridgedemo-run
+
+=== example-lcl-dbgrid ===
+Hint: (lazbuild) Primary config path: "C:\Users\Tom\AppData\Local\lazarus"
+Hint: (lazarus) [TBuildManager.SetBuildTarget] Old=x86_64-win64--win32 New=x86_64-win64--win32 Changed: OS/CPU=True LCL=False
+Hint: (lazarus) [TBuildManager.SetBuildTarget] Old=x86_64-win64--win32 New=x86_64-win64--win32 Changed: OS/CPU=True LCL=False
+Hint: (lazarus) Build Project: nothing to do.
+Info: (lazarus) Execute Title="编译项目，目标：D:\Projects\TyFPJDBC\test-results\bin\ex09\ex09_dbgrid.exe"
+Info: (lazarus) Working Directory="D:\Projects\TyFPJDBC\examples\ex09_dbgrid\"
+Info: (lazarus) Executable="C:\lazarus\fpc\3.2.2\bin\x86_64-win64\fpc.exe"
+Info: (lazarus) Param[0]="-MObjFPC"
+Info: (lazarus) Param[1]="-Scghi"
+Info: (lazarus) Param[2]="-O1"
+Info: (lazarus) Param[3]="-g"
+Info: (lazarus) Param[4]="-gl"
+Info: (lazarus) Param[5]="-WG"
+Info: (lazarus) Param[6]="-l"
+Info: (lazarus) Param[7]="-vewnhibq"
+Info: (lazarus) Param[8]="-FuD:\Projects\TyFPJDBC\examples\ex09_dbgrid\"
+Info: (lazarus) Param[9]="-FuD:\Projects\TyFPJDBC\src\core"
+Info: (lazarus) Param[10]="-FuD:\Projects\TyFPJDBC\src\db"
+Info: (lazarus) Param[11]="-FuC:\lazarus\lcl\units\x86_64-win64\win32"
+Info: (lazarus) Param[12]="-FuC:\lazarus\lcl\units\x86_64-win64"
+Info: (lazarus) Param[13]="-FuC:\lazarus\components\freetype\lib\x86_64-win64"
+Info: (lazarus) Param[14]="-FuC:\lazarus\components\lazutils\lib\x86_64-win64"
+Info: (lazarus) Param[15]="-FuC:\lazarus\packager\units\x86_64-win64"
+Info: (lazarus) Param[16]="-FED:\Projects\TyFPJDBC\test-results\bin\ex09\"
+Info: (lazarus) Param[17]="-oD:\Projects\TyFPJDBC\test-results\bin\ex09\ex09_dbgrid.exe"
+Info: (lazarus) Param[18]="-dLCL"
+Info: (lazarus) Param[19]="-dLCLwin32"
+Info: (lazarus) Param[20]="ex09_dbgrid.lpr"
+Hint: (11030) Start of reading config file C:\lazarus\fpc\3.2.2\bin\x86_64-win64\fpc.cfg
+Hint: (11031) End of reading config file C:\lazarus\fpc\3.2.2\bin\x86_64-win64\fpc.cfg
+Free Pascal Compiler version 3.2.2 [2026/06/06] for x86_64
+Copyright (c) 1993-2021 by Florian Klaempfl and others
+(1002) Target OS: Win64 for x64
+(3104) Compiling ex09_dbgrid.lpr
+(9022) Compiling resource D:\Projects\TyFPJDBC\test-results\bin\ex09\ex09_dbgrid.obj
+(9015) Linking D:\Projects\TyFPJDBC\test-results\bin\ex09\ex09_dbgrid.exe
+(1008) 19 lines compiled, 2.2 sec, 2148016 bytes code, 132804 bytes data
+(1022) 2 hint(s) issued
+Info: (lazarus) [TCompiler.Compile] end
+PASS-MATRIX: ex09-compile
+PASS-MATRIX: ex09-exe
+ex09-alive-4s=True
+PASS-MATRIX: ex09-smoke-run
 
 === mautool-manifests ===
 drivers ok: 3
