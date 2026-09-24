@@ -196,7 +196,7 @@ begin
           if fld <> nil then
           begin
             Edit;
-            fld.AsString := IntToStr(FLastGenKey);
+            FieldFromUTF8(fld, UTF8String(IntToStr(FLastGenKey)));
             Post;
           end;
         end;
@@ -331,7 +331,7 @@ begin
           if fld <> nil then
           begin
             Edit;
-            fld.AsString := IntToStr(FLastGenKey);
+            FieldFromUTF8(fld, UTF8String(IntToStr(FLastGenKey)));
             Post;
           end;
         end;
@@ -354,7 +354,10 @@ begin
     bm := GetBookmark;
     try
       First;
-      for r := 1 to FBaseCount do
+      { Same skip as the genkey loop above: rows applied by earlier
+        ApplyUpdates calls are already in the table and must not be
+        collected again, or the second batch would re-insert them. }
+      for r := 1 to FBaseCount + FAppliedInserts do
         Next;
       for r := 0 to Pending - 1 do
       begin

@@ -233,6 +233,24 @@ begin
         'SELECT id,name FROM live_t WHERE id>=1000 ORDER BY id', 0, 10, 100);
       Ok('live-reread', (Length(rows) = 2) and (rows[0][0] = '1000') and
         (rows[0][1] = UTF8String('新增一')) and (rows[1][1] = UTF8String('新增二')));
+      { Second ApplyUpdates batch: must insert ONLY the new row. Before the
+        skip fix the collector re-read from FBaseCount and re-inserted the
+        first batch (duplicate PK 1000/1001). }
+      q.Append;
+      q.FieldFromUTF8(q.Fields[1], '新增三');
+      q.Post;
+      Ok('live-pending-2', q.PendingInserts = 1);
+      q.ApplyUpdates;
+      Ok('live-applied-2', (q.AppliedInserts = 3) and (q.PendingInserts = 0));
+      Ok('live-genkey-2', q.GetGeneratedKeys = 1002);
+      rows := bridge.FetchBatch(c,
+        'SELECT id,name FROM live_t WHERE id>=1000 ORDER BY id', 0, 10, 100);
+      Ok('live-reread-2', (Length(rows) = 3) and (rows[0][0] = '1000') and
+        (rows[1][0] = '1001') and (rows[2][0] = '1002') and
+        (rows[2][1] = UTF8String('新增三')));
+      rows := bridge.FetchBatch(c,
+        'SELECT COUNT(*) FROM live_t', 0, 10, 100);
+      Ok('live-no-dupes', rows[0][0] = '6');
       q.First;
       q.Edit;
       q.FieldFromUTF8(q.Fields[1], '改名');

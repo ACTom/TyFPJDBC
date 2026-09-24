@@ -24,7 +24,7 @@ Copyright (c) 1993-2021 by Florian Klaempfl and others
 Target OS: Win64 for x64
 Compiling D:\Projects\TyFPJDBC\tests\TestParser.lpr
 Linking D:\Projects\TyFPJDBC\test-results\bin\testparser.exe
-281 lines compiled, 0.4 sec, 175664 bytes code, 9540 bytes data
+281 lines compiled, 0.3 sec, 175664 bytes code, 9540 bytes data
 PASS-MATRIX: TestParser-compile
 PASS: dup-sql
 PASS: dup-count
@@ -73,7 +73,7 @@ Copyright (c) 1993-2021 by Florian Klaempfl and others
 Target OS: Win64 for x64
 Compiling D:\Projects\TyFPJDBC\tests\TestTypeMap.lpr
 Linking D:\Projects\TyFPJDBC\test-results\bin\testtypemap.exe
-105 lines compiled, 0.5 sec, 274320 bytes code, 13764 bytes data
+105 lines compiled, 2.8 sec, 274320 bytes code, 13764 bytes data
 PASS-MATRIX: TestTypeMap-compile
 PASS: VARCHAR -> ftWideString
 PASS: CHARACTER VARYING -> ftWideString
@@ -136,7 +136,7 @@ Target OS: Win64 for x64
 Compiling D:\Projects\TyFPJDBC\tests\TestQuery.lpr
 TestQuery.lpr(32,32) Warning: Constructing a class "TJDBCQuery" with abstract method "LoadBlobIntoBuffer"
 Linking D:\Projects\TyFPJDBC\test-results\bin\testquery.exe
-192 lines compiled, 0.6 sec, 467088 bytes code, 16596 bytes data
+192 lines compiled, 0.6 sec, 467152 bytes code, 16596 bytes data
 1 warning(s) issued
 PASS-MATRIX: TestQuery-compile
 PASS jdbc-sql
@@ -187,9 +187,9 @@ PASS proc-out
 PASS script-count
 PASS script-semi-in-str
 PASS perf-10k-count
-PERF 10k rows ms=0
+PERF 10k rows ms=16
 PASS perf-100k-count
-PERF 100k rows ms=31
+PERF 100k rows ms=15
 PASS perf-10k-bounded
 PASS perf-100k-bounded
 --- fails=0
@@ -203,7 +203,7 @@ Copyright (c) 1993-2021 by Florian Klaempfl and others
 Target OS: Win64 for x64
 Compiling D:\Projects\TyFPJDBC\tests\TestBridge.lpr
 Linking D:\Projects\TyFPJDBC\test-results\bin\testbridge.exe
-180 lines compiled, 0.4 sec, 195504 bytes code, 9780 bytes data
+180 lines compiled, 2.8 sec, 195504 bytes code, 9780 bytes data
 PASS-MATRIX: TestBridge-compile
 PASS bridge-version
 PASS fetch-default
@@ -238,7 +238,7 @@ Target OS: Win64 for x64
 Compiling D:\Projects\TyFPJDBC\tests\TestPoolDataset.lpr
 TestPoolDataset.lpr(92,32) Warning: Constructing a class "TJDBCQuery" with abstract method "LoadBlobIntoBuffer"
 Linking D:\Projects\TyFPJDBC\test-results\bin\testpooldataset.exe
-153 lines compiled, 0.6 sec, 464512 bytes code, 16596 bytes data
+153 lines compiled, 1.5 sec, 464576 bytes code, 16596 bytes data
 1 warning(s) issued
 PASS-MATRIX: TestPoolDataset-compile
 PASS distinct-connections
@@ -366,7 +366,7 @@ Target OS: Win64 for x64
 Compiling D:\Projects\TyFPJDBC\tests\TestLiveBridge.lpr
 TestLiveBridge.lpr(212,32) Warning: Constructing a class "TJDBCQuery" with abstract method "LoadBlobIntoBuffer"
 Linking D:\Projects\TyFPJDBC\test-results\bin\testlivebridge.exe
-386 lines compiled, 0.6 sec, 494176 bytes code, 16788 bytes data
+404 lines compiled, 0.6 sec, 494848 bytes code, 16788 bytes data
 1 warning(s) issued
 PASS-MATRIX: TestLiveBridge-compile
 PASS jvm-started
@@ -396,6 +396,11 @@ PASS live-pending
 PASS live-applied
 PASS live-genkey
 PASS live-reread
+PASS live-pending-2
+PASS live-applied-2
+PASS live-genkey-2
+PASS live-reread-2
+PASS live-no-dupes
 PASS live-edit
 PASS tx-rollback
 PASS tx-commit
@@ -410,7 +415,7 @@ PASS bad-sql-raises
 PASS error-chain
 PASS ddl-bulk
 PASS bulk-10k
-PERF live-bulk-10k ms=47
+PERF live-bulk-10k ms=46
 PASS bulk-count
 PASS heap-used
 PASS heap-max
@@ -435,7 +440,7 @@ Target OS: Win64 for x64
 Compiling D:\Projects\TyFPJDBC\tests\TestLiveGrid.lpr
 TestLiveGrid.lpr(42,30) Warning: Constructing a class "TJDBCQuery" with abstract method "LoadBlobIntoBuffer"
 Linking D:\Projects\TyFPJDBC\test-results\bin\testlivegrid.exe
-85 lines compiled, 0.5 sec, 478272 bytes code, 16692 bytes data
+85 lines compiled, 0.6 sec, 478336 bytes code, 16692 bytes data
 1 warning(s) issued
 PASS-MATRIX: TestLiveGrid-compile
 SLF4J: No SLF4J providers were found.
@@ -447,7 +452,7 @@ WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers i
 WARNING: Restricted methods will be blocked in a future release unless native access is enabled
 
 PASS try-live
-NOTE live: D:\Projects\TyFPJDBC\test-results\work\testlivegrid.dbdir\grid-7468.db
+NOTE live: D:\Projects\TyFPJDBC\test-results\work\testlivegrid.dbdir\grid-16408.db
 PASS grid-rows
 PASS grid-chinese
 PASS grid-cached
@@ -467,9 +472,9 @@ PASS-MATRIX: javac-test
 Thanks for using JUnit! Support its development at https://junit.org/sponsoring
 
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
-[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection conn0: url=jdbc:h2:mem:cx1093957666642268 user=SA
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection conn0: url=jdbc:h2:mem:cx1095211835195534 user=SA
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
-[pool-1-thread-1] WARN com.zaxxer.hikari.pool.ProxyConnection - HikariPool-1 - Connection conn0: url=jdbc:h2:mem:cx1093957666642268 user=SA marked as broken because of SQLSTATE(57014), ErrorCode(57014)
+[pool-1-thread-1] WARN com.zaxxer.hikari.pool.ProxyConnection - HikariPool-1 - Connection conn0: url=jdbc:h2:mem:cx1095211835195534 user=SA marked as broken because of SQLSTATE(57014), ErrorCode(57014)
 org.h2.jdbc.JdbcSQLTimeoutException: Statement was canceled or the session timed out; SQL statement:
 SELECT COUNT(*) FROM SYSTEM_RANGE(1,200000) A, SYSTEM_RANGE(1,200) B [57014-224]
 	at org.h2.message.DbException.getJdbcSQLException(DbException.java:572)
@@ -500,11 +505,11 @@ SELECT COUNT(*) FROM SYSTEM_RANGE(1,200000) A, SYSTEM_RANGE(1,200) B [57014-224]
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown initiated...
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-2 - Starting...
-[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-2 - Added connection conn2: url=jdbc:h2:mem:to1093959829285845 user=SA
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-2 - Added connection conn2: url=jdbc:h2:mem:to1095213948808577 user=SA
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-2 - Start completed.
-[main] WARN com.zaxxer.hikari.pool.ProxyConnection - HikariPool-2 - Connection conn2: url=jdbc:h2:mem:to1093959829285845 user=SA marked as broken because of SQLSTATE(57014), ErrorCode(57014)
+[main] WARN com.zaxxer.hikari.pool.ProxyConnection - HikariPool-2 - Connection conn2: url=jdbc:h2:mem:to1095213948808577 user=SA marked as broken because of SQLSTATE(57014), ErrorCode(57014)
 org.h2.jdbc.JdbcSQLTimeoutException: Statement was canceled or the session timed out; SQL statement:
-CREATE TABLE big_t1093959836807192 AS SELECT A.X AS a, B.X AS b FROM SYSTEM_RANGE(1,300000) A, SYSTEM_RANGE(1,300) B [57014-224]
+CREATE TABLE big_t1095213953886318 AS SELECT A.X AS a, B.X AS b FROM SYSTEM_RANGE(1,300000) A, SYSTEM_RANGE(1,300) B [57014-224]
 	at org.h2.message.DbException.getJdbcSQLException(DbException.java:572)
 	at org.h2.message.DbException.getJdbcSQLException(DbException.java:489)
 	at org.h2.message.DbException.get(DbException.java:223)
@@ -642,58 +647,58 @@ WARNING: Restricted methods will be blocked in a future release unless native ac
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-3 - Shutdown initiated...
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-3 - Shutdown completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-4 - Starting...
-[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-4 - Added connection conn4: url=jdbc:h2:mem:odoo1093961360524871 user=SA
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-4 - Added connection conn4: url=jdbc:h2:mem:odoo1095215395268113 user=SA
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-4 - Start completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-4 - Shutdown initiated...
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-4 - Shutdown completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-5 - Starting...
-[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-5 - Added connection conn5: url=jdbc:h2:mem:bom1093961417729069 user=SA
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-5 - Added connection conn5: url=jdbc:h2:mem:bom1095215454895245 user=SA
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-5 - Start completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-5 - Shutdown initiated...
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-5 - Shutdown completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-6 - Starting...
-[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-6 - Added connection conn6: url=jdbc:h2:mem:perf1093961449654355 user=SA
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-6 - Added connection conn6: url=jdbc:h2:mem:perf1095215481772683 user=SA
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-6 - Start completed.
-PERF 10k fetch ms=43
+PERF 10k fetch ms=48
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-6 - Shutdown initiated...
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-6 - Shutdown completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-7 - Starting...
-[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-7 - Added connection conn8: url=jdbc:h2:mem:t1093961630282061 user=SA
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-7 - Added connection conn8: url=jdbc:h2:mem:t1095215643316119 user=SA
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-7 - Start completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-7 - Shutdown initiated...
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-7 - Shutdown completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-8 - Starting...
-[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-8 - Added connection conn9: url=jdbc:h2:mem:wide1093961648298317 user=SA
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-8 - Added connection conn9: url=jdbc:h2:mem:wide1095215660113226 user=SA
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-8 - Start completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-8 - Shutdown initiated...
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-8 - Shutdown completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-9 - Starting...
-[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-9 - Added connection conn10: url=jdbc:h2:mem:shop1093961674435996 user=SA
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-9 - Added connection conn10: url=jdbc:h2:mem:shop1095215685049636 user=SA
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-9 - Start completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-9 - Shutdown initiated...
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-9 - Shutdown completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-10 - Starting...
-[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-10 - Added connection conn12: url=jdbc:h2:mem:batch1093961835653972 user=SA
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-10 - Added connection conn12: url=jdbc:h2:mem:batch1095215834522544 user=SA
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-10 - Start completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-10 - Shutdown initiated...
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-10 - Shutdown completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-11 - Starting...
-[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-11 - Added connection conn13: url=jdbc:h2:mem:pg1093961909699137 user=SA
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-11 - Added connection conn13: url=jdbc:h2:mem:pg1095215915532840 user=SA
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-11 - Start completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-11 - Shutdown initiated...
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-11 - Shutdown completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-12 - Starting...
-[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-12 - Added connection conn15: url=jdbc:h2:mem:pg1093962080990740 user=SA
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-12 - Added connection conn15: url=jdbc:h2:mem:pg1095216079013953 user=SA
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-12 - Start completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-12 - Shutdown initiated...
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-12 - Shutdown completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-13 - Starting...
-[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-13 - Added connection conn16: url=jdbc:h2:mem:tx1093962103793079 user=SA
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-13 - Added connection conn16: url=jdbc:h2:mem:tx1095216100637650 user=SA
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-13 - Start completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-13 - Shutdown initiated...
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-13 - Shutdown completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-14 - Starting...
-[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-14 - Added connection conn17: url=jdbc:h2:mem:cc1093962132365147 user=SA
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-14 - Added connection conn17: url=jdbc:h2:mem:cc1095216126535914 user=SA
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-14 - Start completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-14 - Shutdown initiated...
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-14 - Shutdown completed.
@@ -703,12 +708,12 @@ PERF 10k fetch ms=43
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-15 - Shutdown initiated...
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-15 - Shutdown completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-16 - Starting...
-[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-16 - Added connection conn19: url=jdbc:h2:mem:ledger1093962226051635 user=SA
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-16 - Added connection conn19: url=jdbc:h2:mem:ledger1095216222357590 user=SA
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-16 - Start completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-16 - Shutdown initiated...
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-16 - Shutdown completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-17 - Starting...
-[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-17 - Added connection conn20: url=jdbc:h2:mem:ddl1093962246441656 user=SA
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-17 - Added connection conn20: url=jdbc:h2:mem:ddl1095216235870480 user=SA
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-17 - Start completed.
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-17 - Shutdown initiated...
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-17 - Shutdown completed.
@@ -736,7 +741,7 @@ PERF 10k fetch ms=43
 ├─ JUnit Vintage ?
 └─ JUnit Platform Suite ?
 
-Test run finished after 4820 ms
+Test run finished after 4611 ms
 [         4 containers found      ]
 [         0 containers skipped    ]
 [         4 containers started    ]
@@ -777,7 +782,7 @@ Copyright (c) 1993-2021 by Florian Klaempfl and others
 Target OS: Win64 for x64
 Compiling D:\Projects\TyFPJDBC\tests\TestPerfTiers.lpr
 Linking D:\Projects\TyFPJDBC\test-results\bin\testperftiers.exe
-210 lines compiled, 0.4 sec, 200496 bytes code, 9732 bytes data
+210 lines compiled, 0.5 sec, 200496 bytes code, 9732 bytes data
 PASS-MATRIX: perf-tiers-compile
 SLF4J: No SLF4J providers were found.
 SLF4J: Defaulting to no-operation (NOP) logger implementation
@@ -787,24 +792,24 @@ WARNING: java.lang.System::load has been called by org.sqlite.SQLiteJDBCLoader i
 WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
 WARNING: Restricted methods will be blocked in a future release unless native access is enabled
 
-PERF tier=10000 insert ms=188 rows_per_sec=52910
+PERF tier=10000 insert ms=187 rows_per_sec=53191
 PASS tier-10000-count
 PASS tier-10000-scan
-PERF tier=10000 scan ms=78 rows_per_sec=126582
+PERF tier=10000 scan ms=94 rows_per_sec=105263
 PASS tier-10000-paged
-PERF tier=10000 paged ms=47 pages=10
+PERF tier=10000 paged ms=31 pages=10
 PASS tier-10000-checksum
-PERF tier=10000 update ms=15 checksum=500000
-PERF tier=10000 fpc-peak-kb=366 heap-used=30562400 heap-max=536870912
-PERF tier=100000 insert ms=1766 rows_per_sec=56593
+PERF tier=10000 update ms=16 checksum=500000
+PERF tier=10000 fpc-peak-kb=366 heap-used=29513824 heap-max=536870912
+PERF tier=100000 insert ms=1719 rows_per_sec=58139
 PASS tier-100000-count
 PASS tier-100000-scan
-PERF tier=100000 scan ms=1063 rows_per_sec=93984
+PERF tier=100000 scan ms=937 rows_per_sec=106609
 PASS tier-100000-paged
-PERF tier=100000 paged ms=812 pages=100
+PERF tier=100000 paged ms=703 pages=100
 PASS tier-100000-checksum
-PERF tier=100000 update ms=141 checksum=5000000
-PERF tier=100000 fpc-peak-kb=366 heap-used=144365712 heap-max=536870912
+PERF tier=100000 update ms=94 checksum=5000000
+PERF tier=100000 fpc-peak-kb=366 heap-used=144092576 heap-max=536870912
 PERF-REP rep=1 done
 --- fails=0
 
@@ -820,15 +825,15 @@ Copyright (c) 1993-2021 by Florian Klaempfl and others
 Target OS: Win64 for x64
 Compiling D:\Projects\TyFPJDBC\tests\TestPerfCompare.lpr
 Linking D:\Projects\TyFPJDBC\test-results\bin\testperfcompare.exe
-168 lines compiled, 0.7 sec, 533712 bytes code, 26372 bytes data
+168 lines compiled, 0.6 sec, 533712 bytes code, 26372 bytes data
 PASS-MATRIX: perf-fpc-compile
-PERF fpc-insert ms=93 rows=20000 rows_per_sec=212765
+PERF fpc-insert ms=78 rows=20000 rows_per_sec=253164
 PASS scan-count
-PERF fpc-scan ms=94 rows=20000 rows_per_sec=210526
+PERF fpc-scan ms=78 rows=20000 rows_per_sec=253164
 PASS paged-count
 PASS paged-pages
 PERF fpc-paged ms=47 rows=20000 pages=20 rows_per_sec=416666
-PERF fpc-update ms=16 checksum=1000000
+PERF fpc-update ms=31 checksum=1000000
 PASS update-checksum
 --- fails=0
 
@@ -841,10 +846,10 @@ WARNING: Restricted methods will be blocked in a future release unless native ac
 
 [main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection org.sqlite.jdbc4.JDBC4Connection@1cd072a9
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
-PERF bridge-insert ms=143 rows=20000 rows_per_sec=138888
-PERF bridge-scan ms=108 rows=20000 rows_per_sec=183486
-PERF bridge-paged ms=44 rows=20000 pages=20 rows_per_sec=444444
-PERF bridge-update ms=25 checksum=1000000
+PERF bridge-insert ms=147 rows=20000 rows_per_sec=135135
+PERF bridge-scan ms=117 rows=20000 rows_per_sec=169491
+PERF bridge-paged ms=45 rows=20000 pages=20 rows_per_sec=434782
+PERF bridge-update ms=30 checksum=1000000
 PERF-DONE rows=20000
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown initiated...
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown completed.
@@ -852,10 +857,10 @@ PERF-DONE rows=20000
 PASS-MATRIX: perf-bridge-pass
 PASS-MATRIX: perf-checksum-agree
 PERF-TABLE phase | sqlite3conn-direct-ms | bridge-jdbc-ms
-PERF-TABLE insert-20k | 93 | 143
-PERF-TABLE scan-20k | 94 | 108
-PERF-TABLE paged-20k | 47 | 44
-PERF-TABLE update-10k | 16 | 25
+PERF-TABLE insert-20k | 78 | 147
+PERF-TABLE scan-20k | 78 | 117
+PERF-TABLE paged-20k | 47 | 45
+PERF-TABLE update-10k | 31 | 30
 PASS-MATRIX: perf-table-complete
 
 === examples-compile-run ===
@@ -864,7 +869,7 @@ Copyright (c) 1993-2021 by Florian Klaempfl and others
 Target OS: Win64 for x64
 Compiling D:\Projects\TyFPJDBC\examples\ex01_connect_select.lpr
 Linking D:\Projects\TyFPJDBC\test-results\bin\ex01_connect_select.exe
-61 lines compiled, 0.6 sec, 522640 bytes code, 26244 bytes data
+61 lines compiled, 2.7 sec, 522640 bytes code, 26244 bytes data
 PASS-MATRIX: ex01_connect_select-compile
 SELECT 1 => 1
 row => hello
@@ -877,7 +882,7 @@ Copyright (c) 1993-2021 by Florian Klaempfl and others
 Target OS: Win64 for x64
 Compiling D:\Projects\TyFPJDBC\examples\ex02_named_params.lpr
 Linking D:\Projects\TyFPJDBC\test-results\bin\ex02_named_params.exe
-37 lines compiled, 0.4 sec, 171280 bytes code, 9508 bytes data
+37 lines compiled, 2.7 sec, 171280 bytes code, 9508 bytes data
 PASS-MATRIX: ex02_named_params-compile
 SQL : SELECT * FROM wp_posts WHERE status=:st ORDER BY created DESC LIMIT :lim  =>  SELECT * FROM wp_posts WHERE status=? ORDER BY created DESC LIMIT ?   params[st,lim]
 SQL : SELECT * FROM t WHERE a=:id OR b=:id  =>  SELECT * FROM t WHERE a=? OR b=?   params[id,id]
@@ -894,7 +899,7 @@ Target OS: Win64 for x64
 Compiling D:\Projects\TyFPJDBC\examples\ex03_batch_fetch.lpr
 ex03_batch_fetch.lpr(17,30) Warning: Constructing a class "TJDBCQuery" with abstract method "LoadBlobIntoBuffer"
 Linking D:\Projects\TyFPJDBC\test-results\bin\ex03_batch_fetch.exe
-44 lines compiled, 0.7 sec, 454576 bytes code, 16516 bytes data
+44 lines compiled, 0.6 sec, 454704 bytes code, 16516 bytes data
 1 warning(s) issued
 PASS-MATRIX: ex03_batch_fetch-compile
 jdbc => SELECT id, name FROM big ORDER BY id
@@ -908,7 +913,7 @@ Target OS: Win64 for x64
 Compiling D:\Projects\TyFPJDBC\examples\ex04_edit_apply.lpr
 ex04_edit_apply.lpr(18,30) Warning: Constructing a class "TJDBCQuery" with abstract method "LoadBlobIntoBuffer"
 Linking D:\Projects\TyFPJDBC\test-results\bin\ex04_edit_apply.exe
-42 lines compiled, 0.6 sec, 456848 bytes code, 16548 bytes data
+42 lines compiled, 0.6 sec, 456912 bytes code, 16548 bytes data
 1 warning(s) issued
 PASS-MATRIX: ex04_edit_apply-compile
 stored value => a' OR '1'='1
@@ -934,7 +939,7 @@ Copyright (c) 1993-2021 by Florian Klaempfl and others
 Target OS: Win64 for x64
 Compiling D:\Projects\TyFPJDBC\examples\ex06_blob_stream.lpr
 Linking D:\Projects\TyFPJDBC\test-results\bin\ex06_blob_stream.exe
-29 lines compiled, 0.5 sec, 273056 bytes code, 13748 bytes data
+29 lines compiled, 0.4 sec, 273056 bytes code, 13748 bytes data
 PASS-MATRIX: ex06_blob_stream-compile
 BLOB => True
 BYTEA needs stream? True
@@ -1000,7 +1005,7 @@ PASS-MATRIX: ex10_json_config-run
 PASS-MATRIX: bridgedemo-compile
 bridge=1.0.0
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
-[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection conn0: url=jdbc:h2:mem:demo1093984882455451 user=SA
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection conn0: url=jdbc:h2:mem:demo1095255605991264 user=SA
 [main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
 row 1 => hello
 row 2 => 中文测试
@@ -1049,7 +1054,7 @@ Copyright (c) 1993-2021 by Florian Klaempfl and others
 (3104) Compiling ex09_dbgrid.lpr
 (9022) Compiling resource D:\Projects\TyFPJDBC\test-results\bin\ex09\ex09_dbgrid.obj
 (9015) Linking D:\Projects\TyFPJDBC\test-results\bin\ex09\ex09_dbgrid.exe
-(1008) 19 lines compiled, 2.5 sec, 2172080 bytes code, 132884 bytes data
+(1008) 19 lines compiled, 2.4 sec, 2172144 bytes code, 132884 bytes data
 (1022) 2 hint(s) issued
 Info: (lazarus) [TCompiler.Compile] end
 PASS-MATRIX: ex09-compile
