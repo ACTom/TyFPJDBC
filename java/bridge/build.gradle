@@ -5,6 +5,7 @@ dependencies {
   implementation 'org.slf4j:slf4j-api:2.0.9'
   testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
   testImplementation 'com.h2database:h2:2.2.224'
+  testImplementation 'org.xerial:sqlite-jdbc:3.46.1.0'
   testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 tasks.withType<Test> { useJUnitPlatform() }

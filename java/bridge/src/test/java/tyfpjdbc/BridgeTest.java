@@ -30,6 +30,36 @@ public class BridgeTest {
     b.destroyPool(pool);
   }
 
+  @Test public void sqliteRoundTrip() throws Exception {
+    Bridge b = new Bridge();
+    String db = System.getProperty("java.io.tmpdir") + "/tyfpjdbc-sqlite-" + System.nanoTime() + ".db";
+    long pool = b.createPool("jdbc:sqlite:" + db, "", "", 2, 1);
+    try {
+      long c = b.borrowConnection(pool);
+      try {
+        String[][] one = b.fetchBatch(c, "SELECT 1", 0, 10, 100);
+        assertEquals(1, one.length);
+        assertEquals("1", one[0][0]);
+        b.execUpdate(c, "CREATE TABLE t(id INTEGER PRIMARY KEY, name TEXT)");
+        b.execUpdate(c, "INSERT INTO t VALUES(1,'hello')");
+        b.execUpdate(c, "INSERT INTO t VALUES(2,'中文测试')");
+        String[][] rows = b.fetchBatch(c, "SELECT id,name FROM t ORDER BY id", 0, 10, 100);
+        assertEquals(2, rows.length);
+        assertEquals("hello", rows[0][1]);
+        assertEquals("中文测试", rows[1][1]);
+        assertTrue(b.poolStats(pool).contains("active="));
+        b.releaseConnection(c);
+      } finally {
+        b.destroyPool(pool);
+        new java.io.File(db).delete();
+      }
+    } catch (Exception e) {
+      try { b.destroyPool(pool); } catch (Exception ignored) {}
+      new java.io.File(db).delete();
+      throw e;
+    }
+  }
+
   @Test public void batchedFetchPagesLargeResult() throws Exception {
     Bridge b = new Bridge();
     long pool = b.createPool("jdbc:h2:mem:pg" + System.nanoTime() + ";DB_CLOSE_DELAY=-1", "sa", "", 2, 1);
