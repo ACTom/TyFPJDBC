@@ -16,6 +16,8 @@ Java 示例用 `javac -cp <bridge jars>` 编译。
 | 池监控 + 慢查询回调 | `ex08_pool_stats.lpr` | `OnPoolStats/OnSlowQuery` |
 | 图形化 DBGrid/DBEdit/DBNavigator | `ex09_dbgrid/` | `lazbuild` 工程，界面全画在 `unit1.lfm`，`TJDBCQuery` 直绑 `TDataSource`；`GridData.TryLoadLive` 走真实 JNI+sqlite 文件库取数（`TestLiveGrid` 无头覆盖），JVM 不可用时回退内置行 |
 | 配置复用只读演示 | `ex10_json_config.lpr` | 读同一份 `configs/drivers.json` + `configs/runtimes.json`，列出驱动/运行时并解析 sqlite 条目到本地 jar |
+| V2 代码优先（建池建表批量插入窗口查询） | `ex11_code_first.lpr` | `TJVMManager` + `TBridgeV2` + `TJdbcEngine` + `TJdbcCommand` + `TJV2Query`，H2 回环 `inserted=3 rows=3 handles=0` |
+| V2 网格绑定（浏览编辑新增落库重查） | `ex12_dbgrid.lpr` | `TJV2Query` 绑 `TDataSource` 按网格方式浏览，编辑一行直写，新增两行经 `ApplyUpdates2` 落库，重查 `requery-rows=4 handles=0` |
 | Java 桥端到端 | `BridgeDemo.java` | `Bridge` 经 H2 跑通读写 |
 
 ```powershell
@@ -26,6 +28,9 @@ Copy-Item C:\Tools\sqlite3.dll . -Force  # 仅 ex01 需要
 # 图形化示例（LCL 工程）
 lazbuild examples/ex09_dbgrid/ex09_dbgrid.lpi
 .\test-results\bin\ex09\ex09_dbgrid.exe
+# V2 示例（需 H2/JVM，classesDir 指向已编译 BridgeV2）
+fpc -Fusrc/core -Fusrc/db -oex11.exe examples/ex11_code_first.lpr
+fpc -Fusrc/core -Fusrc/db -oex12.exe examples/ex12_dbgrid.lpr
 # Java
 $cp="C:\Tools\tyfpjdbc-libs\HikariCP-5.1.0.jar;C:\Tools\tyfpjdbc-libs\slf4j-api-2.0.9.jar;C:\Tools\tyfpjdbc-libs\h2-2.2.224.jar"
 & "$jh\bin\javac.exe" -cp $cp -d out examples/BridgeDemo.java java/bridge/src/main/java/tyfpjdbc/Bridge.java

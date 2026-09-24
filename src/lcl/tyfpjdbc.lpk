@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <Package Version="5">
+    <Name Value="tyfpjdbc"/>
+    <Type Value="RunAndDesignTime"/>
+    <Author Value="TyFPJDBC"/>
+    <Description Value="TyFPJDBC V2 generic JDBC design-time components"/>
+    <License Value="MPL-2.0"/>
+    <Version Major="2" Minor="0" Release="0" Build="0"/>
+    <CompilerOptions>
+      <Version Value="11"/>
+      <SearchPaths>
+        <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)/$(LCLWidgetType)"/>
+      </SearchPaths>
+      <Other>
+        <CustomOptions Value="$(IDEBuildOptions)"/>
+      </Other>
+    </CompilerOptions>
+    <RequiredPkgs>
+      <Item>
+        <PackageName Value="LCL"/>
+      </Item>
+      <Item>
+        <PackageName Value="IDEIntf"/>
+      </Item>
+      <Item>
+        <PackageName Value="FCL"/>
+      </Item>
+    </RequiredPkgs>
+    <Files>
+      <Item>
+        <Filename Value="TyFPJDBC.LCL.Conn.pas"/>
+        <UnitName Value="TyFPJDBC.LCL.Conn"/>
+      </Item>
+      <Item>
+        <Filename Value="TyFPJDBC.LCL.Query.pas"/>
+        <UnitName Value="TyFPJDBC.LCL.Query"/>
+      </Item>
+      <Item>
+        <Filename Value="TyFPJDBC.LCL.ConnDialog.pas"/>
+        <UnitName Value="TyFPJDBC.LCL.ConnDialog"/>
+      </Item>
+      <Item>
+        <Filename Value="tyfpjdbcreg.pas"/>
+        <HasRegisterProc Value="True"/>
+        <UnitName Value="tyfpjdbcreg"/>
+      </Item>
+    </Files>
+  </Package>
+</CONFIG>

@@ -18,6 +18,8 @@ type
     class function DefaultPort(const DriverId: string): Integer; static;
     class function BuildUrl(const DriverId, Host: string; Port: Integer;
       const Database: string; Extra: TStrings): string; static;
+    class function BuildUrlNil(const DriverId, Host: string; Port: Integer;
+      const Database: string): string; static;
     class procedure BuildProperties(const DriverId: string; LoginTimeoutSecs,
       SocketTimeoutSecs: Integer; ReadOnly: Boolean; Dest: TStrings); static;
   end;
@@ -154,6 +156,12 @@ begin
   Dest.Values['loginTimeout'] := IntToStr(LoginTimeoutSecs);
   Dest.Values['socketTimeout'] := IntToStr(SocketTimeoutSecs);
   Dest.Values['readOnly'] := LowerCase(BoolToStr(ReadOnly, True));
+end;
+
+class function TDriverRegistry.BuildUrlNil(const DriverId, Host: string;
+  Port: Integer; const Database: string): string;
+begin
+  Result := BuildUrl(DriverId, Host, Port, Database, nil);
 end;
 
 initialization
