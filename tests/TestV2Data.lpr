@@ -48,12 +48,14 @@ var
   eng: TJdbcEngine;
   cfg: TPoolCfgRec;
   pool, conn: Int64;
-  cmd: TJdbcCommand;
+  cmd, cmd2: TJdbcCommand;
   q: TJV2Query;
   rows: array of TBoundRow;
   r: TBoundRow;
   i: Integer;
-  keys: TV2Row;
+  keys, keys2: TV2Row;
+  stmt, cur: Int64;
+  back: TV2Rows;
   raised: Boolean;
   st: EJDBCError;
 begin
@@ -89,10 +91,43 @@ begin
         SetLength(r, 3);
         r[0] := BInt64(1); r[1] := BBigDec('19.99'); r[2] := BStr('中文测试');
         Ok('insert-typed', cmd.ExecUpdate(r) = 1);
-        keys := cmd.LastInsertKeys;
-        Ok('genkeys-shape', True);
       finally
         cmd.Free;
+      end;
+
+      { Generated-key backfill on an auto-increment table: insert without
+        the key column, LastInsertKeys must return the generated key, and
+        a re-read must show the same id row (not a hard-coded value). }
+      Ok('ddl-seq', bridge.ExecDirect(conn,
+        'CREATE TABLE seq(id BIGINT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(50))') = 0);
+      cmd2 := TJdbcCommand.Create(eng, conn);
+      try
+        cmd2.SetSQL('INSERT INTO seq(name) VALUES(:name)');
+        SetLength(r, 1);
+        r[0] := BStr('first');
+        Ok('seq-insert-1', cmd2.ExecUpdate(r) = 1);
+        keys := cmd2.LastInsertKeys;
+        Ok('genkeys-shape', (Length(keys) >= 1) and (Trim(string(keys[0])) <> ''));
+        r[0] := BStr('second');
+        Ok('seq-insert-2', cmd2.ExecUpdate(r) = 1);
+        keys2 := cmd2.LastInsertKeys;
+        Ok('genkeys-advance', (Length(keys2) >= 1) and (keys2[0] <> keys[0]));
+        stmt := bridge.Prepare(conn, 'SELECT id,name FROM seq ORDER BY id');
+        try
+          cur := bridge.QueryOpen(stmt, 10);
+          try
+            back := bridge.FetchWindow(cur, 10);
+            Ok('genkeys-reread', (Length(back) = 2) and
+              (back[0][0] = keys[0]) and (back[1][0] = keys2[0]) and
+              (back[0][1] = 'first') and (back[1][1] = 'second'));
+          finally
+            bridge.CloseCursor(cur);
+          end;
+        finally
+          bridge.CloseStmt(stmt);
+        end;
+      finally
+        cmd2.Free;
       end;
 
       { 2500-row batch with BatchSize split 1000 -> 1000+1000+500. }
