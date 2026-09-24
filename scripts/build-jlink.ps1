@@ -48,9 +48,14 @@ if ($BridgeDir -ne "") {
   Copy-Item (Join-Path $BridgeDir "*") (Join-Path $out "bridge")
   "drivers are resolved at runtime: place JDBC driver jars here (e.g. h2-2.2.224.jar) and load via URLClassLoader; see configs/drivers.json" | Out-File -FilePath (Join-Path $out "drivers/README.txt") -Encoding utf8
 }
+# Deterministic packaging: sorted entries, fixed 2026-01-01 timestamp, Optimal.
+# Must run under PowerShell 7 (pwsh) so System.IO.Compression output is stable;
+# Windows PowerShell 5.1 uses a different Deflate encoder and yields different
+# bytes for identical inputs. Rebuilding the same stage dir twice with this
+# script under the same pwsh/.NET produces byte-identical zips.
 $zip = Join-Path $OutRoot ("jre-25-tyfpjdbc-" + $Platform + ".zip")
-if (Test-Path $zip) { Remove-Item -Force $zip }
-Compress-Archive -Path $out -DestinationPath $zip
+$packer = Join-Path $PSScriptRoot "build-runtime-zip.ps1"
+& $packer -StageDir $out -OutZip $zip
 $h = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
 $u = (Get-ChildItem $out -Recurse -File | Measure-Object Length -Sum).Sum
 $b = (Get-Item $zip).Length

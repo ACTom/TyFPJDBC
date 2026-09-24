@@ -9,11 +9,11 @@
       "jdepsModules": ["java.base", "java.management", "java.naming", "java.sql"],
       "bridgeVersion": "1.0.0",
       "asset": "jre-25-tyfpjdbc-win64.zip",
-      "packedBytes": 24982246,
-      "unpackedBytes": 38873595,
-      "verifiedNote": "Built 2026-09-24 by same-host jlink from Temurin 25.0.4.1 win64 jmods (flags: --disable-plugin generate-jli-classes --vm server, --compress=zip-9, --exclude-resources classes*.jsa), plus bridge/ (Bridge.class, HikariCP 5.1.0, slf4j-api 2.0.9) and drivers/README. Boots java -version; live H2 probe passed on this layout.",
+      "packedBytes": 24982120,
+      "unpackedBytes": 38873598,
+      "verifiedNote": "Built 2026-09-24 by same-host jlink from Temurin 25.0.4.1 win64 jmods (flags: --disable-plugin generate-jli-classes --vm server, --compress=zip-9, --exclude-resources classes*.jsa), plus bridge/ (Bridge.class, HikariCP 5.1.0, slf4j-api 2.0.9) and drivers/README. Packed with scripts/build-runtime-zip.ps1 under PowerShell 7 (sorted entries, fixed 2026-01-01 timestamp, Optimal): byte-identical rebuild proven. Boots java -version; live H2 probe passed.",
       "url": "TyFPJDBC-Runtimes Release asset: jre-25-tyfpjdbc-win64.zip",
-      "sha256": "bef5a283a8fee11484e003dd053107c9f4694089b1bbdf9e80d05de8ab2669b9"
+      "sha256": "fa3f575f439ef954ffd657489474fd56ce59d54772852e55e83d410277accc04"
     },
     {
       "platform": "linux-x64",
@@ -24,11 +24,11 @@
       "moduleSet": "9-module trim, release MODULES verified",
       "bridgeVersion": "1.0.0",
       "asset": "jre-25-tyfpjdbc-linux-x64.zip",
-      "packedBytes": 27222535,
-      "unpackedBytes": 48583396,
-      "verifiedNote": "Built 2026-09-24 by cross-host jlink: Windows Temurin jlink binary against Microsoft 25.0.4.1 linux-x64 jmods (same flags as win64). Layout verified: ELF launcher and lib/server/libjvm.so (7F-45-4C-46), zero dll/exe, 9-module release MODULES, no server CDS archives.",
+      "packedBytes": 27222401,
+      "unpackedBytes": 48583399,
+      "verifiedNote": "Built 2026-09-24 by cross-host jlink: Windows Temurin jlink binary against Microsoft 25.0.4.1 linux-x64 jmods (same flags as win64). Packed with scripts/build-runtime-zip.ps1 under PowerShell 7 (sorted, fixed timestamp): byte-identical rebuild proven. Layout verified: ELF launcher and lib/server/libjvm.so (7F-45-4C-46), zero dll/exe, 9-module release MODULES.",
       "url": "TyFPJDBC-Runtimes Release asset: jre-25-tyfpjdbc-linux-x64.zip",
-      "sha256": "a6cf9f204945e8fe37ef04c5b56e606d7597fc42b9fb54b35dd20de36f039ad9"
+      "sha256": "9f3b71860c2f417adf07e7a24384ac49a34e5ea0893571c5ee4f4a60d2b2c57f"
     },
     {
       "platform": "linux-arm64",
@@ -39,11 +39,11 @@
       "moduleSet": "9-module trim, release MODULES verified",
       "bridgeVersion": "1.0.0",
       "asset": "jre-25-tyfpjdbc-linux-arm64.zip",
-      "packedBytes": 26452279,
-      "unpackedBytes": 46965193,
-      "verifiedNote": "Built 2026-09-24 by cross-host jlink against Microsoft 25.0.4.1 linux-aarch64 jmods (same flags). Layout verified: ELF launcher and lib/server/libjvm.so, zero dll/exe, 9-module release MODULES.",
+      "packedBytes": 26452141,
+      "unpackedBytes": 46965196,
+      "verifiedNote": "Built 2026-09-24 by cross-host jlink against Microsoft 25.0.4.1 linux-aarch64 jmods (same flags). Packed with scripts/build-runtime-zip.ps1 under PowerShell 7: byte-identical rebuild proven. Layout verified: ELF launcher and lib/server/libjvm.so, zero dll/exe, 9-module release MODULES.",
       "url": "TyFPJDBC-Runtimes Release asset: jre-25-tyfpjdbc-linux-arm64.zip",
-      "sha256": "0fdfb17207e7359b9f481737fd7e0ed1a253a92918f3a86210f00c1d375918a1"
+      "sha256": "1be8407bac801db3fe2cc991f908724499d2f11fd4f641276e8c2fb13524fbc3"
     },
     {
       "platform": "macos-x64",
@@ -54,11 +54,11 @@
       "moduleSet": "9-module trim, release MODULES verified",
       "bridgeVersion": "1.0.0",
       "asset": "jre-25-tyfpjdbc-macos-x64.zip",
-      "packedBytes": 24178880,
-      "unpackedBytes": 41323422,
-      "verifiedNote": "Built 2026-09-24 by cross-host jlink against Microsoft 25.0.4.1 mac-x64 jmods (same flags). Layout verified: Mach-O launcher and lib/server/libjvm.dylib (CF-FA-ED-FE), zero .so, 9-module release MODULES.",
+      "packedBytes": 24178746,
+      "unpackedBytes": 41323425,
+      "verifiedNote": "Built 2026-09-24 by cross-host jlink against Microsoft 25.0.4.1 mac-x64 jmods (same flags). Packed with scripts/build-runtime-zip.ps1 under PowerShell 7: byte-identical rebuild proven. Layout verified: Mach-O launcher and lib/server/libjvm.dylib (CF-FA-ED-FE), zero .so, 9-module release MODULES.",
       "url": "TyFPJDBC-Runtimes Release asset: jre-25-tyfpjdbc-macos-x64.zip",
-      "sha256": "da0f1b68c051df4020abfcd04a87a8061be9ff68d6b501cf256e602fb509e794"
+      "sha256": "feb2bedd17231a1d239e8a3bf3dfddaddd83056bc9aa9999e56686d5b53f5555"
     },
     {
       "platform": "macos-arm64",
@@ -69,11 +69,11 @@
       "moduleSet": "9-module trim, release MODULES verified",
       "bridgeVersion": "1.0.0",
       "asset": "jre-25-tyfpjdbc-macos-arm64.zip",
-      "packedBytes": 23191571,
-      "unpackedBytes": 39104964,
-      "verifiedNote": "Built 2026-09-24 by cross-host jlink against Microsoft 25.0.4.1 mac-aarch64 jmods (same flags). Layout verified: Mach-O launcher and lib/server/libjvm.dylib, zero .so, 9-module release MODULES.",
+      "packedBytes": 23191433,
+      "unpackedBytes": 39104967,
+      "verifiedNote": "Built 2026-09-24 by cross-host jlink against Microsoft 25.0.4.1 mac-aarch64 jmods (same flags). Packed with scripts/build-runtime-zip.ps1 under PowerShell 7: byte-identical rebuild proven. Layout verified: Mach-O launcher and lib/server/libjvm.dylib, zero .so, 9-module release MODULES.",
       "url": "TyFPJDBC-Runtimes Release asset: jre-25-tyfpjdbc-macos-arm64.zip",
-      "sha256": "12c7ee3e17e8d2b4d44aa4f06cc8480ab3ccd101bd6a2f2cab5709426ca1925a"
+      "sha256": "b846b54d0aaea1189a3c4d397d8ccfce9d0ca651aab06be030d3e949b9bac154"
     }
   ]
 }
