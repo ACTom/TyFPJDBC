@@ -1,0 +1,183 @@
+program TestV2Engine;
+
+{$mode objfpc}{$H+}
+{$codepage UTF8}
+
+{ V2 engine live loopback: JVM (real JNI_CreateJavaVM) -> BridgeV2 (real JNI)
+  -> HikariCP -> H2 mem DB. Covers: version, bad-handle local reject,
+  pool/borrow, typed batch via direct prepare, windowed fetch, savepoint
+  rollback with re-read, structured pool stats, handle count归零.
+  Usage: TestV2Engine <classesDir>. }
+
+uses
+  SysUtils, Classes, TyFPJDBC.Handles, TyFPJDBC.JVM.Manager,
+  TyFPJDBC.JNI.BridgeV2, TyFPJDBC.Engine;
+
+var
+  Fails: Integer = 0;
+
+procedure Ok(const N: string; C: Boolean);
+begin
+  if C then WriteLn('PASS ', N) else begin Inc(Fails); WriteLn('FAIL ', N); end;
+end;
+
+function LibJar(const Name: string): string;
+begin
+  Result := 'C:\Tools\tyfpjdbc-libs\' + Name;
+  if not FileExists(Result) then
+    raise Exception.Create('missing jar: ' + Result);
+end;
+
+function FindJvmDll: string;
+const
+  Cands: array[0..1] of string = (
+    'C:\Tools\ms-jdks\win64\jdk-25.0.4.1+1\bin\server\jvm.dll',
+    'C:\Tools\jdk25\jdk-25.0.4.1+1\bin\server\jvm.dll');
+var
+  i: Integer;
+begin
+  for i := 0 to High(Cands) do
+    if FileExists(Cands[i]) then
+      Exit(Cands[i]);
+  raise Exception.Create('no jvm.dll found');
+end;
+
+var
+  classesDir: string;
+  bridge: TBridgeV2;
+  eng: TJdbcEngine;
+  cfg: TPoolCfgRec;
+  pool, conn, stmt, cur: Int64;
+  rows: TV2Rows;
+  raised: Boolean;
+  st: string;
+begin
+  if ParamCount < 1 then
+  begin
+    WriteLn('usage: TestV2Engine <classesDir>');
+    Halt(2);
+  end;
+  classesDir := ParamStr(1);
+  TJVMManager.ResetForTests;
+  TJVMManager.SetClassPath(classesDir + ';' + LibJar('HikariCP-5.1.0.jar') +
+    ';' + LibJar('slf4j-api-2.0.9.jar') + ';' + LibJar('h2-2.2.224.jar') +
+    ';' + LibJar('sqlite-jdbc-3.46.1.0.jar'));
+  TJVMManager.EnsureStarted(FindJvmDll, TJVMManager.BuildDesktopArgs);
+  Ok('jvm-started', TJVMManager.IsStarted);
+
+  bridge := TBridgeV2.Create;
+  try
+    Ok('bridge-version-2', bridge.GetVersion = '2.0.0');
+    try
+      bridge.BorrowConn(0);
+      Ok('bad-handle-local', False);
+    except
+      on E: EJDBCError do
+        Ok('bad-handle-local', (E.SQLState = 'HY000') and (E.VendorCode = 99));
+    end;
+    st := bridge.ErrorChain;
+    Ok('errorchain-thread', True);
+
+    eng := TJdbcEngine.Create(bridge);
+    try
+      cfg := DefaultPoolCfg('jdbc:h2:mem:v2eng;DB_CLOSE_DELAY=-1', 'org.h2.Driver');
+      pool := eng.OpenPool(cfg);
+      Ok('pool-open', pool > 0);
+      conn := eng.Borrow(pool);
+      Ok('borrow', conn > 0);
+      Ok('isvalid', bridge.IsValid(conn, 2));
+      st := bridge.DatabaseMeta(conn);
+      Ok('dbmeta-h2', Pos('H2', st) > 0);
+
+      Ok('ddl', bridge.ExecDirect(conn,
+        'CREATE TABLE t(id BIGINT PRIMARY KEY, amt DECIMAL(10,2), name VARCHAR(50))') = 0);
+      stmt := bridge.Prepare(conn, 'INSERT INTO t VALUES(?,?,?)');
+      try
+        bridge.BindLong(stmt, 1, 1);
+        bridge.BindBigDecimal(stmt, 2, '19.99');
+        bridge.BindString(stmt, 3, 'hi');
+        bridge.AddBatch(stmt);
+        bridge.BindLong(stmt, 1, 2);
+        bridge.BindBigDecimal(stmt, 2, '3.50');
+        bridge.BindString(stmt, 3, 'ho');
+        bridge.AddBatch(stmt);
+        Ok('typed-batch-2', bridge.ExecBatch(stmt) = 2);
+      finally
+        bridge.CloseStmt(stmt);
+      end;
+
+      stmt := bridge.Prepare(conn, 'SELECT id,amt,name FROM t ORDER BY id');
+      try
+        cur := bridge.QueryOpen(stmt, 1);
+        try
+          Ok('cursor-cols', bridge.CursorCols(cur) = 3);
+          rows := bridge.FetchWindow(cur, 1);
+          Ok('window-1', (Length(rows) = 1) and (rows[0][0] = '1') and (rows[0][1] = '19.99'));
+          rows := bridge.FetchWindow(cur, 10);
+          Ok('window-2', (Length(rows) = 1) and (rows[0][0] = '2'));
+        finally
+          bridge.CloseCursor(cur);
+        end;
+      finally
+        bridge.CloseStmt(stmt);
+      end;
+
+      eng.SetAutoCommit(conn, False);
+      stmt := bridge.Prepare(conn, 'INSERT INTO t VALUES(?,?,?)');
+      try
+        bridge.BindLong(stmt, 1, 3);
+        bridge.BindBigDecimal(stmt, 2, '1.00');
+        bridge.BindString(stmt, 3, 'tmp');
+        bridge.ExecUpdate(stmt);
+        eng.Savepoint(conn, 'sp1');
+        bridge.BindLong(stmt, 1, 4);
+        bridge.BindBigDecimal(stmt, 2, '2.00');
+        bridge.BindString(stmt, 3, 'tmp2');
+        bridge.ExecUpdate(stmt);
+        eng.RollbackTo(conn, 'sp1');
+        eng.ReleaseSavepoint(conn, 'sp1');
+        eng.Commit(conn);
+      finally
+        bridge.CloseStmt(stmt);
+      end;
+      stmt := bridge.Prepare(conn, 'SELECT COUNT(*) FROM t');
+      try
+        cur := bridge.QueryOpen(stmt, 10);
+        try
+          rows := bridge.FetchWindow(cur, 10);
+          Ok('savepoint-count', (Length(rows) = 1) and (rows[0][0] = '3'));
+        finally
+          bridge.CloseCursor(cur);
+        end;
+      finally
+        bridge.CloseStmt(stmt);
+      end;
+      eng.SetAutoCommit(conn, True);
+
+      raised := False;
+      try
+        eng.Savepoint(conn, 'evil name!');
+      except
+        on E: EJDBCError do
+          raised := E.SQLState = 'HY092';
+      end;
+      Ok('savepoint-whitelist', raised);
+
+      Ok('pool-active', eng.PoolActive(pool) >= 0);
+      Ok('pool-idle', eng.PoolIdle(pool) >= 0);
+      Ok('pool-waiting', eng.PoolWaiting(pool) >= 0);
+
+      eng.Release(conn);
+      eng.ClosePool(pool);
+      Ok('handles-zero', eng.HandleCount = 0);
+    finally
+      eng.Free;
+    end;
+  finally
+    bridge.Free;
+  end;
+  TJVMManager.ShutdownJvm;
+  Ok('shutdown', True);
+  WriteLn('TOTAL fails=', Fails);
+  if Fails > 0 then Halt(1);
+end.

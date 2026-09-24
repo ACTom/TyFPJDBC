@@ -20,6 +20,7 @@ type
     destructor Destroy; override;
     procedure Validate;
     function BuildArgs: string;
+    function BuildArgArray: TStringArray;
   end;
 
   TJVMManager = class
@@ -35,7 +36,6 @@ type
     class var FJavaVM: PJavaVM;
     class var FMainEnv: PJNIEnv;
     class procedure DoLog(const Msg: string); static;
-    class function SplitArgs(const S: string): TStringArray; static;
   public
     class constructor Create;
     class destructor Destroy;
@@ -48,6 +48,13 @@ type
     class procedure EnsureStarted(const LibJvm, ExtraArgs: string); static;
     class procedure EnsureStartedWithOptions(const LibJvm: string;
       Opts: TJVMOptions); static;
+    class procedure EnsureStartedArgs(const LibJvm: string;
+      const Args: array of string); static;
+    class function JoinArgs(const Args: array of string): string; static;
+    class function SplitArgs(const S: string): TStringArray; static;
+    class function FindLibJvmV2(const CustomPath: string): string; static;
+    class procedure ShutdownJvm; static;
+    class function JniVersionUsed: LongInt; static;
     class function LastStartArgs: string; static;
     class procedure ResetForTests; static;
     class procedure AttachThread; static;
@@ -111,25 +118,40 @@ begin
 end;
 
 function TJVMOptions.BuildArgs: string;
+begin
+  Result := TJVMManager.JoinArgs(BuildArgArray);
+end;
+
+function TJVMOptions.BuildArgArray: TStringArray;
+
+  procedure Add(const S: string);
+  begin
+    SetLength(Result, Length(Result) + 1);
+    Result[High(Result)] := S;
+  end;
+
 var
   i: Integer;
 begin
   Validate;
+  SetLength(Result, 0);
   case Mode of
     jvmServer:
-      Result := '-XX:MaxRAMPercentage=' +
+      Add('-XX:MaxRAMPercentage=' +
         StringReplace(FloatToStr(MaxRAMPercentage), ',', '.',
-          [rfReplaceAll]) + ' -Xrs';
+          [rfReplaceAll]));
     else
-      Result := '-Xmx' + Xmx;
+      Add('-Xmx' + Xmx);
   end;
-  Result := Result + ' -Dfile.encoding=' + FileEncoding +
-    ' -Djava.awt.headless=true';
+  if Mode = jvmServer then
+    Add('-Xrs');
+  Add('-Dfile.encoding=' + FileEncoding);
+  Add('-Djava.awt.headless=true');
   if EnableCheckJNI then
-    Result := Result + ' -Xcheck:jni';
+    Add('-Xcheck:jni');
   for i := 0 to ExtraArgs.Count - 1 do
     if Trim(ExtraArgs[i]) <> '' then
-      Result := Result + ' ' + Trim(ExtraArgs[i]);
+      Add(Trim(ExtraArgs[i]));
 end;
 
 class procedure TJVMManager.DoLog(const Msg: string);
@@ -140,25 +162,38 @@ end;
 
 class function TJVMManager.SplitArgs(const S: string): TStringArray;
 var
-  parts: TStringList;
   i: Integer;
-begin
-  SetLength(Result, 0);
-  parts := TStringList.Create;
-  try
-    parts.Delimiter := ' ';
-    parts.StrictDelimiter := True;
-    parts.DelimitedText := Trim(S);
-    SetLength(Result, 0);
-    for i := 0 to parts.Count - 1 do
-      if Trim(parts[i]) <> '' then
-      begin
-        SetLength(Result, Length(Result) + 1);
-        Result[High(Result)] := Trim(parts[i]);
-      end;
-  finally
-    parts.Free;
+  cur: string;
+  quoted: Boolean;
+
+  procedure Flush;
+  begin
+    if cur <> '' then
+    begin
+      SetLength(Result, Length(Result) + 1);
+      Result[High(Result)] := cur;
+      cur := '';
+    end;
   end;
+
+begin
+  { Quote-aware splitter: "C:\Program Files\x" stays one arg. Old callers
+    passing unquoted args behave exactly as before. }
+  SetLength(Result, 0);
+  cur := '';
+  quoted := False;
+  i := 1;
+  while i <= Length(S) do
+  begin
+    if S[i] = '"' then
+      quoted := not quoted
+    else if (S[i] = ' ') and not quoted then
+      Flush
+    else
+      cur := cur + S[i];
+    Inc(i);
+  end;
+  Flush;
 end;
 
 class function TJVMManager.IsHeadlessArg(const S: string): Boolean;
@@ -321,14 +356,101 @@ end;
 class procedure TJVMManager.EnsureStartedWithOptions(const LibJvm: string;
   Opts: TJVMOptions);
 begin
-  { TJVMOptions is the real JVM start path: BuildArgs validates the option
-    set (headless/encoding/RAM range included), so changing any option
-    changes the JVM command line that EnsureStarted receives. }
   if Opts = nil then
     raise Exception.Create('JVM options required');
   EnsureStarted(LibJvm, Opts.BuildArgs);
 end;
 
+class function TJVMManager.JoinArgs(const Args: array of string): string;
+var
+  i: Integer;
+  a: string;
+begin
+  { Array-based entry: args containing spaces are double-quoted; the
+    quote-aware SplitArgs on the creation path strips them back, so
+    '-Dpath=C:\Program Files\x' arrives as ONE option. }
+  Result := '';
+  for i := 0 to High(Args) do
+  begin
+    a := Args[i];
+    if (Pos(' ', a) > 0) and ((a = '') or (a[1] <> '"')) then
+      a := '"' + a + '"';
+    if Result <> '' then
+      Result := Result + ' ';
+    Result := Result + a;
+  end;
+end;
+
+class procedure TJVMManager.EnsureStartedArgs(const LibJvm: string;
+  const Args: array of string);
+begin
+  { JoinArgs quotes space-bearing args; the quote-aware SplitArgs below
+    strips them back, so paths with spaces arrive as single options. }
+  EnsureStarted(LibJvm, JoinArgs(Args));
+end;
+
+class function TJVMManager.FindLibJvmV2(const CustomPath: string): string;
+var
+  h, cand: string;
+
+  function TryPath(const P: string): Boolean;
+  begin
+    Result := (P <> '') and FileExists(P);
+    if Result then
+      FindLibJvmV2 := P;
+  end;
+
+begin
+  if TryPath(CustomPath) then
+    Exit;
+  { Bundled runtime next to the executable. }
+  cand := IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) + 'jre' +
+    PathDelim + 'bin' + PathDelim + 'server' + PathDelim + 'jvm.dll';
+  if TryPath(cand) then
+    Exit;
+  cand := IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) + 'jre' +
+    PathDelim + 'lib' + PathDelim + 'server' + PathDelim + 'libjvm.so';
+  if TryPath(cand) then
+    Exit;
+  h := GetEnvironmentVariable('JAVA_HOME');
+  if h <> '' then
+  begin
+    if TryPath(IncludeTrailingPathDelimiter(h) + 'bin' + PathDelim + 'server' +
+      PathDelim + 'jvm.dll') then
+      Exit;
+    if TryPath(IncludeTrailingPathDelimiter(h) + 'lib' + PathDelim + 'server' +
+      PathDelim + 'libjvm.so') then
+      Exit;
+    if TryPath(IncludeTrailingPathDelimiter(h) + 'Contents' + PathDelim + 'Home' +
+      PathDelim + 'lib' + PathDelim + 'server' + PathDelim + 'libjvm.dylib') then
+      Exit;
+  end;
+  { Well-known macOS location (harmless to probe on other platforms). }
+  if TryPath('/Library/Java/JavaVirtualMachines/temurin-25.jdk/Contents/Home/lib/server/libjvm.dylib') then
+    Exit;
+  Result := FindLibJvm(CustomPath);
+end;
+
+class procedure TJVMManager.ShutdownJvm;
+begin
+  { HotSpot supports exactly one VM per process and DestroyJavaVM rarely
+    unloads cleanly, so shutdown only releases thread accounting; the VM
+    itself is retained. Callers must close all pools/cursors first. }
+  FLock.Enter;
+  try
+    FAttachCount := 0;
+    DoLog('JVM shutdown (VM retained by HotSpot)');
+  finally
+    FLock.Leave;
+  end;
+end;
+
+class function TJVMManager.JniVersionUsed: LongInt;
+begin
+  { FPC 3.2.2's jni unit caps at JNI_VERSION_1_6; HotSpot 25 still accepts
+    it for the CreateVM/GetEnv version field. No negotiation possible. }
+  Result := JNI_VERSION_1_6;
+end;
 class function TJVMManager.LastStartArgs: string;
 begin
   FLock.Enter;

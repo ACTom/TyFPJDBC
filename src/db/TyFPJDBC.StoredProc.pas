@@ -2,51 +2,86 @@ unit TyFPJDBC.StoredProc;
 {$mode objfpc}{$H+}
 interface
 uses
-  SysUtils, Classes;
+  SysUtils, Classes, TyFPJDBC.Handles, TyFPJDBC.JNI.BridgeV2, TyFPJDBC.Engine;
+
 type
+  { V2 stored procedure: CallableStatement via BridgeV2. In params bind by
+    index, out params register by JDBC type, execute, then read outs. }
   TJDBCStoredProc = class
+  private
+    FEngine: TJdbcEngine;
+    FConn: Int64;
+    FStmt: Int64;
   public
-    ProcName: string;
-    InParams: TStringList;
-    OutValues: TStringList;
-    constructor Create;
+    constructor Create(AEngine: TJdbcEngine; AConn: Int64);
     destructor Destroy; override;
-    procedure RegisterOutParam(Index: Integer; SqlType: Integer);
-    procedure SetInParam(const Name, Value: string);
-    procedure Exec;
-    function OutAsString(Index: Integer): string;
+    procedure PrepareCall(const SQL: string);
+    procedure BindString(Idx: Integer; const V: UTF8String);
+    procedure BindLong(Idx: Integer; V: Int64);
+    procedure RegisterOut(Idx, SqlType: Integer);
+    function Exec: Boolean;
+    function OutValue(Idx: Integer): UTF8String;
   end;
+
 implementation
-constructor TJDBCStoredProc.Create;
+
+constructor TJDBCStoredProc.Create(AEngine: TJdbcEngine; AConn: Int64);
 begin
-  InParams := TStringList.Create;
-  OutValues := TStringList.Create;
+  inherited Create;
+  if AEngine = nil then
+    raise EJDBCError.CreateChain('engine required', 'HY000', 99, 'nil');
+  CheckHandle('conn', AConn);
+  FEngine := AEngine;
+  FConn := AConn;
+  FStmt := 0;
 end;
+
 destructor TJDBCStoredProc.Destroy;
 begin
-  InParams.Free;
-  OutValues.Free;
+  if FStmt > 0 then
+    try
+      FEngine.Bridge.CloseStmt(FStmt);
+    except
+    end;
   inherited;
 end;
-procedure TJDBCStoredProc.RegisterOutParam(Index: Integer; SqlType: Integer);
+
+procedure TJDBCStoredProc.PrepareCall(const SQL: string);
 begin
-  while OutValues.Count <= Index do
-    OutValues.Add('');
+  if FStmt > 0 then
+    raise EJDBCError.CreateChain('already prepared', 'HY000', 99, 'call');
+  FStmt := FEngine.Bridge.PrepareCall(FConn, UTF8String(SQL));
+  CheckHandle('stmt', FStmt);
 end;
-procedure TJDBCStoredProc.SetInParam(const Name, Value: string);
+
+procedure TJDBCStoredProc.BindString(Idx: Integer; const V: UTF8String);
 begin
-  InParams.Values[Name] := Value;
+  CheckHandle('stmt', FStmt);
+  FEngine.Bridge.BindString(FStmt, Idx, V);
 end;
-procedure TJDBCStoredProc.Exec;
+
+procedure TJDBCStoredProc.BindLong(Idx: Integer; V: Int64);
 begin
-  if ProcName = '' then
-    raise Exception.Create('proc name required');
-  while OutValues.Count < 1 do
-    OutValues.Add('');
-  OutValues[0] := 'OUT:' + InParams.DelimitedText;
+  CheckHandle('stmt', FStmt);
+  FEngine.Bridge.BindLong(FStmt, Idx, V);
 end;
-function TJDBCStoredProc.OutAsString(Index: Integer): string;
+
+procedure TJDBCStoredProc.RegisterOut(Idx, SqlType: Integer);
 begin
-  Result := OutValues[Index];
+  CheckHandle('stmt', FStmt);
+  FEngine.Bridge.RegisterOut(FStmt, Idx, SqlType);
 end;
+
+function TJDBCStoredProc.Exec: Boolean;
+begin
+  CheckHandle('stmt', FStmt);
+  Result := FEngine.Bridge.ExecProc(FStmt);
+end;
+
+function TJDBCStoredProc.OutValue(Idx: Integer): UTF8String;
+begin
+  CheckHandle('stmt', FStmt);
+  Result := FEngine.Bridge.OutValue(FStmt, Idx);
+end;
+
 end.
