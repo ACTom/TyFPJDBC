@@ -78,9 +78,53 @@ begin
   Result := 'https://repo1.maven.org/maven2/' + Rel;
 end;
 
+function CacheDir: string;
+begin
+  Result := GetEnvironmentVariable('TYFPJDBC_CACHE');
+  if Trim(Result) = '' then
+    Result := IncludeTrailingPathDelimiter(GetEnvironmentVariable('USERPROFILE')) +
+      '.tyfpjdbc' + PathDelim + 'cache';
+  if not DirectoryExists(Result) then
+    ForceDirectories(Result);
+end;
+
+function IsGplLicense(const L: string): Boolean;
+begin
+  Result := (Pos('GPL', UpperCase(L)) > 0);
+end;
+
+procedure NeedLicense(const DriverId, License: string; var AcceptFlag: Boolean);
+var
+  marker, ans: string;
+begin
+  if not IsGplLicense(License) then
+    Exit;
+  if AcceptFlag then
+    Exit;
+  marker := CacheDir + PathDelim + 'license-' + LowerCase(DriverId) + '.accepted';
+  if FileExists(marker) then
+    Exit;
+  Write('Driver ', DriverId, ' is ', License,
+    '. Type ACCEPT to download: ');
+  ReadLn(ans);
+  if UpperCase(Trim(ans)) <> 'ACCEPT' then
+    Fail('license not accepted for ' + DriverId);
+  with TStringList.Create do
+  try
+    Text := 'accepted ' + DateTimeToStr(Now);
+    SaveToFile(marker);
+  finally
+    Free;
+  end;
+end;
+
 function Downloader: string;
 begin
-  Result := 'curl.exe';
+  { Prefer curl where present; fall back to PowerShell Invoke-WebRequest so
+    stock Windows without curl still works. No hard curl dependency. }
+  if FileExists(GetEnvironmentVariable('SystemRoot') + '\System32\curl.exe') then
+    Exit('curl');
+  Result := 'powershell';
 end;
 
 function RunCapture(const Exe, Args: string; out Output: string): Boolean;
@@ -140,22 +184,45 @@ begin
 end;
 
 function RunGet(const Exe, Args, OutFile: string): Boolean;
+var
+  dlArgs, final_: string;
 begin
   if OutFile = '' then
-    Result := RunToFile(Exe, Args, GetTempFileName('', 'mauout'))
+    Exit(RunToFile(Exe, Args, GetTempFileName('', 'mauout')));
+  { curl -o vs powershell -OutFile: normalize here so callers pass URLs only. }
+  if (Exe = 'powershell') and (Pos('http', Args) > 0) then
+  begin
+    dlArgs := '-NoProfile -Command Invoke-WebRequest ' + Trim(Args) + ' ' +
+      OutFile + '.tmp';
+    Result := RunToFile(Exe, dlArgs, OutFile + '.tmp');
+  end
   else
     Result := RunToFile(Exe, Args + ' -o "' + OutFile + '"', OutFile + '.tmp');
+  if not Result then
+    Exit(False);
+  { Atomic rename after successful download (no partial cache poison). }
+  final_ := OutFile;
+  if FileExists(final_) then
+    DeleteFile(final_);
+  Result := RenameFile(OutFile + '.tmp', final_);
 end;
 
 function FetchText(const URL: string): string;
 var
   tmp: string;
   sl: TStringList;
+  dl: string;
 begin
   Result := '';
   tmp := GetTempFileName('', 'mau');
   try
-    if not RunGet(Downloader, '-sL "' + URL + '"', tmp) then
+    dl := Downloader;
+    if dl = 'powershell' then
+    begin
+      if not RunGet(dl, URL, tmp) then
+        Fail('download failed: ' + URL);
+    end
+    else if not RunGet(dl, '-sL "' + URL + '"', tmp) then
       Fail('download failed: ' + URL);
     sl := TStringList.Create;
     try
@@ -169,7 +236,7 @@ begin
   end;
 end;
 
-procedure CmdDriver(const Cfg, Id, OutDir: string);
+procedure CmdDriver(const Cfg, Id, OutDir: string; AcceptLicense: Boolean);
 var
   j: TJSONData;
   arr: TJSONArray;
@@ -186,11 +253,15 @@ begin
         o := arr.Objects[i];
     if o = nil then
       Fail('unknown driver ' + Id);
+    NeedLicense(Id, o.Strings['license'], AcceptLicense);
     maven := ReqStr(o, 'maven');
     rel := MavenPath(maven, grp, art, ver);
     url := MavenURL(rel);
     target := IncludeTrailingPathDelimiter(OutDir) + art + '-' + ver + '.jar';
+    if (OutDir = 'drivers') or (Trim(OutDir) = '') then
+      target := CacheDir + PathDelim + art + '-' + ver + '.jar';
     WriteLn('driver: ', ReqStr(o, 'id'));
+    WriteLn('cache: ', target);
     WriteLn('maven: ', maven);
     WriteLn('url: ', url);
     WriteLn('expected-path: ', target);
@@ -212,12 +283,31 @@ begin
       gotSha := LowerCase(SHA1Print(SHA1File(target)));
       WriteLn('local-sha1: ', gotSha);
       if gotSha = LowerCase(Trim(expectSha)) then
-        WriteLn('checksum: VERIFIED')
+        WriteLn('checksum: VERIFIED (cache hit)')
       else
         Fail('checksum MISMATCH for ' + target);
     end
     else
-      WriteLn('checksum: PENDING (file not present, expected sha1 ' + Trim(expectSha) + ')');
+    begin
+      { Cache miss: download, verify, atomically store. Proxy comes from
+        environment (https_proxy) via curl/powershell defaults. }
+      WriteLn('cache: MISS, downloading...');
+      if Downloader = 'powershell' then
+      begin
+        if not RunGet('powershell', url, target) then
+          Fail('download failed: ' + url);
+      end
+      else if not RunGet(Downloader, '-sL "' + url + '"', target) then
+        Fail('download failed: ' + url);
+      gotSha := LowerCase(SHA1Print(SHA1File(target)));
+      WriteLn('local-sha1: ', gotSha);
+      if gotSha <> LowerCase(Trim(expectSha)) then
+      begin
+        DeleteFile(target);
+        Fail('checksum MISMATCH for ' + target);
+      end;
+      WriteLn('checksum: VERIFIED (downloaded)');
+    end;
   finally
     j.Free;
   end;
@@ -391,7 +481,7 @@ begin
       o := arr.Objects[i];
       ReqStr(o, 'platform');
       ReqStr(o, 'jdkVersion');
-      if o.Strings['bridgeVersion'] <> '1.0.0' then
+      if o.Strings['bridgeVersion'] <> '2.0.0' then
         Fail('bridgeVersion mismatch');
       ReqStr(o, 'url');
       s := ReqStr(o, 'sha256');
@@ -436,6 +526,7 @@ end;
 
 var
   mode, cfg, id, outd, rcfg, sha, plat: string;
+  acceptLicense: Boolean;
   i: Integer;
 begin
   mode := '';
@@ -445,15 +536,20 @@ begin
   outd := 'drivers';
   sha := '';
   plat := '';
+  acceptLicense := False;
   i := 1;
   while i <= ParamCount do
   begin
     if ParamStr(i) = '--list' then mode := 'list'
     else if ParamStr(i) = '--driver' then begin Inc(i); id := ParamStr(i); if mode = '' then mode := 'driver'; end
+    else if ParamStr(i) = '--fetch-driver' then begin Inc(i); id := ParamStr(i); mode := 'driver'; end
+    else if ParamStr(i) = '--resolve-runtime' then mode := 'verifyruntime'
+    else if ParamStr(i) = '--accept-license' then acceptLicense := True
     else if ParamStr(i) = '--out' then begin Inc(i); outd := ParamStr(i); end
     else if ParamStr(i) = '--sha1' then begin Inc(i); sha := ParamStr(i); end
     else if ParamStr(i) = '--sha256' then begin Inc(i); sha := ParamStr(i); end
-    else if ParamStr(i) = '--config' then begin Inc(i); cfg := ParamStr(i); rcfg := ExtractFilePath(cfg) + 'runtimes.json'; end
+    else if ParamStr(i) = '--config' then begin Inc(i); cfg := ParamStr(i);
+      rcfg := IncludeTrailingPathDelimiter(ExtractFilePath(cfg)) + 'runtimes.json'; end
     else if ParamStr(i) = '--verify-manifests' then mode := 'verify'
     else if ParamStr(i) = '--verify-file' then mode := 'verifyfile'
     else if ParamStr(i) = '--verify-runtime' then mode := 'verifyruntime'
@@ -461,7 +557,7 @@ begin
     Inc(i);
   end;
   if mode = 'list' then CmdList(cfg)
-  else if mode = 'driver' then begin if id = '' then Fail('--driver needs id'); CmdDriver(cfg, id, outd); end
+  else if mode = 'driver' then begin if id = '' then Fail('--driver needs id'); CmdDriver(cfg, id, outd, acceptLicense); end
   else if mode = 'verify' then begin CheckDrivers(cfg); CheckRuntimes(rcfg); WriteLn('manifests verified'); end
   else if mode = 'verifyfile' then
   begin
@@ -473,5 +569,5 @@ begin
     if (plat = '') or (sha = '') then Fail('--verify-runtime needs --platform <p> --sha256 <hex> [--out <dir>]');
     CmdVerifyRuntime(rcfg, plat, outd, sha);
   end
-  else begin WriteLn('usage: mautool --list | --driver <id> --out <dir> | --verify-file --driver <id> --sha1 <hex> --out <dir> | --verify-runtime --platform <p> --sha256 <hex> --out <dir> | --verify-manifests'); Halt(2); end;
+  else begin WriteLn('usage: mautool --list | --driver <id> --out <dir> | --fetch-driver <id> [--accept-license] | --verify-file --driver <id> --sha1 <hex> --out <dir> | --resolve-runtime --platform <p> --sha256 <hex> --out <dir> | --verify-runtime --platform <p> --sha256 <hex> --out <dir> | --verify-manifests'); Halt(2); end;
 end.
