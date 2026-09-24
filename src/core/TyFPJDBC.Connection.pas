@@ -25,8 +25,14 @@ type
     Borrowed: Boolean;
     TransactionActive: Boolean;
     Savepoints: TStringList;
+    LoginTimeoutSecs: Integer;
+    SocketTimeoutSecs: Integer;
+    ValidationQuery: string;
+    Catalog: string;
+    Schema: string;
     constructor Create; virtual;
     destructor Destroy; override;
+    procedure Validate; virtual;
     procedure Borrow; virtual;
     procedure Release; virtual;
     procedure StartTransaction; virtual;
@@ -67,6 +73,11 @@ begin
   Borrowed := False;
   TransactionActive := False;
   Savepoints := TStringList.Create;
+  LoginTimeoutSecs := 15;
+  SocketTimeoutSecs := 30;
+  ValidationQuery := 'SELECT 1';
+  Catalog := '';
+  Schema := '';
 end;
 
 destructor TJDBCConnection.Destroy;
@@ -78,6 +89,19 @@ end;
 class procedure TJDBCConnection.ResetIdsForTests;
 begin
   FNextId := 0;
+end;
+
+procedure TJDBCConnection.Validate;
+begin
+  if LoginTimeoutSecs < 0 then
+    raise EJDBCError.CreateChain('bad login timeout', 'HY092', 11,
+      'LoginTimeoutSecs<0');
+  if SocketTimeoutSecs < 0 then
+    raise EJDBCError.CreateChain('bad socket timeout', 'HY092', 12,
+      'SocketTimeoutSecs<0');
+  if Trim(ValidationQuery) = '' then
+    raise EJDBCError.CreateChain('bad validation query', 'HY092', 13,
+      'ValidationQuery empty');
 end;
 
 procedure TJDBCConnection.Borrow;

@@ -5,6 +5,22 @@ uses
   SysUtils, Classes, syncobjs, dynlibs, jni;
 type
   TJVMLogProc = procedure(const Msg: string) of object;
+  TJVMMode = (jvmAuto, jvmDesktop, jvmServer);
+
+  TJVMOptions = class
+  public
+    Mode: TJVMMode;
+    Xmx: string;
+    MaxRAMPercentage: Double;
+    Headless: Boolean;
+    FileEncoding: string;
+    EnableCheckJNI: Boolean;
+    ExtraArgs: TStringList;
+    constructor Create;
+    destructor Destroy; override;
+    procedure Validate;
+    function BuildArgs: string;
+  end;
 
   TJVMManager = class
   private
@@ -58,6 +74,59 @@ end;
 class destructor TJVMManager.Destroy;
 begin
   FLock.Free;
+end;
+
+constructor TJVMOptions.Create;
+begin
+  inherited Create;
+  Mode := jvmAuto;
+  Xmx := '512m';
+  MaxRAMPercentage := 60.0;
+  Headless := True;
+  FileEncoding := 'UTF-8';
+  EnableCheckJNI := False;
+  ExtraArgs := TStringList.Create;
+end;
+
+destructor TJVMOptions.Destroy;
+begin
+  ExtraArgs.Free;
+  inherited;
+end;
+
+procedure TJVMOptions.Validate;
+begin
+  if not Headless then
+    raise Exception.Create('JVM must run headless=true');
+  if FileEncoding <> 'UTF-8' then
+    raise Exception.Create('JVM FileEncoding must be UTF-8, got ' +
+      FileEncoding);
+  if (MaxRAMPercentage < 50.0) or (MaxRAMPercentage > 75.0) then
+    raise Exception.Create('MaxRAMPercentage out of range 50..75');
+  if Trim(Xmx) = '' then
+    raise Exception.Create('Xmx must not be empty');
+end;
+
+function TJVMOptions.BuildArgs: string;
+var
+  i: Integer;
+begin
+  Validate;
+  case Mode of
+    jvmServer:
+      Result := '-XX:MaxRAMPercentage=' +
+        StringReplace(FloatToStr(MaxRAMPercentage), ',', '.',
+          [rfReplaceAll]) + ' -Xrs';
+    else
+      Result := '-Xmx' + Xmx;
+  end;
+  Result := Result + ' -Dfile.encoding=' + FileEncoding +
+    ' -Djava.awt.headless=true';
+  if EnableCheckJNI then
+    Result := Result + ' -Xcheck:jni';
+  for i := 0 to ExtraArgs.Count - 1 do
+    if Trim(ExtraArgs[i]) <> '' then
+      Result := Result + ' ' + Trim(ExtraArgs[i]);
 end;
 
 class procedure TJVMManager.DoLog(const Msg: string);

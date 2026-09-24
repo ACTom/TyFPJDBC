@@ -23,10 +23,14 @@ type
     KeepaliveTime: Int64;
     LeakDetectionThreshold: Int64;
     SlowQueryThresholdMs: Int64;
+    IdleTimeoutMs: Int64;
+    ValidationTimeoutMs: Int64;
+    ConnectionTestQuery: string;
     OnPoolStats: TPoolStats;
     OnSlowQuery: TSlowQuery;
     constructor Create;
     destructor Destroy; override;
+    procedure Validate;
     function GetConnection: TJDBCConnection;
     function Borrow: TJDBCConnection;
     procedure ReleaseConnection(C: TJDBCConnection);
@@ -49,7 +53,26 @@ begin
   KeepaliveTime := 30000;
   LeakDetectionThreshold := 0;
   SlowQueryThresholdMs := 1000;
+  IdleTimeoutMs := 600000;
+  ValidationTimeoutMs := 5000;
+  ConnectionTestQuery := 'SELECT 1';
   FSlowThresholdMs := SlowQueryThresholdMs;
+end;
+
+procedure TJDBCHikariPool.Validate;
+begin
+  if MaximumPoolSize < 1 then
+    raise EJDBCError.CreateChain('bad pool size', 'HY092', 31,
+      'MaximumPoolSize<1');
+  if ConnectionTimeout < 0 then
+    raise EJDBCError.CreateChain('bad connection timeout', 'HY092', 32,
+      'ConnectionTimeout<0');
+  if MinimumIdle < 0 then
+    raise EJDBCError.CreateChain('bad minimum idle', 'HY092', 33,
+      'MinimumIdle<0');
+  if Trim(ConnectionTestQuery) = '' then
+    raise EJDBCError.CreateChain('bad test query', 'HY092', 34,
+      'ConnectionTestQuery empty');
 end;
 
 destructor TJDBCHikariPool.Destroy;
@@ -128,6 +151,8 @@ end;
 
 procedure TJDBCHikariPool.ReportSlow(const SQL: string; ElapsedMs: Int64);
 begin
+  { Read the live property (not the construction-time snapshot) so a
+    threshold change via assignment takes effect immediately. }
   if (ElapsedMs >= SlowQueryThresholdMs) and Assigned(OnSlowQuery) then
     OnSlowQuery(SQL, ElapsedMs);
 end;
