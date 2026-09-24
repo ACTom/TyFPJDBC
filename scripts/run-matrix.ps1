@@ -227,6 +227,66 @@ $rxw = '(?s)platform": "win64".*?sha256": "([0-9a-f]{64})"'
 $hw = [regex]::Match($m, $rxw).Groups[1].Value
 Check "deterministic-matches-manifest" ($ha -eq $hw)
 
+Section "v2-bridge-classes"
+# BridgeV2 is the V2 single state machine; V2 Pascal tests drive real JNI
+# into these classes, so they must be compiled before the v2-live section.
+$jv2 = Join-Path $work "jv2"
+New-Item -ItemType Directory -Force -Path $jv2 | Out-Null
+$cpv = "$libs\HikariCP-5.1.0.jar;$libs\slf4j-api-2.0.9.jar;$libs\h2-2.2.224.jar;$libs\sqlite-jdbc-3.46.1.0.jar"
+& "$jh\bin\javac.exe" -encoding UTF-8 -cp $cpv -d $jv2 "$ws\java\bridge\src\main\java\tyfpjdbc\PoolCfg.java" "$ws\java\bridge\src\main\java\tyfpjdbc\BridgeV2.java" "$ws\java\bridge\src\main\java\tyfpjdbc\BridgeV2Smoke.java" 2>&1
+Check "v2-javac" ($LASTEXITCODE -eq 0)
+$smoke = & "$jh\bin\java.exe" "-Dfile.encoding=UTF-8" -cp "$jv2;$cpv" tyfpjdbc.BridgeV2Smoke 2>&1 | Out-String
+Write-Output $smoke
+Check "v2-smoke-17" (($smoke -match "TOTAL fails=0") -and (([regex]::Matches($smoke, "(?m)^PASS ").Count) -eq 17))
+
+Section "v2-live-h2-sqlite"
+# Live V2 loopback on the drivers present on this host (H2 + SQLite jars).
+# PG/MySQL/MSSQL/Oracle have no local servers here: recorded as env-missing,
+# covered by dialect pure-logic asserts in TestV2Dialect instead of faked.
+foreach ($t in @("TestV2Handles","TestV2Jvm","TestV2Engine","TestV2Data","TestV2Dialect","TestV2ProcBlob","TestV2Distrib","TestV2Lcl","TestV2Soak")) {
+  Write-Output ("--- " + $t + " ---")
+  $exe = Join-Path $bin ($t.ToLower() + ".exe")
+  $lpr = Join-Path $ws ("tests\" + $t + ".lpr")
+  if ($t -eq "TestV2Lcl") {
+    fpc "-Fu$ws\src\core" "-Fu$ws\src\db" "-Fu$ws\src\lcl" "-o$exe" $lpr 2>&1
+  } else {
+    fpc "-Fu$ws\src\core" "-Fu$ws\src\db" "-o$exe" $lpr 2>&1
+  }
+  Check "$t-compile" ($LASTEXITCODE -eq 0)
+  if ($t -eq "TestV2Handles") { $o = & $exe 2>&1 | Out-String }
+  elseif ($t -eq "TestV2Dialect") { $o = & $exe 2>&1 | Out-String }
+  elseif ($t -eq "TestV2Jvm") { $o = & $exe 2>&1 | Out-String }
+  elseif ($t -eq "TestV2Distrib") { $o = & $exe 2>&1 | Out-String }
+  else { $o = & $exe $jv2 2>&1 | Out-String }
+  Write-Output $o
+  Check "$t-fails-0" ($o -match "TOTAL fails=0")
+  if ($o -cmatch "(?m)^FAIL ") { Check "$t-no-fail-lines" $false } else { Check "$t-no-fail-lines" $true }
+}
+foreach ($pg in @("pg","mysql","mssql","oracle")) {
+  Write-Output ("SKIP-MATRIX: " + $pg + " no local server (env-missing, dialect asserts cover SQL shape)")
+}
+
+Section "v2-examples-lpk"
+foreach ($e in @("ex11_code_first","ex12_dbgrid")) {
+  $exe = Join-Path $bin ($e + ".exe")
+  fpc "-Fu$ws\src\core" "-Fu$ws\src\db" "-o$exe" (Join-Path $ws ("examples\" + $e + ".lpr")) 2>&1
+  Check "$e-compile" ($LASTEXITCODE -eq 0)
+  $o = & $exe $jv2 2>&1 | Out-String
+  Write-Output $o
+  if ($e -eq "ex11_code_first") { Check "$e-run" (($o -match "inserted=3") -and ($o -match "ex11 ok")) }
+  else { Check "$e-run" (($o -match "requery-rows=4") -and ($o -match "ex12 ok")) }
+}
+& "$ws\scripts\guard.ps1" 2>&1
+Check "v2-guard" ($?)
+Remove-Item "$ws\src\lcl\lib" -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item "$ws\src\lcl\tyfpjdbc.pas" -Force -ErrorAction SilentlyContinue
+Remove-Item "$ws\src\lcl\packagefiles.xml" -Force -ErrorAction SilentlyContinue
+& lazbuild --build-all "$ws\src\lcl\tyfpjdbc.lpk" 2>&1
+Check "v2-lpk" ($LASTEXITCODE -eq 0)
+Remove-Item "$ws\src\lcl\tyfpjdbc.pas" -Force -ErrorAction SilentlyContinue
+Remove-Item "$ws\src\lcl\packagefiles.xml" -Force -ErrorAction SilentlyContinue
+Remove-Item "$ws\src\lcl\lib" -Recurse -Force -ErrorAction SilentlyContinue
+
 Section "summary"
 Write-Output ("MATRIX-FAILURES=" + $script:failures)
 if ($script:failures -gt 0) { exit 1 } else { Write-Output "MATRIX-OK"; exit 0 }

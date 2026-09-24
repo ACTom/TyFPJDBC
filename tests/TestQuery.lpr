@@ -3,7 +3,7 @@ program TestQuery;
 {$codepage UTF8}
 uses
   SysUtils, Classes, DB, TyFPJDBC.Options, TyFPJDBC.Query,
-  TyFPJDBC.Mock.Engine, TyFPJDBC.StoredProc, TyFPJDBC.Script,
+  TyFPJDBC.Mock.Engine, TyFPJDBC.Script,
   TyFPJDBC.&Type.Map;
 
 var
@@ -19,7 +19,6 @@ var
   q: TJDBCQuery;
   rows: TStringList;
   tot, off, cnt, pages, maxPage: Integer;
-  sp: TJDBCStoredProc;
   parts: TStringList;
   ms: TMemoryStream;
   blobVal: string;
@@ -126,16 +125,9 @@ begin
       q.Free;
     end;
 
-    sp := TJDBCStoredProc.Create;
-    try
-      sp.ProcName := 'demo';
-      sp.SetInParam('p1', 'v1');
-      sp.RegisterOutParam(0, 12);
-      sp.Exec;
-      Ok('proc-out', sp.OutAsString(0) <> '');
-    finally
-      sp.Free;
-    end;
+    { V1 mock proc simulation was deleted by the V2 rewrite (real
+      CallableStatement in TyFPJDBC.StoredProc, covered live by
+      TestV2ProcBlob 'proc-out'); nothing to assert here anymore. }
 
     parts := TJDBCScript.Split('SELECT 1; SELECT '';''; SELECT 3 -- ;' + #10 + '; SELECT 4 /* ; */;');
     try
