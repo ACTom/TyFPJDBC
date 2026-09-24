@@ -213,6 +213,56 @@ begin
     Ok('macro-accept-expand');
 end;
 
+procedure TestPgCompat;
+var
+  r: TSqlParseResult;
+begin
+  r := TSqlParser.Parse('SELECT id, name FROM users WHERE age > :minAge AND city = :city ORDER BY id LIMIT 10 OFFSET 20');
+  if r.JdbcSql <> 'SELECT id, name FROM users WHERE age > ? AND city = ? ORDER BY id LIMIT 10 OFFSET 20' then
+    Ng('pg-where-order', 'got: ' + r.JdbcSql)
+  else
+    Ok('pg-where-order');
+  if (Length(r.ParamOrder) <> 2) or (r.ParamOrder[0] <> 'minAge') or (r.ParamOrder[1] <> 'city') then
+    Ng('pg-where-order-names', 'order mismatch')
+  else
+    Ok('pg-where-order-names');
+  r := TSqlParser.Parse('INSERT INTO t (a, b) VALUES (:a, :b) RETURNING id');
+  if r.JdbcSql <> 'INSERT INTO t (a, b) VALUES (?, ?) RETURNING id' then
+    Ng('pg-insert-returning', 'got: ' + r.JdbcSql)
+  else
+    Ok('pg-insert-returning');
+  if (Length(r.ParamOrder) <> 2) or (r.ParamOrder[0] <> 'a') or (r.ParamOrder[1] <> 'b') then
+    Ng('pg-insert-returning-names', 'order mismatch')
+  else
+    Ok('pg-insert-returning-names');
+  r := TSqlParser.Parse('SELECT created::date, payload->>''name'' FROM events WHERE id=:id');
+  if r.JdbcSql <> 'SELECT created::date, payload->>''name'' FROM events WHERE id=?' then
+    Ng('pg-cast-json', 'got: ' + r.JdbcSql)
+  else
+    Ok('pg-cast-json');
+  if (Length(r.ParamOrder) <> 1) or (r.ParamOrder[0] <> 'id') then
+    Ng('pg-cast-json-names', 'order mismatch')
+  else
+    Ok('pg-cast-json-names');
+  r := TSqlParser.Parse('SELECT * FROM t WHERE name LIKE :kw ESCAPE ''\''');
+  if r.JdbcSql <> 'SELECT * FROM t WHERE name LIKE ? ESCAPE ''\''' then
+    Ng('pg-like-escape', 'got: ' + r.JdbcSql)
+  else
+    Ok('pg-like-escape');
+  if (Length(r.ParamOrder) <> 1) or (r.ParamOrder[0] <> 'kw') then
+    Ng('pg-like-escape-names', 'order mismatch')
+  else
+    Ok('pg-like-escape-names');
+  if TSqlParser.CheckMacro('DESC') then
+    Ok('macro-desc-ident')
+  else
+    Ng('macro-desc-ident', 'rejected');
+  if TSqlParser.CheckMacro('a b') then
+    Ng('macro-space-reject', 'accepted')
+  else
+    Ok('macro-space-reject');
+end;
+
 begin
   TestDuplicateParams;
   TestQuotedUntouched;
@@ -224,6 +274,7 @@ begin
   TestInjectionValue;
   TestMacroReject;
   TestMacroAccept;
+  TestPgCompat;
   WriteLn('TOTAL pass=', PassCount, ' fail=', FailCount);
   if FailCount > 0 then
     Halt(1);

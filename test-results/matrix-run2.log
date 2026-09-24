@@ -1,0 +1,614 @@
+
+=== guard ===
+guard ok
+PASS-MATRIX: guard-exit-0
+
+=== mautool-build ===
+Free Pascal Compiler version 3.2.2 [2026/06/06] for x86_64
+Copyright (c) 1993-2021 by Florian Klaempfl and others
+Target OS: Win64 for x64
+Compiling D:\Projects\TyFPJDBC\src\tools\mautool.lpr
+mautool.lpr(232,25) Note: Local variable "rel" is assigned but never used
+Linking D:\Projects\TyFPJDBC\test-results\bin\mautool.exe
+477 lines compiled, 0.5 sec, 325648 bytes code, 15380 bytes data
+1 note(s) issued
+PASS-MATRIX: mautool-compile
+
+=== fpc-tests-compile-run ===
+--- TestParser ---
+Free Pascal Compiler version 3.2.2 [2026/06/06] for x86_64
+Copyright (c) 1993-2021 by Florian Klaempfl and others
+Target OS: Win64 for x64
+Compiling D:\Projects\TyFPJDBC\tests\TestParser.lpr
+Linking D:\Projects\TyFPJDBC\test-results\bin\testparser.exe
+281 lines compiled, 0.4 sec, 175760 bytes code, 9540 bytes data
+PASS-MATRIX: TestParser-compile
+PASS: dup-sql
+PASS: dup-count
+PASS: dup-names
+PASS: quoted-single
+PASS: quoted-single-order
+PASS: quoted-double
+PASS: line-comment
+PASS: line-comment-order
+PASS: block-comment
+PASS: block-comment-order
+PASS: double-colon
+PASS: time-literal
+PASS: walrus
+PASS: json-qmark
+PASS: json-ops
+PASS: json-ops-order
+PASS: lone-qmark
+PASS: dollar-body
+PASS: dollar-body-order
+PASS: inject-shape
+PASS: inject-noconcat
+PASS: inject-noor
+PASS: inject-dashdash
+PASS: macro-reject-check
+PASS: macro-reject-expand
+PASS: macro-accept-check
+PASS: macro-accept-expand
+PASS: pg-where-order
+PASS: pg-where-order-names
+PASS: pg-insert-returning
+PASS: pg-insert-returning-names
+PASS: pg-cast-json
+PASS: pg-cast-json-names
+PASS: pg-like-escape
+PASS: pg-like-escape-names
+PASS: macro-desc-ident
+PASS: macro-space-reject
+TOTAL pass=37 fail=0
+
+PASS-MATRIX: TestParser-37-0
+PASS-MATRIX: TestParser-no-fail-lines
+--- TestTypeMap ---
+Free Pascal Compiler version 3.2.2 [2026/06/06] for x86_64
+Copyright (c) 1993-2021 by Florian Klaempfl and others
+Target OS: Win64 for x64
+Compiling D:\Projects\TyFPJDBC\tests\TestTypeMap.lpr
+Linking D:\Projects\TyFPJDBC\test-results\bin\testtypemap.exe
+105 lines compiled, 0.4 sec, 274320 bytes code, 13764 bytes data
+PASS-MATRIX: TestTypeMap-compile
+PASS: VARCHAR -> ftWideString
+PASS: CHARACTER VARYING -> ftWideString
+PASS: NVARCHAR -> ftWideString
+PASS: CHAR -> ftWideString
+PASS: CHARACTER -> ftWideString
+PASS: TEXT -> ftWideMemo
+PASS: CLOB -> ftWideMemo
+PASS: NCLOB -> ftWideMemo
+PASS: SQLXML -> ftWideMemo
+PASS: JSON -> ftWideMemo
+PASS: JSONB -> ftWideMemo
+PASS: UUID -> ftWideMemo
+PASS: INTEGER -> ftInteger
+PASS: INT -> ftInteger
+PASS: SMALLINT -> ftInteger
+PASS: INT2 -> ftInteger
+PASS: BIGINT -> ftLargeint
+PASS: INT8 -> ftLargeint
+PASS: NUMERIC -> ftFMTBcd
+PASS: DECIMAL -> ftFMTBcd
+PASS: FLOAT -> ftFloat
+PASS: FLOAT8 -> ftFloat
+PASS: DOUBLE -> ftFloat
+PASS: DOUBLE PRECISION -> ftFloat
+PASS: REAL -> ftFloat
+PASS: FLOAT4 -> ftFloat
+PASS: BOOLEAN -> ftBoolean
+PASS: BOOL -> ftBoolean
+PASS: BIT -> ftBoolean
+PASS: DATE -> ftDate
+PASS: TIME -> ftTime
+PASS: TIMESTAMP -> ftDateTime
+PASS: TIMESTAMP WITH TIME ZONE -> ftDateTime
+PASS: BLOB -> ftBlob
+PASS: BYTEA -> ftBlob
+PASS: BINARY -> ftBlob
+PASS: VARBINARY -> ftBlob
+PASS: IMAGE -> ftBlob
+PASS: ARRAY -> ftWideMemo
+PASS: STRUCT -> ftWideMemo
+PASS: WHATEVER_XYZ -> ftWideString
+PASS: varchar -> ftWideString
+PASS: numeric(10,2) -> ftFMTBcd
+PASS: stream(BLOB) = TRUE
+PASS: stream(BYTEA) = TRUE
+PASS: stream(BINARY) = TRUE
+PASS: stream(VARBINARY) = TRUE
+PASS: stream(VARCHAR) = FALSE
+PASS: stream(CLOB) = FALSE
+PASS: stream(INTEGER) = FALSE
+TOTAL pass=50 fail=0
+
+PASS-MATRIX: TestTypeMap-50-0
+PASS-MATRIX: TestTypeMap-no-fail-lines
+--- TestQuery ---
+Free Pascal Compiler version 3.2.2 [2026/06/06] for x86_64
+Copyright (c) 1993-2021 by Florian Klaempfl and others
+Target OS: Win64 for x64
+Compiling D:\Projects\TyFPJDBC\tests\TestQuery.lpr
+TestQuery.lpr(31,32) Warning: Constructing a class "TJDBCQuery" with abstract method "LoadBlobIntoBuffer"
+Linking D:\Projects\TyFPJDBC\test-results\bin\testquery.exe
+191 lines compiled, 0.6 sec, 457680 bytes code, 16532 bytes data
+1 warning(s) issued
+PASS-MATRIX: TestQuery-compile
+PASS jdbc-sql
+PASS param-order
+PASS small-total
+PASS small-count
+PASS chinese-verbatim
+PASS large-total-stable
+PASS large-total-stable
+PASS large-total-stable
+PASS large-total-stable
+PASS large-total-stable
+PASS large-total-stable
+PASS large-total-stable
+PASS large-total-stable
+PASS large-total-stable
+PASS large-total-stable
+PASS large-total-stable
+PASS large-total-stable
+PASS large-total-stable
+PASS large-total-stable
+PASS large-total-stable
+PASS large-total-stable
+PASS large-total-stable
+PASS large-total-stable
+PASS large-total-stable
+PASS large-total-stable
+PASS large-count
+PASS large-bounded
+PASS large-pages
+PASS blob-is-blob
+PASS blob-needstream
+PASS blob-roundtrip
+PASS can-apply
+PASS genkey-none-yet
+PASS pending-zero
+PASS injection-as-value
+PASS pending-one
+PASS genkey-first
+PASS genkey-in-row
+PASS applied-one
+PASS genkey-sequence
+PASS genkey-second-in-row
+PASS applied-two
+PASS can-apply-readonly
+PASS readonly-apply-raises
+PASS proc-out
+PASS script-count
+PASS script-semi-in-str
+PASS perf-10k-count
+PERF 10k rows ms=16
+PASS perf-100k-count
+PERF 100k rows ms=31
+PASS perf-10k-bounded
+PASS perf-100k-bounded
+--- fails=0
+
+PASS-MATRIX: TestQuery-fails-0
+PASS-MATRIX: TestQuery-perf
+PASS-MATRIX: TestQuery-no-fail-lines
+--- TestBridge ---
+Free Pascal Compiler version 3.2.2 [2026/06/06] for x86_64
+Copyright (c) 1993-2021 by Florian Klaempfl and others
+Target OS: Win64 for x64
+Compiling D:\Projects\TyFPJDBC\tests\TestBridge.lpr
+Linking D:\Projects\TyFPJDBC\test-results\bin\testbridge.exe
+180 lines compiled, 0.4 sec, 190048 bytes code, 9764 bytes data
+PASS-MATRIX: TestBridge-compile
+PASS bridge-version
+PASS fetch-default
+PASS jvm-fake-path-rejected
+PASS real-jvm-present
+PASS jvm-started
+PASS attach
+PASS detach
+PASS distinct-ids
+PASS tx-savepoint
+PASS commit-no-tx-fails
+PASS pool-distinct
+PASS pool-active
+PASS pool-exhaust-fails
+PASS pool-idle
+PASS stats-fired
+PASS timeout-set
+PASS exec-update
+PASS exec-batch
+PASS cancel-observed
+PASS timeout-observed
+PASS fetch-no-hook
+PASS cross-thread-cancel
+--- fails=0
+
+PASS-MATRIX: TestBridge-fails-0
+PASS-MATRIX: TestBridge-no-fail-lines
+--- TestPoolDataset ---
+Free Pascal Compiler version 3.2.2 [2026/06/06] for x86_64
+Copyright (c) 1993-2021 by Florian Klaempfl and others
+Target OS: Win64 for x64
+Compiling D:\Projects\TyFPJDBC\tests\TestPoolDataset.lpr
+TestPoolDataset.lpr(91,32) Warning: Constructing a class "TJDBCQuery" with abstract method "LoadBlobIntoBuffer"
+Linking D:\Projects\TyFPJDBC\test-results\bin\testpooldataset.exe
+152 lines compiled, 0.5 sec, 455968 bytes code, 16564 bytes data
+1 warning(s) issued
+PASS-MATRIX: TestPoolDataset-compile
+PASS distinct-connections
+PASS active-two
+PASS slow-cancel-or-timeout
+PASS cancel-observed
+PASS slow-reported
+PASS released-idle
+PASS small-full
+PASS small-chinese
+PASS stream-total
+PASS stream-bounded
+PASS pending-one
+PASS edit-genkey
+PASS edit-genkey-in-row
+PASS edit-applied
+--- fails=0
+
+PASS-MATRIX: TestPoolDataset-fails-0
+PASS-MATRIX: TestPoolDataset-no-fail-lines
+
+=== java-bridge-9-tests ===
+PASS-MATRIX: javac-main
+PASS-MATRIX: javac-test
+
+Thanks for using JUnit! Support its development at https://junit.org/sponsoring
+
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection conn0: url=jdbc:h2:mem:cx1079838634108245 user=SA
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
+[pool-1-thread-1] WARN com.zaxxer.hikari.pool.ProxyConnection - HikariPool-1 - Connection conn0: url=jdbc:h2:mem:cx1079838634108245 user=SA marked as broken because of SQLSTATE(57014), ErrorCode(57014)
+org.h2.jdbc.JdbcSQLTimeoutException: Statement was canceled or the session timed out; SQL statement:
+SELECT COUNT(*) FROM SYSTEM_RANGE(1,200000) A, SYSTEM_RANGE(1,200) B [57014-224]
+	at org.h2.message.DbException.getJdbcSQLException(DbException.java:572)
+	at org.h2.message.DbException.getJdbcSQLException(DbException.java:489)
+	at org.h2.message.DbException.get(DbException.java:223)
+	at org.h2.message.DbException.get(DbException.java:199)
+	at org.h2.message.DbException.get(DbException.java:188)
+	at org.h2.command.Command.checkCanceled(Command.java:149)
+	at org.h2.command.Prepared.checkCanceled(Prepared.java:337)
+	at org.h2.command.Prepared.setCurrentRowNumber(Prepared.java:398)
+	at org.h2.command.query.Select.gatherGroup(Select.java:518)
+	at org.h2.command.query.Select.queryGroup(Select.java:488)
+	at org.h2.command.query.Select.queryWithoutCache(Select.java:828)
+	at org.h2.command.query.Query.queryWithoutCacheLazyCheck(Query.java:197)
+	at org.h2.command.query.Query.query(Query.java:520)
+	at org.h2.command.query.Query.query(Query.java:483)
+	at org.h2.command.CommandContainer.query(CommandContainer.java:252)
+	at org.h2.command.Command.executeQuery(Command.java:192)
+	at org.h2.jdbc.JdbcStatement.executeQuery(JdbcStatement.java:101)
+	at com.zaxxer.hikari.pool.ProxyStatement.executeQuery(ProxyStatement.java:110)
+	at com.zaxxer.hikari.pool.HikariProxyStatement.executeQuery(HikariProxyStatement.java)
+	at tyfpjdbc.Bridge.fetchBatch(Bridge.java:83)
+	at tyfpjdbc.BridgeTest.lambda$cancelInterruptsLongQuery$0(BridgeTest.java:118)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:328)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
+	at java.base/java.lang.Thread.run(Thread.java:1474)
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown initiated...
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown completed.
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-2 - Starting...
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-2 - Added connection conn2: url=jdbc:h2:mem:to1079840703991708 user=SA
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-2 - Start completed.
+[main] WARN com.zaxxer.hikari.pool.ProxyConnection - HikariPool-2 - Connection conn2: url=jdbc:h2:mem:to1079840703991708 user=SA marked as broken because of SQLSTATE(57014), ErrorCode(57014)
+org.h2.jdbc.JdbcSQLTimeoutException: Statement was canceled or the session timed out; SQL statement:
+CREATE TABLE big_t1079840710364585 AS SELECT A.X AS a, B.X AS b FROM SYSTEM_RANGE(1,300000) A, SYSTEM_RANGE(1,300) B [57014-224]
+	at org.h2.message.DbException.getJdbcSQLException(DbException.java:572)
+	at org.h2.message.DbException.getJdbcSQLException(DbException.java:489)
+	at org.h2.message.DbException.get(DbException.java:223)
+	at org.h2.message.DbException.get(DbException.java:199)
+	at org.h2.message.DbException.get(DbException.java:188)
+	at org.h2.engine.SessionLocal.checkCanceled(SessionLocal.java:1273)
+	at org.h2.command.Prepared.checkCanceled(Prepared.java:334)
+	at org.h2.command.Prepared.setCurrentRowNumber(Prepared.java:398)
+	at org.h2.command.query.Select$LazyResultQueryFlat.fetchNextRow(Select.java:1844)
+	at org.h2.result.LazyResult.hasNext(LazyResult.java:78)
+	at org.h2.result.FetchedResult.next(FetchedResult.java:34)
+	at org.h2.command.query.Select.queryFlat(Select.java:728)
+	at org.h2.command.query.Select.queryWithoutCache(Select.java:833)
+	at org.h2.command.query.Query.queryWithoutCacheLazyCheck(Query.java:197)
+	at org.h2.command.query.Query.query(Query.java:520)
+	at org.h2.command.dml.Insert.insertRows(Insert.java:197)
+	at org.h2.command.dml.Insert.update(Insert.java:135)
+	at org.h2.command.dml.DataChangeStatement.update(DataChangeStatement.java:74)
+	at org.h2.command.ddl.CreateTable.insertAsData(CreateTable.java:199)
+	at org.h2.command.ddl.CreateTable.update(CreateTable.java:157)
+	at org.h2.command.CommandContainer.update(CommandContainer.java:169)
+	at org.h2.command.Command.executeUpdate(Command.java:256)
+	at org.h2.jdbc.JdbcStatement.executeUpdateInternal(JdbcStatement.java:196)
+	at org.h2.jdbc.JdbcStatement.executeUpdate(JdbcStatement.java:147)
+	at com.zaxxer.hikari.pool.ProxyStatement.executeUpdate(ProxyStatement.java:119)
+	at com.zaxxer.hikari.pool.HikariProxyStatement.executeUpdate(HikariProxyStatement.java)
+	at tyfpjdbc.Bridge.execUpdateTimeout(Bridge.java:67)
+	at tyfpjdbc.BridgeTest.queryTimeoutAbortsLongUpdate(BridgeTest.java:150)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at org.junit.platform.commons.util.ReflectionUtils.invokeMethod(ReflectionUtils.java:728)
+	at org.junit.jupiter.engine.execution.MethodInvocation.proceed(MethodInvocation.java:60)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$ValidatingInvocation.proceed(InvocationInterceptorChain.java:131)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.intercept(TimeoutExtension.java:156)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestableMethod(TimeoutExtension.java:147)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestMethod(TimeoutExtension.java:86)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker$ReflectiveInterceptorCall.lambda$ofVoidMethod$0(InterceptingExecutableInvoker.java:103)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.lambda$invoke$0(InterceptingExecutableInvoker.java:93)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$InterceptedInvocation.proceed(InvocationInterceptorChain.java:106)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.proceed(InvocationInterceptorChain.java:64)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.chainAndInvoke(InvocationInterceptorChain.java:45)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.invoke(InvocationInterceptorChain.java:37)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:92)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:86)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.lambda$invokeTestMethod$7(TestMethodTestDescriptor.java:218)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.invokeTestMethod(TestMethodTestDescriptor.java:214)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:139)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:69)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:151)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:155)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:155)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.submit(SameThreadHierarchicalTestExecutorService.java:35)
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestExecutor.execute(HierarchicalTestExecutor.java:57)
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestEngine.execute(HierarchicalTestEngine.java:54)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:198)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:169)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:93)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.lambda$execute$0(EngineExecutionOrchestrator.java:58)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.withInterceptedStreams(EngineExecutionOrchestrator.java:141)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:57)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:103)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:85)
+	at org.junit.platform.launcher.core.DelegatingLauncher.execute(DelegatingLauncher.java:47)
+	at org.junit.platform.launcher.core.SessionPerRequestLauncher.execute(SessionPerRequestLauncher.java:63)
+	at org.junit.platform.console.tasks.ConsoleTestExecutor.executeTests(ConsoleTestExecutor.java:102)
+	at org.junit.platform.console.tasks.ConsoleTestExecutor.lambda$execute$1(ConsoleTestExecutor.java:71)
+	at org.junit.platform.console.tasks.CustomContextClassLoaderExecutor.replaceThreadContextClassLoaderAndInvoke(CustomContextClassLoaderExecutor.java:42)
+	at org.junit.platform.console.tasks.CustomContextClassLoaderExecutor.invoke(CustomContextClassLoaderExecutor.java:33)
+	at org.junit.platform.console.tasks.ConsoleTestExecutor.execute(ConsoleTestExecutor.java:71)
+	at org.junit.platform.console.options.ExecuteTestsCommand.execute(ExecuteTestsCommand.java:61)
+	at org.junit.platform.console.options.ExecuteTestsCommand.execute(ExecuteTestsCommand.java:27)
+	at org.junit.platform.console.options.BaseCommand.call(BaseCommand.java:74)
+	at org.junit.platform.console.shadow.picocli.CommandLine.executeUserObject(CommandLine.java:2041)
+	at org.junit.platform.console.shadow.picocli.CommandLine.access$1500(CommandLine.java:148)
+	at org.junit.platform.console.shadow.picocli.CommandLine$RunLast.executeUserObjectOfLastSubcommandWithSameParent(CommandLine.java:2461)
+	at org.junit.platform.console.shadow.picocli.CommandLine$RunLast.handle(CommandLine.java:2453)
+	at org.junit.platform.console.shadow.picocli.CommandLine$RunLast.handle(CommandLine.java:2415)
+	at org.junit.platform.console.shadow.picocli.CommandLine$AbstractParseResultHandler.execute(CommandLine.java:2273)
+	at org.junit.platform.console.shadow.picocli.CommandLine$RunLast.execute(CommandLine.java:2417)
+	at org.junit.platform.console.shadow.picocli.CommandLine.execute(CommandLine.java:2170)
+	at org.junit.platform.console.options.MainCommand.runCommand(MainCommand.java:137)
+	at org.junit.platform.console.options.MainCommand.runCommand(MainCommand.java:129)
+	at org.junit.platform.console.options.MainCommand.runCommand(MainCommand.java:93)
+	at org.junit.platform.console.options.MainCommand.call(MainCommand.java:77)
+	at org.junit.platform.console.shadow.picocli.CommandLine.executeUserObject(CommandLine.java:2041)
+	at org.junit.platform.console.shadow.picocli.CommandLine.access$1500(CommandLine.java:148)
+	at org.junit.platform.console.shadow.picocli.CommandLine$RunLast.executeUserObjectOfLastSubcommandWithSameParent(CommandLine.java:2461)
+	at org.junit.platform.console.shadow.picocli.CommandLine$RunLast.handle(CommandLine.java:2453)
+	at org.junit.platform.console.shadow.picocli.CommandLine$RunLast.handle(CommandLine.java:2415)
+	at org.junit.platform.console.shadow.picocli.CommandLine$AbstractParseResultHandler.execute(CommandLine.java:2273)
+	at org.junit.platform.console.shadow.picocli.CommandLine$RunLast.execute(CommandLine.java:2417)
+	at org.junit.platform.console.shadow.picocli.CommandLine.execute(CommandLine.java:2170)
+	at org.junit.platform.console.options.MainCommand.runCommand(MainCommand.java:137)
+	at org.junit.platform.console.options.MainCommand.run(MainCommand.java:125)
+	at org.junit.platform.console.options.CommandFacade.run(CommandFacade.java:36)
+	at org.junit.platform.console.ConsoleLauncher.run(ConsoleLauncher.java:57)
+	at org.junit.platform.console.ConsoleLauncher.run(ConsoleLauncher.java:42)
+	at org.junit.platform.console.ConsoleLauncher.main(ConsoleLauncher.java:35)
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-2 - Shutdown initiated...
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-2 - Shutdown completed.
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-3 - Starting...
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-3 - Added connection conn4: url=jdbc:h2:mem:perf1079841865480668 user=SA
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-3 - Start completed.
+PERF 10k fetch ms=77
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-3 - Shutdown initiated...
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-3 - Shutdown completed.
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-4 - Starting...
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-4 - Added connection conn6: url=jdbc:h2:mem:t1079842098113866 user=SA
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-4 - Start completed.
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-4 - Shutdown initiated...
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-4 - Shutdown completed.
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-5 - Starting...
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-5 - Added connection conn7: url=jdbc:h2:mem:pg1079842125113666 user=SA
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-5 - Start completed.
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-5 - Shutdown initiated...
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-5 - Shutdown completed.
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-6 - Starting...
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-6 - Added connection conn9: url=jdbc:h2:mem:pg1079842342183154 user=SA
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-6 - Start completed.
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-6 - Shutdown initiated...
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-6 - Shutdown completed.
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-7 - Starting...
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-7 - Added connection conn10: url=jdbc:h2:mem:cc1079842365873595 user=SA
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-7 - Start completed.
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-7 - Shutdown initiated...
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-7 - Shutdown completed.
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-8 - Starting...
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by org.sqlite.SQLiteJDBCLoader in an unnamed module (file:/C:/Tools/tyfpjdbc-libs/sqlite-jdbc-3.46.1.0.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+[main] INFO com.zaxxer.hikari.pool.HikariPool - HikariPool-8 - Added connection org.sqlite.jdbc4.JDBC4Connection@6d304f9d
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-8 - Start completed.
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-8 - Shutdown initiated...
+[main] INFO com.zaxxer.hikari.HikariDataSource - HikariPool-8 - Shutdown completed.
+?
+├─ JUnit Jupiter ?
+│  └─ BridgeTest ?
+│     ├─ cancelInterruptsLongQuery() ?
+│     ├─ queryTimeoutAbortsLongUpdate() ?
+│     ├─ perfSmoke10kFetch() ?
+│     ├─ h2RoundTrip() ?
+│     ├─ batchedFetchPagesLargeResult() ?
+│     ├─ postgresDialectRoundTrip() ?
+│     ├─ concurrentBorrowDistinct() ?
+│     ├─ sqliteRoundTrip() ?
+│     └─ versionMatchesSpec() ?
+├─ JUnit Vintage ?
+└─ JUnit Platform Suite ?
+
+Test run finished after 4266 ms
+[         4 containers found      ]
+[         0 containers skipped    ]
+[         4 containers started    ]
+[         0 containers aborted    ]
+[         4 containers successful ]
+[         0 containers failed     ]
+[         9 tests found           ]
+[         0 tests skipped         ]
+[         9 tests started         ]
+[         0 tests aborted         ]
+[         9 tests successful      ]
+[         0 tests failed          ]
+
+
+WARNING: Delegated to the 'execute' command.
+         This behaviour has been deprecated and will be removed in a future release.
+         Please use the 'execute' command directly.
+
+PASS-MATRIX: java-9-found
+PASS-MATRIX: java-9-ok
+PASS-MATRIX: java-0-failed
+PASS-MATRIX: java-sqlite-present
+PASS-MATRIX: java-pg-present
+PASS-MATRIX: java-perf-present
+
+=== mautool-manifests ===
+drivers ok: 3
+runtimes ok: 5
+manifests verified
+
+PASS-MATRIX: manifests-verified
+
+=== mautool-drivers-sqlite-chain ===
+driver: h2
+maven: com.h2database:h2:2.2.224
+url: https://repo1.maven.org/maven2/com/h2database/h2/2.2.224/h2-2.2.224.jar
+expected-path: C:\Tools\tyfpjdbc-libs\h2-2.2.224.jar
+driverClass: org.h2.Driver
+urlTemplate: jdbc:h2:mem:{database}
+testQuery: SELECT 1
+manifest-sha1: 7bdade27d8cd197d9b5ce9dc251f41d2edc5f7ad
+local-sha1: 7bdade27d8cd197d9b5ce9dc251f41d2edc5f7ad
+checksum: VERIFIED
+
+PASS-MATRIX: driver-h2-verified
+driver: sqlite
+maven: org.xerial:sqlite-jdbc:3.46.1.0
+url: https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.46.1.0/sqlite-jdbc-3.46.1.0.jar
+expected-path: C:\Tools\tyfpjdbc-libs\sqlite-jdbc-3.46.1.0.jar
+driverClass: org.sqlite.JDBC
+urlTemplate: jdbc:sqlite:{database}
+testQuery: SELECT 1
+manifest-sha1: 97ca06712e2afa8c0e551245da72280fca5474cf
+local-sha1: 97ca06712e2afa8c0e551245da72280fca5474cf
+checksum: VERIFIED
+
+PASS-MATRIX: driver-sqlite-verified
+PASS-MATRIX: driver-sqlite-sha1
+file: C:\Tools\tyfpjdbc-libs\sqlite-jdbc-3.46.1.0.jar
+expected-sha1: 97ca06712e2afa8c0e551245da72280fca5474cf
+actual-sha1: 97ca06712e2afa8c0e551245da72280fca5474cf
+checksum: VERIFIED
+
+PASS-MATRIX: verify-file-accept
+file: C:\Tools\tyfpjdbc-libs\sqlite-jdbc-3.46.1.0.jar
+ERROR checksum MISMATCH
+expected-sha1: 0000000000000000000000000000000000000000
+actual-sha1: 97ca06712e2afa8c0e551245da72280fca5474cf
+
+PASS-MATRIX: verify-file-reject
+
+=== mautool-verify-runtime-accept-reject ===
+runtime: jre-25-tyfpjdbc-win64.zip
+file: D:\Projects\TyFPJDBC-Runtimes\zips\jre-25-tyfpjdbc-win64.zip
+manifest-sha256: bc04cdab23b4468829ca29a2fcff008b3ea7dd78de41a7636247c8774b486cec
+actual-sha256: bc04cdab23b4468829ca29a2fcff008b3ea7dd78de41a7636247c8774b486cec
+checksum: VERIFIED
+
+PASS-MATRIX: runtime-accept-win64
+runtime: jre-25-tyfpjdbc-linux-x64.zip
+file: D:\Projects\TyFPJDBC-Runtimes\zips\jre-25-tyfpjdbc-linux-x64.zip
+manifest-sha256: 3a680947b9cb7d857c4681f6294fd2db33c3c74a7938b7ebb87c190187900ae0
+actual-sha256: 3a680947b9cb7d857c4681f6294fd2db33c3c74a7938b7ebb87c190187900ae0
+checksum: VERIFIED
+
+PASS-MATRIX: runtime-accept-linux-x64
+runtime: jre-25-tyfpjdbc-linux-arm64.zip
+file: D:\Projects\TyFPJDBC-Runtimes\zips\jre-25-tyfpjdbc-linux-arm64.zip
+manifest-sha256: 30d3016245ac4b32d05351c3ac9c091c9ffa4ee493f55091ea404bd17a3c3ab8
+actual-sha256: 30d3016245ac4b32d05351c3ac9c091c9ffa4ee493f55091ea404bd17a3c3ab8
+checksum: VERIFIED
+
+PASS-MATRIX: runtime-accept-linux-arm64
+runtime: jre-25-tyfpjdbc-macos-x64.zip
+file: D:\Projects\TyFPJDBC-Runtimes\zips\jre-25-tyfpjdbc-macos-x64.zip
+manifest-sha256: 2e21359b710f49c2105ee5ac15ca7e4fd28e96b536e51b75562dc0045f5d6db5
+actual-sha256: 2e21359b710f49c2105ee5ac15ca7e4fd28e96b536e51b75562dc0045f5d6db5
+checksum: VERIFIED
+
+PASS-MATRIX: runtime-accept-macos-x64
+runtime: jre-25-tyfpjdbc-macos-arm64.zip
+file: D:\Projects\TyFPJDBC-Runtimes\zips\jre-25-tyfpjdbc-macos-arm64.zip
+manifest-sha256: 95c90b3b49fd6db12ed79058f735e8fc927a0ed2191c8e72c711ebc67fffba16
+actual-sha256: 95c90b3b49fd6db12ed79058f735e8fc927a0ed2191c8e72c711ebc67fffba16
+checksum: VERIFIED
+
+PASS-MATRIX: runtime-accept-macos-arm64
+runtime: jre-25-tyfpjdbc-win64.zip
+file: D:\Projects\TyFPJDBC-Runtimes\zips\jre-25-tyfpjdbc-win64.zip
+manifest-sha256: 0000000000000000000000000000000000000000000000000000000000000000
+actual-sha256: bc04cdab23b4468829ca29a2fcff008b3ea7dd78de41a7636247c8774b486cec
+ERROR checksum MISMATCH
+
+PASS-MATRIX: runtime-reject
+
+=== deterministic-proof ===
+entries=134
+bytes=24733112
+sha256=bc04cdab23b4468829ca29a2fcff008b3ea7dd78de41a7636247c8774b486cec
+
+entries=134
+bytes=24733112
+sha256=bc04cdab23b4468829ca29a2fcff008b3ea7dd78de41a7636247c8774b486cec
+
+det-a=bc04cdab23b4468829ca29a2fcff008b3ea7dd78de41a7636247c8774b486cec
+det-b=bc04cdab23b4468829ca29a2fcff008b3ea7dd78de41a7636247c8774b486cec
+PASS-MATRIX: deterministic-byte-identical
+PASS-MATRIX: deterministic-matches-manifest
+
+=== summary ===
+MATRIX-FAILURES=0
+MATRIX-OK

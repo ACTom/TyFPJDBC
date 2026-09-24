@@ -17,3 +17,7 @@ drivers/
 runtimes/
 jre-*/
 .tyfpjdbc/
+
+# Test runs: binaries go to test-results/bin (gitignored), logs stay committed
+test-results/bin/
+test-results/work/

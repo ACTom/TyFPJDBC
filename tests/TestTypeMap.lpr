@@ -50,8 +50,11 @@ end;
 
 begin
   CheckMap('VARCHAR', ftWideString);
+  CheckMap('CHARACTER VARYING', ftWideString);
   CheckMap('NVARCHAR', ftWideString);
   CheckMap('CHAR', ftWideString);
+  CheckMap('CHARACTER', ftWideString);
+  CheckMap('TEXT', ftWideMemo);
   CheckMap('CLOB', ftWideMemo);
   CheckMap('NCLOB', ftWideMemo);
   CheckMap('SQLXML', ftWideMemo);
@@ -59,14 +62,21 @@ begin
   CheckMap('JSONB', ftWideMemo);
   CheckMap('UUID', ftWideMemo);
   CheckMap('INTEGER', ftInteger);
+  CheckMap('INT', ftInteger);
   CheckMap('SMALLINT', ftInteger);
+  CheckMap('INT2', ftInteger);
   CheckMap('BIGINT', ftLargeint);
+  CheckMap('INT8', ftLargeint);
   CheckMap('NUMERIC', ftFmtBCD);
   CheckMap('DECIMAL', ftFmtBCD);
   CheckMap('FLOAT', ftFloat);
+  CheckMap('FLOAT8', ftFloat);
   CheckMap('DOUBLE', ftFloat);
+  CheckMap('DOUBLE PRECISION', ftFloat);
   CheckMap('REAL', ftFloat);
+  CheckMap('FLOAT4', ftFloat);
   CheckMap('BOOLEAN', ftBoolean);
+  CheckMap('BOOL', ftBoolean);
   CheckMap('BIT', ftBoolean);
   CheckMap('DATE', ftDate);
   CheckMap('TIME', ftTime);
@@ -76,6 +86,7 @@ begin
   CheckMap('BYTEA', ftBlob);
   CheckMap('BINARY', ftBlob);
   CheckMap('VARBINARY', ftBlob);
+  CheckMap('IMAGE', ftBlob);
   CheckMap('ARRAY', ftWideMemo);
   CheckMap('STRUCT', ftWideMemo);
   CheckMap('WHATEVER_XYZ', ftWideString);

@@ -26,26 +26,29 @@ begin
   if p > 0 then
     t := Copy(t, 1, p - 1);
   t := Trim(t);
-  if (t = 'VARCHAR') or (t = 'NVARCHAR') or (t = 'CHAR') then
+  if (t = 'VARCHAR') or (t = 'CHARACTER VARYING') or (t = 'NVARCHAR') or
+    (t = 'CHAR') or (t = 'CHARACTER') then
     Exit(ftWideString);
-  if (t = 'CLOB') or (t = 'NCLOB') or (t = 'SQLXML') or (t = 'JSON') or
-    (t = 'JSONB') or (t = 'UUID') then
+  if (t = 'CLOB') or (t = 'NCLOB') or (t = 'TEXT') or (t = 'SQLXML') or
+    (t = 'JSON') or (t = 'JSONB') or (t = 'UUID') then
     Exit(ftWideMemo);
-  if (t = 'INTEGER') or (t = 'SMALLINT') then
+  if (t = 'INTEGER') or (t = 'INT') or (t = 'SMALLINT') or (t = 'INT2') then
     Exit(ftInteger);
-  if t = 'BIGINT' then
+  if (t = 'BIGINT') or (t = 'INT8') then
     Exit(ftLargeint);
   if (t = 'NUMERIC') or (t = 'DECIMAL') then
     Exit(ftFmtBCD);
-  if (t = 'FLOAT') or (t = 'DOUBLE') or (t = 'REAL') then
+  if (t = 'FLOAT') or (t = 'FLOAT8') or (t = 'DOUBLE') or
+    (t = 'DOUBLE PRECISION') or (t = 'REAL') or (t = 'FLOAT4') then
     Exit(ftFloat);
-  if (t = 'BOOLEAN') or (t = 'BIT') then
+  if (t = 'BOOLEAN') or (t = 'BOOL') or (t = 'BIT') then
     Exit(ftBoolean);
   if t = 'DATE' then
     Exit(ftDate);
   if t = 'TIME' then
     Exit(ftTime);
-  if (t = 'BLOB') or (t = 'BYTEA') or (t = 'BINARY') or (t = 'VARBINARY') then
+  if (t = 'BLOB') or (t = 'BYTEA') or (t = 'BINARY') or (t = 'VARBINARY') or
+    (t = 'IMAGE') then
     Exit(ftBlob);
   if (t = 'ARRAY') or (t = 'STRUCT') then
     Exit(ftWideMemo);

@@ -23,6 +23,8 @@ var
   ms: TMemoryStream;
   blobVal: string;
   raised: Boolean;
+  t0: Int64;
+  perfMs10k, perfMs100k: Int64;
 begin
   eng := TMockEngine.Create(20000);
   try
@@ -141,6 +143,45 @@ begin
     finally
       parts.Free;
     end;
+
+    // perf-smoke: buffered fetch throughput on mock engine (regression guard,
+    // not a benchmark claim). 10k and 100k rows must stay bounded and ordered.
+    t0 := GetTickCount64;
+    off := 0; cnt := 0;
+    while off < 10000 do
+    begin
+      rows := eng.FetchLarge(off, 1000, tot);
+      try
+        Inc(cnt, rows.Count);
+        off := off + rows.Count;
+        if rows.Count = 0 then Break;
+      finally
+        rows.Free;
+      end;
+    end;
+    perfMs10k := GetTickCount64 - t0;
+    Ok('perf-10k-count', cnt = 10000);
+    WriteLn('PERF 10k rows ms=', perfMs10k);
+    t0 := GetTickCount64;
+    off := 0; cnt := 0;
+    while off < 100000 do
+    begin
+      // reuse same 20k engine cyclically: 5 passes x 20k
+      rows := eng.FetchLarge(off mod eng.LargeTotal, 1000, tot);
+      try
+        Inc(cnt, rows.Count);
+        off := off + rows.Count;
+        if rows.Count = 0 then Break;
+      finally
+        rows.Free;
+      end;
+    end;
+    perfMs100k := GetTickCount64 - t0;
+    Ok('perf-100k-count', cnt = 100000);
+    WriteLn('PERF 100k rows ms=', perfMs100k);
+    // guard rails: mock fetch must not degrade into seconds on this machine
+    Ok('perf-10k-bounded', perfMs10k < 5000);
+    Ok('perf-100k-bounded', perfMs100k < 30000);
   finally
     eng.Free;
   end;

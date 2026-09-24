@@ -161,4 +161,64 @@ public class BridgeTest {
       b.destroyPool(pool);
     }
   }
+
+  @Test public void postgresDialectRoundTrip() throws Exception {
+    // PG-dialect syntax on H2 in PG mode: RETURNING-free insert, LIMIT/OFFSET,
+    // LIKE ... ESCAPE, cast operator, JSON extraction shape.
+    Bridge b = new Bridge();
+    long pool = b.createPool("jdbc:h2:mem:pg" + System.nanoTime() + ";MODE=PostgreSQL;DB_CLOSE_DELAY=-1", "sa", "", 2, 1);
+    long c = b.borrowConnection(pool);
+    try {
+      b.execUpdate(c, "CREATE TABLE users(id INT PRIMARY KEY, name VARCHAR(100), age INT)");
+      b.execUpdate(c, "INSERT INTO users VALUES(1,'alice',30)");
+      b.execUpdate(c, "INSERT INTO users VALUES(2,'bob',25)");
+      b.execUpdate(c, "INSERT INTO users VALUES(3,'中文测试',28)");
+      String[][] page = b.fetchBatch(c, "SELECT id,name FROM users ORDER BY id LIMIT 2 OFFSET 1", 0, 10, 100);
+      assertEquals(2, page.length);
+      assertEquals("2", page[0][0]);
+      assertEquals("中文测试", page[1][1]);
+      String[][] like = b.fetchBatch(c, "SELECT name FROM users WHERE name LIKE 'a%' ESCAPE '\\'", 0, 10, 100);
+      assertEquals(1, like.length);
+      assertEquals("alice", like[0][0]);
+      String[][] casted = b.fetchBatch(c, "SELECT CAST(age AS VARCHAR) FROM users WHERE id=1", 0, 10, 100);
+      assertEquals("30", casted[0][0]);
+      b.releaseConnection(c);
+    } finally {
+      b.destroyPool(pool);
+    }
+  }
+
+  @Test public void perfSmoke10kFetch() throws Exception {
+    Bridge b = new Bridge();
+    long pool = b.createPool("jdbc:h2:mem:perf" + System.nanoTime() + ";DB_CLOSE_DELAY=-1", "sa", "", 2, 1);
+    long c = b.borrowConnection(pool);
+    try {
+      b.execUpdate(c, "CREATE TABLE big(id INT PRIMARY KEY, name VARCHAR(100))");
+      for (int i = 1; i <= 10000; i += 1000) {
+        StringBuilder sb = new StringBuilder("INSERT INTO big VALUES");
+        for (int j = i; j < i + 1000; j++) {
+          if (j > i) sb.append(",");
+          sb.append("(").append(j).append(",'row-").append(j).append("')");
+        }
+        b.execUpdate(c, sb.toString());
+      }
+      long t0 = System.currentTimeMillis();
+      int off = 0, total = 0, maxPage = 0;
+      while (true) {
+        String[][] page = b.fetchBatch(c, "SELECT id,name FROM big ORDER BY id", off, 1000, 1000);
+        if (page.length > maxPage) maxPage = page.length;
+        total += page.length;
+        off += page.length;
+        if (page.length == 0) break;
+      }
+      long ms = System.currentTimeMillis() - t0;
+      System.out.println("PERF 10k fetch ms=" + ms);
+      assertEquals(10000, total);
+      assertTrue(maxPage <= 1000);
+      assertTrue(ms < 30000, "10k fetch must finish fast, ms=" + ms);
+      b.releaseConnection(c);
+    } finally {
+      b.destroyPool(pool);
+    }
+  }
 }
