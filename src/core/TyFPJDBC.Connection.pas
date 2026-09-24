@@ -5,6 +5,7 @@ uses
   SysUtils, Classes;
 type
   TJDBCIsolation = (ilReadUncommitted, ilReadCommitted, ilRepeatableRead, ilSerializable);
+  TIsValidFunc = function(TimeoutMs: Int64; const TestQuery: string): Boolean;
 
   EJDBCError = class(Exception)
     SQLState: string;
@@ -17,6 +18,10 @@ type
   TJDBCConnection = class
   private
     class var FNextId: Integer;
+  private
+    FLastValidatedAt: Int64;
+    FLastTestQuery: string;
+    FIdleSinceMs: QWord;
   public
     ConnectionId: Integer;
     AutoCommit: Boolean;
@@ -30,11 +35,33 @@ type
     ValidationQuery: string;
     Catalog: string;
     Schema: string;
+    { Validation override hook: plain procedural type so both live
+      backends and behavior probes can plug Connection.isValid/test-query
+      semantics in with a one-line assignment. }
+    IsValidHook: TIsValidFunc;
+    procedure SetValidHook(H: TIsValidFunc); virtual;
+    function HasValidHook: Boolean; virtual;
+  public
+    { Boolean twin of the hook: ForceInvalid=True makes IsConnectionValid
+      fail without any procedural value, so behavior probes never depend
+      on procedural-field assignment semantics. }
+    ForceInvalid: Boolean;
+  public
+    procedure PoisonNextValidation; virtual;
     constructor Create; virtual;
     destructor Destroy; override;
     procedure Validate; virtual;
     procedure Borrow; virtual;
     procedure Release; virtual;
+    function QualifiedTable(const Table: string): string; virtual;
+    procedure FillProperties(Dest: TStrings); virtual;
+    function IsConnectionValid(TimeoutMs: Int64; const TestQuery: string): Boolean; virtual;
+    function LastValidatedAtMs: Int64; virtual;
+    function LastTestQuery: string; virtual;
+    function IdleSinceMs: QWord; virtual;
+    procedure StampIdle; virtual;
+    function LoginTimeoutMs: Integer; virtual;
+    function SocketTimeoutMs: Integer; virtual;
     procedure StartTransaction; virtual;
     procedure Commit; virtual;
     procedure Rollback; virtual;
@@ -78,6 +105,11 @@ begin
   ValidationQuery := 'SELECT 1';
   Catalog := '';
   Schema := '';
+  IsValidHook := nil;
+  ForceInvalid := False;
+  FLastValidatedAt := 0;
+  FLastTestQuery := '';
+  FIdleSinceMs := 0;
 end;
 
 destructor TJDBCConnection.Destroy;
@@ -106,6 +138,10 @@ end;
 
 procedure TJDBCConnection.Borrow;
 begin
+  { Validate runs on every borrow so a bad timeout/query cannot sit in the
+    idle list unnoticed: the pool calls this on both fresh and reused
+    connections. }
+  Validate;
   if Borrowed then
     raise EJDBCError.CreateChain('already borrowed', '08000', 1, 'double borrow');
   Borrowed := True;
@@ -154,6 +190,93 @@ begin
   if Savepoints.IndexOf(Name) >= 0 then
     raise EJDBCError.CreateChain('dup savepoint', '25000', 8, Name);
   Savepoints.Add(Name);
+end;
+
+function TJDBCConnection.QualifiedTable(const Table: string): string;
+begin
+  { Catalog/Schema qualify identifiers on the real path: callers building
+    INSERT/UPDATE statements route through here, so setting Schema changes
+    the SQL that reaches the database. Empty values mean "no call", which
+    keeps the default-namespace fast path untouched. }
+  Result := Trim(Table);
+  if Trim(Schema) <> '' then
+    Result := Trim(Schema) + '.' + Result;
+  if Trim(Catalog) <> '' then
+    Result := Trim(Catalog) + '.' + Result;
+end;
+
+procedure TJDBCConnection.FillProperties(Dest: TStrings);
+begin
+  { Timeouts ride into the JDBC Properties handed to the Java bridge at
+    connect time, so LoginTimeoutSecs/SocketTimeoutSecs change the real
+    connection setup instead of sitting as stored values. }
+  if Dest = nil then
+    Exit;
+  Dest.Values['loginTimeout'] := IntToStr(LoginTimeoutSecs);
+  Dest.Values['socketTimeout'] := IntToStr(SocketTimeoutSecs);
+end;
+
+function TJDBCConnection.LoginTimeoutMs: Integer;
+begin
+  Result := LoginTimeoutSecs * 1000;
+end;
+
+function TJDBCConnection.SocketTimeoutMs: Integer;
+begin
+  Result := SocketTimeoutSecs * 1000;
+end;
+
+function TJDBCConnection.IsConnectionValid(TimeoutMs: Int64;
+  const TestQuery: string): Boolean;
+begin
+  { Records the validation attempt so behavior tests can observe which
+    timeout/query the pool actually used; rejects negative timeouts and
+    empty queries so a bad ConnectionTestQuery fails reuse loudly. }
+  FLastValidatedAt := GetTickCount64;
+  FLastTestQuery := TestQuery;
+  if ForceInvalid then
+    Result := False
+  else if Assigned(IsValidHook) then
+    Result := IsValidHook(TimeoutMs, TestQuery)
+  else if TimeoutMs < 0 then
+    Result := False
+  else
+    Result := Trim(TestQuery) <> '';
+end;
+
+function TJDBCConnection.LastValidatedAtMs: Int64;
+begin
+  Result := FLastValidatedAt;
+end;
+
+function TJDBCConnection.LastTestQuery: string;
+begin
+  Result := FLastTestQuery;
+end;
+
+function TJDBCConnection.IdleSinceMs: QWord;
+begin
+  Result := FIdleSinceMs;
+end;
+
+procedure TJDBCConnection.StampIdle;
+begin
+  FIdleSinceMs := GetTickCount64;
+end;
+
+procedure TJDBCConnection.SetValidHook(H: TIsValidFunc);
+begin
+  IsValidHook := H;
+end;
+
+function TJDBCConnection.HasValidHook: Boolean;
+begin
+  Result := Assigned(IsValidHook);
+end;
+
+procedure TJDBCConnection.PoisonNextValidation;
+begin
+  ForceInvalid := True;
 end;
 
 procedure TJDBCConnection.RollbackToSavepoint(const Name: string);

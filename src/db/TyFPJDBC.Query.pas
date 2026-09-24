@@ -3,7 +3,7 @@ unit TyFPJDBC.Query;
 interface
 uses
   SysUtils, Classes, DB, BufDataset, TyFPJDBC.Options, TyFPJDBC.Sql.Parser,
-  TyFPJDBC.&Type.Map, TyFPJDBC.JNI.Bridge;
+  TyFPJDBC.&Type.Map, TyFPJDBC.Connection, TyFPJDBC.JNI.Bridge;
 const
   GEN_KEY_SEED = 1000;
 type
@@ -21,6 +21,7 @@ type
     FLiveConn: Int64;
     FLiveTable: UTF8String;
     FLiveSnap: array of UTF8String;
+    FLiveConnProps: TJDBCConnection;
     function GetJdbcSql: string;
     function GetSQL: TStrings;
     procedure SetSQL(const V: TStrings);
@@ -53,6 +54,7 @@ type
       const Table: UTF8String; const SQL: UTF8String;
       const ColNames, ColTypes: array of string);
     function MaxBufferedRows: Integer;
+    function BufferedRowLimit: Integer;
     { Unicode-correct field access: the bridge carries UTF-8 bytes, while
       ftWideString/ftWideMemo fields store UTF-16. Going through AsString
       would run the bytes through the ANSI codepage and corrupt non-ASCII
@@ -65,6 +67,10 @@ type
     property LiveBridge: TBridgeClient read FLiveBridge write FLiveBridge;
     property LiveConn: Int64 read FLiveConn write FLiveConn;
     property LiveTable: UTF8String read FLiveTable write FLiveTable;
+    { Optional live-connection settings (Catalog/Schema/ValidationQuery):
+      when assigned, identifiers resolve through QualifiedTable so schema
+      changes reach the SQL below, and ApplyUpdates validates first. }
+    property LiveConnProps: TJDBCConnection read FLiveConnProps write FLiveConnProps;
     property SQL: TStrings read GetSQL write SetSQL;
     property CachedUpdates: Boolean read GetCached write SetCached;
     property JdbcSql: string read GetJdbcSql;
@@ -155,7 +161,7 @@ end;
 
 procedure TJDBCQuery.ApplyUpdates;
 var
-  pending, k: Integer;
+  pending, k, batchN: Integer;
   fld: TField;
   bm: TBookmark;
   live: Boolean;
@@ -164,14 +170,26 @@ begin
     raise Exception.Create('set CachedUpdates first');
   if UpdateOptions.ReadOnly then
     raise Exception.Create('readonly query');
+  FetchOptions.Validate;
+  UpdateOptions.Validate;
   pending := GetPendingInserts;
   live := (FLiveBridge <> nil) and (FLiveTable <> '');
   if live then
   begin
-    { Edits to base rows go out first so a re-read sees both. }
+    { BatchApplySize caps each ExecBatch round trip: a 2500-row pending set
+      with BatchApplySize=1000 ships as 1000+1000+500. Edits to base rows
+      go out first so a re-read sees both. }
+    if FLiveConnProps <> nil then
+      FLiveConnProps.Validate;
     ApplyEditsLive;
-    if pending > 0 then
-      ApplyInsertsLive(pending);
+    while pending > 0 do
+    begin
+      batchN := pending;
+      if batchN > UpdateOptions.BatchApplySize then
+        batchN := UpdateOptions.BatchApplySize;
+      ApplyInsertsLive(batchN);
+      pending := GetPendingInserts;
+    end;
     TakeSnapshot;
     Exit;
   end;
@@ -290,7 +308,7 @@ end;
 
 procedure TJDBCQuery.ApplyInsertsLive(Pending: Integer);
 var
-  cols, ph: UTF8String;
+  cols, ph, target: UTF8String;
   i, r: Integer;
   batch: TJavaRows;
   nulls: TJavaNulls;
@@ -384,8 +402,20 @@ begin
   finally
     EnableControls;
   end;
+  { BatchApplySize is enforced here (not just documented): oversized single
+    batches are rejected, and ApplyUpdates pre-splits so a large pending
+    set ships as several BatchApplySize-sized round trips. The target
+    honors LiveConnProps Schema/Catalog via QualifiedTable. }
+  UpdateOptions.Validate;
+  if Pending > UpdateOptions.BatchApplySize then
+    raise Exception.Create('ApplyInsertsLive batch over BatchApplySize: ' +
+      IntToStr(Pending) + '>' + IntToStr(UpdateOptions.BatchApplySize));
+  if FLiveConnProps <> nil then
+    target := UTF8String(FLiveConnProps.QualifiedTable(string(FLiveTable)))
+  else
+    target := FLiveTable;
   if FLiveBridge.ExecBatch(FLiveConn,
-    'INSERT INTO ' + FLiveTable + '(' + cols + ') VALUES(' + ph + ')',
+    'INSERT INTO ' + target + '(' + cols + ') VALUES(' + ph + ')',
     batch, nulls) < Pending then
     raise Exception.Create('live insert short write');
   Inc(FAppliedInserts, Pending);
@@ -395,12 +425,16 @@ procedure TJDBCQuery.ApplyEditsLive;
 var
   bm: TBookmark;
   i, row: Integer;
-  img, key, setList, upd: UTF8String;
+  img, key, setList, upd, target: UTF8String;
   fi: Integer;
 begin
   if (Length(FLiveSnap) = 0) or (FBaseCount = 0) then
     Exit;
   key := UTF8String(KeyFieldName);
+  if FLiveConnProps <> nil then
+    target := UTF8String(FLiveConnProps.QualifiedTable(string(FLiveTable)))
+  else
+    target := FLiveTable;
   DisableControls;
   try
     bm := GetBookmark;
@@ -423,7 +457,7 @@ begin
                 SqlQuote(FieldToUTF8(Fields[i]), Fields[i].IsNull);
             end;
           fi := FieldByName(key).Index;
-          upd := 'UPDATE ' + FLiveTable + ' SET ' + setList + ' WHERE ' +
+          upd := 'UPDATE ' + target + ' SET ' + setList + ' WHERE ' +
             key + '=' + SqlQuote(FieldToUTF8(Fields[fi]), Fields[fi].IsNull);
           if FLiveBridge.ExecUpdate(FLiveConn, upd) < 1 then
             raise Exception.Create('live update affected 0 rows');
@@ -465,6 +499,11 @@ var
   ft: TFieldType;
   parts: TStringList;
 begin
+  FetchOptions.Validate;
+  if Rows.Count > FetchOptions.MaxBufferedRows then
+    raise EJDBCError.CreateChain('buffer over MaxBufferedRows', 'HY001', 60,
+      'rows=' + IntToStr(Rows.Count) + ' max=' +
+      IntToStr(FetchOptions.MaxBufferedRows) + '; switch to fmOnDemand');
   Close;
   FieldDefs.Clear;
   for i := 0 to High(ColNames) do
@@ -507,6 +546,13 @@ var
   i, r, c: Integer;
   ft: TFieldType;
 begin
+  { MaxBufferedRows caps fmAll buffering: callers that lower the option get
+    a HY001 refusal instead of silently buffering past the budget. }
+  FetchOptions.Validate;
+  if Length(Rows) > FetchOptions.MaxBufferedRows then
+    raise EJDBCError.CreateChain('buffer over MaxBufferedRows', 'HY001', 60,
+      'rows=' + IntToStr(Length(Rows)) + ' max=' +
+      IntToStr(FetchOptions.MaxBufferedRows) + '; switch to fmOnDemand');
   Close;
   FieldDefs.Clear;
   for i := 0 to High(ColNames) do
@@ -540,16 +586,21 @@ procedure TJDBCQuery.LoadRowsLive(ABridge: TBridgeClient; AConn: Int64;
 var
   all: TJavaRows;
   page: TJavaRows;
-  off, r, base: Integer;
+  off, r, base, pageSize: Integer;
 begin
+  { Live paging honors FetchOptions.RowsetSize (validated >= 1): shrinking
+    it multiplies the FetchBatch round trips for the same row total, and
+    total buffered rows still respect MaxBufferedRows via LoadJavaRows. }
+  FetchOptions.Validate;
+  pageSize := FetchOptions.RowsetSize;
   FLiveBridge := ABridge;
   FLiveConn := AConn;
   FLiveTable := Table;
   SetLength(all, 0);
   off := 0;
   repeat
-    page := ABridge.FetchBatch(AConn, SQL + ' LIMIT 1000 OFFSET ' +
-      IntToStr(off), 0, 1000, 1000);
+    page := ABridge.FetchBatch(AConn, SQL + ' LIMIT ' + IntToStr(pageSize) +
+      ' OFFSET ' + IntToStr(off), 0, pageSize, FetchOptions.FetchSize);
     if Length(page) = 0 then
       Break;
     base := Length(all);
@@ -557,13 +608,21 @@ begin
     for r := 0 to High(page) do
       all[base + r] := page[r];
     off := off + Length(page);
-  until Length(page) < 1000;
+  until Length(page) < pageSize;
   LoadJavaRows(ColNames, ColTypes, all);
 end;
 
 function TJDBCQuery.MaxBufferedRows: Integer;
 begin
+  { Effective buffered-row budget: the FetchOptions setting caps how many
+    rows fmAll load paths accept, while the function result reports how
+    many are currently buffered. }
   Result := RecordCount;
+end;
+
+function TJDBCQuery.BufferedRowLimit: Integer;
+begin
+  Result := FetchOptions.MaxBufferedRows;
 end;
 
 end.

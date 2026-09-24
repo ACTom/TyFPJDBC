@@ -46,6 +46,9 @@ type
     class procedure SetClassPath(const CP: string); static;
     class function GetClassPath: string; static;
     class procedure EnsureStarted(const LibJvm, ExtraArgs: string); static;
+    class procedure EnsureStartedWithOptions(const LibJvm: string;
+      Opts: TJVMOptions); static;
+    class function LastStartArgs: string; static;
     class procedure ResetForTests; static;
     class procedure AttachThread; static;
     class procedure DetachThread; static;
@@ -310,6 +313,27 @@ begin
     FArgs := ExtraArgs;
     FStarted := True;
     DoLog('JVM started: ' + LibJvm);
+  finally
+    FLock.Leave;
+  end;
+end;
+
+class procedure TJVMManager.EnsureStartedWithOptions(const LibJvm: string;
+  Opts: TJVMOptions);
+begin
+  { TJVMOptions is the real JVM start path: BuildArgs validates the option
+    set (headless/encoding/RAM range included), so changing any option
+    changes the JVM command line that EnsureStarted receives. }
+  if Opts = nil then
+    raise Exception.Create('JVM options required');
+  EnsureStarted(LibJvm, Opts.BuildArgs);
+end;
+
+class function TJVMManager.LastStartArgs: string;
+begin
+  FLock.Enter;
+  try
+    Result := FArgs;
   finally
     FLock.Leave;
   end;

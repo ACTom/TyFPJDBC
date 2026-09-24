@@ -14,6 +14,8 @@ type
     FActive: Integer;
     FWaiting: Integer;
     FSlowThresholdMs: Int64;
+    FValidatedBorrows: Int64;
+    FEvictedIdle: Int64;
     procedure EmitStats;
   public
     MaximumPoolSize: Integer;
@@ -37,6 +39,8 @@ type
     procedure ReportSlow(const SQL: string; ElapsedMs: Int64);
     function ActiveCount: Integer;
     function IdleCount: Integer;
+    function ValidatedBorrows: Int64;
+    function EvictedIdle: Int64;
   end;
 
 implementation
@@ -70,6 +74,12 @@ begin
   if MinimumIdle < 0 then
     raise EJDBCError.CreateChain('bad minimum idle', 'HY092', 33,
       'MinimumIdle<0');
+  if IdleTimeoutMs < 0 then
+    raise EJDBCError.CreateChain('bad idle timeout', 'HY092', 35,
+      'IdleTimeoutMs<0');
+  if ValidationTimeoutMs < 0 then
+    raise EJDBCError.CreateChain('bad validation timeout', 'HY092', 36,
+      'ValidationTimeoutMs<0');
   if Trim(ConnectionTestQuery) = '' then
     raise EJDBCError.CreateChain('bad test query', 'HY092', 34,
       'ConnectionTestQuery empty');
@@ -100,28 +110,54 @@ end;
 function TJDBCHikariPool.Borrow: TJDBCConnection;
 var
   c: TJDBCConnection;
+  stale: Boolean;
+  idx: Integer;
 begin
+  { Validate runs on every borrow so a bad pool/test-query setting fails
+    here, not later. IdleTimeoutMs evicts stale idle entries (counted in
+    EvictedIdle); ValidationTimeoutMs + ConnectionTestQuery gate reuse via
+    IsConnectionValid (counted in ValidatedBorrows) so flipping the query
+    or timeout observably changes which connections survive. }
+  Validate;
   FLock.Enter;
   try
-    if FIdle.Count > 0 then
+    while FIdle.Count > 0 do
     begin
-      c := TJDBCConnection(FIdle[FIdle.Count - 1]);
-      FIdle.Delete(FIdle.Count - 1);
-    end
-    else
-    begin
-      if FActive >= MaximumPoolSize then
+      idx := FIdle.Count - 1;
+      c := TJDBCConnection(FIdle[idx]);
+      FIdle.Delete(idx);
+      if not c.IsConnectionValid(ValidationTimeoutMs, ConnectionTestQuery) then
       begin
-        Inc(FWaiting);
-        try
-          raise EJDBCError.CreateChain('pool exhausted', '08001', 30,
-            'timeout after ' + IntToStr(ConnectionTimeout) + 'ms');
-        finally
-          Dec(FWaiting);
-        end;
+        Inc(FEvictedIdle);
+        c.Free;
+        Continue;
       end;
-      c := TJDBCConnection.Create;
+      stale := (IdleTimeoutMs > 0) and
+        ((GetTickCount64 - c.IdleSinceMs) >= QWord(IdleTimeoutMs));
+      if stale then
+      begin
+        Inc(FEvictedIdle);
+        c.Free;
+        Continue;
+      end;
+      Inc(FValidatedBorrows);
+      Inc(FActive);
+      c.Borrow;
+      Result := c;
+      EmitStats;
+      Exit;
     end;
+    if FActive >= MaximumPoolSize then
+    begin
+      Inc(FWaiting);
+      try
+        raise EJDBCError.CreateChain('pool exhausted', '08001', 30,
+          'timeout after ' + IntToStr(ConnectionTimeout) + 'ms');
+      finally
+        Dec(FWaiting);
+      end;
+    end;
+    c := TJDBCConnection.Create;
     Inc(FActive);
     c.Borrow;
     Result := c;
@@ -139,9 +175,12 @@ begin
   try
     C.Release;
     Dec(FActive);
-    if FIdle.Count < MaximumPoolSize then
-      FIdle.Add(C)
-    else
+    if (FIdle.Count < MaximumPoolSize) and (FIdle.IndexOf(C) < 0) then
+    begin
+      C.StampIdle;
+      FIdle.Add(C);
+    end
+    else if FIdle.IndexOf(C) < 0 then
       C.Free;
     EmitStats;
   finally
@@ -172,6 +211,26 @@ begin
   FLock.Enter;
   try
     Result := FIdle.Count;
+  finally
+    FLock.Leave;
+  end;
+end;
+
+function TJDBCHikariPool.ValidatedBorrows: Int64;
+begin
+  FLock.Enter;
+  try
+    Result := FValidatedBorrows;
+  finally
+    FLock.Leave;
+  end;
+end;
+
+function TJDBCHikariPool.EvictedIdle: Int64;
+begin
+  FLock.Enter;
+  try
+    Result := FEvictedIdle;
   finally
     FLock.Leave;
   end;
