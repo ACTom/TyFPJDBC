@@ -25,6 +25,8 @@ type
     Field_WideWidth, Savepoint_MaxLen: Integer;
     Obs_SlowWarnMs, Obs_SlowErrorMs: Int64;
     Obs_SampleEvery: Integer;
+    Runtime_Root: string;
+    Runtime_JvmPath: string;
     constructor Create;
     class function Default: TJdbcConfig;
     procedure Validate;
@@ -57,6 +59,8 @@ begin
   Obs_SlowWarnMs := 1000;
   Obs_SlowErrorMs := 5000;
   Obs_SampleEvery := 1;
+  Runtime_Root := '';
+  Runtime_JvmPath := '';
 end;
 
 class function TJdbcConfig.Default: TJdbcConfig;
@@ -82,6 +86,8 @@ begin
     raise Exception.Create('JVM must run headless=true');
   if JVM_FileEncoding <> 'UTF-8' then
     raise Exception.Create('JVM FileEncoding must be UTF-8');
+  if (Runtime_JvmPath <> '') and not FileExists(Runtime_JvmPath) then
+    raise Exception.Create('Runtime_JvmPath not found: ' + Runtime_JvmPath);
 end;
 
 procedure TJdbcConfig.ApplyToPoolCfg(var Cfg: TPoolCfgRec);

@@ -1,7 +1,9 @@
 program TestJvm;
 {$mode objfpc}{$H+}
 uses
-  SysUtils, TyFPJDBC.JVM.Manager;
+  SysUtils, Classes,
+  {$IFDEF MSWINDOWS}Windows,{$ENDIF}
+  TyFPJDBC.JVM.Manager;
 var
   Fails: Integer = 0;
 procedure Ok(const N: string; C: Boolean);
@@ -12,6 +14,10 @@ var
   Cfg: TJVMOptions;
   arr: TStringArray;
   joined: string;
+  tmpJvm: string;
+  {$IFDEF MSWINDOWS}
+  jhName, jhVal: AnsiString;
+  {$ENDIF}
 begin
   Cfg := TJVMOptions.Create;
   try
@@ -56,13 +62,30 @@ begin
   TJVMManager.ShutdownJvm;
   Ok('shutdown-ok', True);
   Ok('jni-version', TJVMManager.JniVersionUsed = $00010006);
+  tmpJvm := IncludeTrailingPathDelimiter(GetTempDir) + 'fake-jvm.dll';
+  with TFileStream.Create(tmpJvm, fmCreate) do Free;
+  try
+    Ok('explicit-path', TJVMManager.FindLibJvm(tmpJvm) = tmpJvm);
+  finally
+    SysUtils.DeleteFile(tmpJvm);
+  end;
+  { Root 钉死到不存在的目录后，JAVA_HOME 必须被无视：系统 JRE 不再是来源。 }
+  TJVMManager.SetRuntimeConfig('C:\nonexistent-root-xyz', '');
+  {$IFDEF MSWINDOWS}
+  jhName := 'JAVA_HOME';
+  jhVal := 'C:\nonexistent-java-home-xyz';
+  Windows.SetEnvironmentVariable(PChar(jhName), PChar(jhVal));
+  {$ENDIF}
   try
     TJVMManager.FindLibJvm('');
-    Ok('findlib-probe', True);
+    Ok('no-system-jre', False);
   except
     on E: Exception do
-      Ok('findlib-probe', Pos('libjvm', E.Message) > 0);
+      Ok('no-system-jre', Pos('libjvm', E.Message) > 0);
   end;
+  TJVMManager.SetRuntimeConfig('', '');
+  Ok('default-cp-shape', (Pos('bridge', TJVMManager.DefaultClassPath) > 0) and
+    (Pos('drivers', TJVMManager.DefaultClassPath) > 0));
   WriteLn('TOTAL fails=', Fails);
   if Fails > 0 then Halt(1);
 end.

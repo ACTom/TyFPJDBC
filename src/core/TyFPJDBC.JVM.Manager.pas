@@ -35,6 +35,8 @@ type
     class var FLibHandle: TLibHandle;
     class var FJavaVM: PJavaVM;
     class var FMainEnv: PJNIEnv;
+    class var FRuntimeRoot: string;
+    class var FRuntimeJvmPath: string;
     class procedure DoLog(const Msg: string); static;
   public
     class constructor Create;
@@ -43,7 +45,8 @@ type
     class function BuildDesktopArgs: string; static;
     class function BuildServerArgs: string; static;
     class function FindLibJvm(const CustomPath: string): string; static;
-    class function FindLibJvmLegacy(const CustomPath: string): string; static;
+    class procedure SetRuntimeConfig(const Root, JvmPath: string); static;
+    class function DefaultClassPath: string; static;
     class procedure SetClassPath(const CP: string); static;
     class function GetClassPath: string; static;
     class procedure EnsureStarted(const LibJvm, ExtraArgs: string); static;
@@ -223,7 +226,7 @@ end;
 
 class function TJVMManager.FindLibJvm(const CustomPath: string): string;
 var
-  h, cand: string;
+  root, cand: string;
 
   function TryPath(const P: string): Boolean;
   begin
@@ -233,56 +236,57 @@ var
   end;
 
 begin
-  { Merged lookup (legacy registry/PATH probe kept as fallback): explicit path first,
-    then bundled runtime, JAVA_HOME, registry/PATH probe, macOS dylib. }
+  { Only three sources: explicit path, configured root, exe-side jre/.
+    System JRE (JAVA_HOME/registry/PATH) is deliberately unsupported. }
   if TryPath(CustomPath) then
-    Exit;
-  cand := IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) + 'jre' +
-    PathDelim + 'bin' + PathDelim + 'server' + PathDelim + 'jvm.dll';
-  if TryPath(cand) then
-    Exit;
-  cand := IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) + 'jre' +
-    PathDelim + 'lib' + PathDelim + 'server' + PathDelim + 'libjvm.so';
-  if TryPath(cand) then
-    Exit;
-  h := GetEnvironmentVariable('JAVA_HOME');
-  if h <> '' then
   begin
-    if TryPath(IncludeTrailingPathDelimiter(h) + 'bin' + PathDelim + 'server' +
-      PathDelim + 'jvm.dll') then
-      Exit;
-    if TryPath(IncludeTrailingPathDelimiter(h) + 'lib' + PathDelim + 'server' +
-      PathDelim + 'libjvm.so') then
-      Exit;
-    if TryPath(IncludeTrailingPathDelimiter(h) + 'Contents' + PathDelim + 'Home' +
-      PathDelim + 'lib' + PathDelim + 'server' + PathDelim + 'libjvm.dylib') then
-      Exit;
-  end;
-  { Well-known macOS location (harmless to probe on other platforms). }
-  if TryPath('/Library/Java/JavaVirtualMachines/temurin-25.jdk/Contents/Home/lib/server/libjvm.dylib') then
+    DoLog('WARNING: explicit libjvm used, version not verified: ' + CustomPath);
     Exit;
-  Result := FindLibJvmLegacy(CustomPath);
+  end;
+  if TryPath(FRuntimeJvmPath) then
+  begin
+    DoLog('WARNING: configured libjvm used, version not verified: ' + FRuntimeJvmPath);
+    Exit;
+  end;
+  root := FRuntimeRoot;
+  if root = '' then
+    root := ExtractFilePath(ParamStr(0));
+  cand := IncludeTrailingPathDelimiter(root) + 'jre' + PathDelim + 'bin' +
+    PathDelim + 'server' + PathDelim + 'jvm.dll';
+  if TryPath(cand) then
+    Exit;
+  cand := IncludeTrailingPathDelimiter(root) + 'jre' + PathDelim + 'lib' +
+    PathDelim + 'server' + PathDelim + 'libjvm.so';
+  if TryPath(cand) then
+    Exit;
+  cand := IncludeTrailingPathDelimiter(root) + 'jre' + PathDelim + 'lib' +
+    PathDelim + 'server' + PathDelim + 'libjvm.dylib';
+  if TryPath(cand) then
+    Exit;
+  raise Exception.Create('libjvm not found: bundle jre/ next to the exe or set ' +
+    'Runtime_Root/Runtime_JvmPath (system JRE is not supported)');
 end;
 
-class function TJVMManager.FindLibJvmLegacy(const CustomPath: string): string;
-var
-  h: string;
+class procedure TJVMManager.SetRuntimeConfig(const Root, JvmPath: string);
 begin
-  if (CustomPath <> '') and FileExists(CustomPath) then
-    Exit(CustomPath);
-  h := GetEnvironmentVariable('JAVA_HOME');
-  if h <> '' then
-  begin
-    Result := IncludeTrailingPathDelimiter(h) + 'bin' + PathDelim + 'server' +
-      PathDelim + 'jvm.dll';
-    if FileExists(Result) then
-      Exit;
-    Result := IncludeTrailingPathDelimiter(h) + 'lib' + PathDelim + 'server' +
-      PathDelim + 'libjvm.so';
-    if FileExists(Result) then
-      Exit;
+  FLock.Enter;
+  try
+    FRuntimeRoot := Root;
+    FRuntimeJvmPath := JvmPath;
+  finally
+    FLock.Leave;
   end;
-  raise Exception.Create('libjvm not found, set JAVA_HOME or bundle jre/');
+end;
+
+class function TJVMManager.DefaultClassPath: string;
+var
+  root: string;
+begin
+  root := FRuntimeRoot;
+  if root = '' then
+    root := ExtractFilePath(ParamStr(0));
+  Result := IncludeTrailingPathDelimiter(root) + 'bridge' + PathDelim + '*' +
+    PathSeparator + IncludeTrailingPathDelimiter(root) + 'drivers' + PathDelim + '*';
 end;
 
 class procedure TJVMManager.SetClassPath(const CP: string);
@@ -300,6 +304,8 @@ begin
   FLock.Enter;
   try
     Result := FClassPath;
+    if Result = '' then
+      Result := DefaultClassPath;
   finally
     FLock.Leave;
   end;
@@ -321,6 +327,7 @@ var
   args: JavaVMInitArgs;
   i, nopt: Integer;
   cpOpt: AnsiString;
+  effCP: string;
 begin
   FLock.Enter;
   try
@@ -365,8 +372,11 @@ begin
       end;
     end;
     argList := SplitArgs(ExtraArgs);
+    effCP := FClassPath;
+    if effCP = '' then
+      effCP := DefaultClassPath;
     nopt := Length(argList);
-    if FClassPath <> '' then
+    if effCP <> '' then
       Inc(nopt);
     SetLength(opts, nopt);
     SetLength(optStrs, nopt);
@@ -376,9 +386,9 @@ begin
       opts[i].optionString := PAnsi(optStrs[i]);
       opts[i].extraInfo := nil;
     end;
-    if FClassPath <> '' then
+    if effCP <> '' then
     begin
-      cpOpt := AnsiString('-Djava.class.path=' + FClassPath);
+      cpOpt := AnsiString('-Djava.class.path=' + effCP);
       optStrs[High(optStrs)] := cpOpt;
       opts[High(opts)].optionString := PAnsi(optStrs[High(optStrs)]);
       opts[High(opts)].extraInfo := nil;
@@ -479,6 +489,8 @@ begin
     { Keep a live VM: HotSpot allows exactly one VM per process, so tests
       must reuse it instead of recreating. Only accounting resets here. }
     FAttachCount := 0;
+    FRuntimeRoot := '';
+    FRuntimeJvmPath := '';
     if FJavaVM = nil then
     begin
       FStarted := False;
