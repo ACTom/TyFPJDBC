@@ -252,6 +252,9 @@ begin
       RunSemantic(eng, bridge, 'h2', 'jdbc:h2:mem:tjsem;DB_CLOSE_DELAY=-1',
         '', '', 'org.h2.Driver', 'BIGINT AUTO_INCREMENT PRIMARY KEY');
       ForceDirectories(WorkDir);
+      { SQLite is file-backed: a stale sem.db from a previous run would
+        break CREATE TABLE, so always start from an empty file. }
+      DeleteFile(WorkDir + PathDelim + 'sem.db');
       RunSemantic(eng, bridge, 'sqlite', 'jdbc:sqlite:' + WorkDir +
         PathDelim + 'sem.db', '', '', 'org.sqlite.JDBC',
         'INTEGER PRIMARY KEY AUTOINCREMENT');

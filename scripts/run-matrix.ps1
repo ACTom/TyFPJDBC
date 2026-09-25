@@ -244,14 +244,14 @@ Check "deterministic-matches-manifest" ($ha -eq $hw)
 Section "lpk-design-package"
 & "$ws\scripts\guard.ps1" 2>&1
 Check "guard-final" ($?)
-Remove-Item "$ws\src\lcl\lib" -Recurse -Force -ErrorAction SilentlyContinue
-Remove-Item "$ws\src\lcl\tyfpjdbc.pas" -Force -ErrorAction SilentlyContinue
-Remove-Item "$ws\src\lcl\packagefiles.xml" -Force -ErrorAction SilentlyContinue
-& lazbuild --build-all "$ws\src\lcl\tyfpjdbc.lpk" 2>&1
+Remove-Item "$ws\lib" -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item "$ws\tyfpjdbc.pas" -Force -ErrorAction SilentlyContinue
+Remove-Item "$ws\packagefiles.xml" -Force -ErrorAction SilentlyContinue
+& lazbuild --build-all "$ws\tyfpjdbc.lpk" 2>&1
 Check "lpk-build" ($LASTEXITCODE -eq 0)
-Remove-Item "$ws\src\lcl\tyfpjdbc.pas" -Force -ErrorAction SilentlyContinue
-Remove-Item "$ws\src\lcl\packagefiles.xml" -Force -ErrorAction SilentlyContinue
-Remove-Item "$ws\src\lcl\lib" -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item "$ws\tyfpjdbc.pas" -Force -ErrorAction SilentlyContinue
+Remove-Item "$ws\packagefiles.xml" -Force -ErrorAction SilentlyContinue
+Remove-Item "$ws\lib" -Recurse -Force -ErrorAction SilentlyContinue
 
 Section "summary"
 Write-Output ("MATRIX-FAILURES=" + $script:failures)
