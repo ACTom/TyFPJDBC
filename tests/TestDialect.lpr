@@ -5,8 +5,9 @@ program TestDialect;
 { Dialect + registry pure-logic tests: no JVM, no DB. }
 
 uses
-  SysUtils, Classes, TyFPJDBC.Handles, TyFPJDBC.Dialect.Api,
-  TyFPJDBC.Dialect.Base, TyFPJDBC.Driver.Registry;
+  SysUtils, Classes, DB, TyFPJDBC.Handles, TyFPJDBC.Dialect.Api,
+  TyFPJDBC.Dialect.Base, TyFPJDBC.Driver.Registry,
+  TyFPJDBC.Dataset.Adapter;
 
 var
   Fails: Integer = 0;
@@ -30,6 +31,8 @@ var
   props: TStringList;
   extra: TStringList;
   e: TDriverEntry;
+  ad: TDatasetAdapter;
+  memo: Boolean;
 begin
   Ok('pg-page', DialectFor('postgresql').PagedSQL('SELECT * FROM t ORDER BY id', 10, 20) =
     'SELECT * FROM t ORDER BY id LIMIT 10 OFFSET 20');
@@ -95,6 +98,9 @@ begin
   e.Embedded := False; e.Paging := psLimitOffset; e.Quote := qsDouble;
   e.KeyReturn := krNone; e.ParamSep := ';'; SetLength(e.TypeAliases, 0);
   e.Paging := psOffsetFetchNext; e.Quote := qsBracket; e.KeyReturn := krReturning;
+  SetLength(e.TypeAliases, 2);
+  e.TypeAliases[0] := 'MYBLOB=blob';
+  e.TypeAliases[1] := 'MYTEXT=widememo';
   TDriverRegistry.Register(e);
   Ok('custom-driver', TDriverRegistry.BuildUrl('mydb', 'h', 0, 'd', nil) =
     'jdbc:mydb://h:1234/d');
@@ -136,6 +142,16 @@ begin
   CheckUrl('mssql', 'db', 0, 'app', 'jdbc:sqlserver://db:1433;databaseName=app');
   CheckUrl('oracle', 'db', 0, 'app', 'jdbc:oracle:thin:@db:1521:app');
   Ok('builtin-count', Length(TDriverRegistry.BuiltinIds) >= 25);
+  ad := TDatasetAdapter.Create;
+  try
+    ad.UnknownTypeFallback := ufError;
+    Ok('alias-blob', ad.MapTypeFor('mydb', 'MYBLOB(10)', memo) = ftBlob);
+    Ok('alias-memo', (ad.MapTypeFor('mydb', 'mYtExT', memo) = ftWideMemo) and memo);
+    Ok('alias-global-fallback', ad.MapTypeFor('mydb', 'VARCHAR', memo) = ftWideString);
+    Ok('alias-unknown-driver', ad.MapTypeFor('nosuchdb', 'VARCHAR', memo) = ftWideString);
+  finally
+    ad.Free;
+  end;
 
   WriteLn('TOTAL fails=', Fails);
   if Fails > 0 then Halt(1);

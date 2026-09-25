@@ -16,6 +16,7 @@ type
     UnknownTypeFallback: TUnknownFallback;
     constructor Create;
     function MapType(const JdbcType: string; out AsMemo: Boolean): TFieldType;
+    function MapTypeFor(const DriverId, JdbcType: string; out AsMemo: Boolean): TFieldType;
     function MapByCode(Code: Integer; out AsMemo: Boolean): TFieldType;
     procedure BuildFields(AQuery: TBufDataset; Names, TypeNames: TStrings);
     procedure FillField(F: TField; const U: UTF8String);
@@ -27,7 +28,109 @@ type
 implementation
 
 uses
-  TyFPJDBC.Config;
+  TyFPJDBC.Config, TyFPJDBC.Driver.Registry;
+
+type
+  TTypeAlias = record
+    Name, Cls: string;
+    Memo: Boolean;
+  end;
+
+const
+  GlobalTypeAliases: array[0..56] of TTypeAlias = (
+    (Name: 'VARCHAR'; Cls: 'widestring'; Memo: False),
+    (Name: 'CHARACTER VARYING'; Cls: 'widestring'; Memo: False),
+    (Name: 'NVARCHAR'; Cls: 'widestring'; Memo: False),
+    (Name: 'CHAR'; Cls: 'widestring'; Memo: False),
+    (Name: 'CHARACTER'; Cls: 'widestring'; Memo: False),
+    (Name: 'NCHAR'; Cls: 'widestring'; Memo: False),
+    (Name: 'CLOB'; Cls: 'widememo'; Memo: True),
+    (Name: 'NCLOB'; Cls: 'widememo'; Memo: True),
+    (Name: 'TEXT'; Cls: 'widememo'; Memo: True),
+    (Name: 'NTEXT'; Cls: 'widememo'; Memo: True),
+    (Name: 'SQLXML'; Cls: 'widememo'; Memo: True),
+    (Name: 'JSON'; Cls: 'widememo'; Memo: True),
+    (Name: 'JSONB'; Cls: 'widememo'; Memo: True),
+    (Name: 'UUID'; Cls: 'widememo'; Memo: True),
+    (Name: 'XML'; Cls: 'widememo'; Memo: True),
+    (Name: 'ARRAY'; Cls: 'widememo'; Memo: True),
+    (Name: 'STRUCT'; Cls: 'widememo'; Memo: True),
+    (Name: 'OTHER'; Cls: 'widememo'; Memo: True),
+    (Name: 'INTEGER'; Cls: 'integer'; Memo: False),
+    (Name: 'INT'; Cls: 'integer'; Memo: False),
+    (Name: 'SMALLINT'; Cls: 'integer'; Memo: False),
+    (Name: 'INT2'; Cls: 'integer'; Memo: False),
+    (Name: 'SERIAL'; Cls: 'integer'; Memo: False),
+    (Name: 'TINYINT'; Cls: 'integer'; Memo: False),
+    (Name: 'MEDIUMINT'; Cls: 'integer'; Memo: False),
+    (Name: 'YEAR'; Cls: 'integer'; Memo: False),
+    (Name: 'BIGINT'; Cls: 'largeint'; Memo: False),
+    (Name: 'INT8'; Cls: 'largeint'; Memo: False),
+    (Name: 'BIGSERIAL'; Cls: 'largeint'; Memo: False),
+    (Name: 'SMALLSERIAL'; Cls: 'largeint'; Memo: False),
+    (Name: 'NUMERIC'; Cls: 'fmtbcd'; Memo: False),
+    (Name: 'DECIMAL'; Cls: 'fmtbcd'; Memo: False),
+    (Name: 'MONEY'; Cls: 'fmtbcd'; Memo: False),
+    (Name: 'SMALLMONEY'; Cls: 'fmtbcd'; Memo: False),
+    (Name: 'FLOAT'; Cls: 'float'; Memo: False),
+    (Name: 'FLOAT8'; Cls: 'float'; Memo: False),
+    (Name: 'DOUBLE'; Cls: 'float'; Memo: False),
+    (Name: 'DOUBLE PRECISION'; Cls: 'float'; Memo: False),
+    (Name: 'REAL'; Cls: 'float'; Memo: False),
+    (Name: 'FLOAT4'; Cls: 'float'; Memo: False),
+    (Name: 'BOOLEAN'; Cls: 'boolean'; Memo: False),
+    (Name: 'BOOL'; Cls: 'boolean'; Memo: False),
+    (Name: 'BIT'; Cls: 'boolean'; Memo: False),
+    (Name: 'DATE'; Cls: 'date'; Memo: False),
+    (Name: 'TIME'; Cls: 'time'; Memo: False),
+    (Name: 'TIMETZ'; Cls: 'time'; Memo: False),
+    (Name: 'TIMESTAMP'; Cls: 'datetime'; Memo: False),
+    (Name: 'TIMESTAMPTZ'; Cls: 'datetime'; Memo: False),
+    (Name: 'DATETIME'; Cls: 'datetime'; Memo: False),
+    (Name: 'SMALLDATETIME'; Cls: 'datetime'; Memo: False),
+    (Name: 'BLOB'; Cls: 'blob'; Memo: False),
+    (Name: 'BYTEA'; Cls: 'blob'; Memo: False),
+    (Name: 'BINARY'; Cls: 'blob'; Memo: False),
+    (Name: 'VARBINARY'; Cls: 'blob'; Memo: False),
+    (Name: 'IMAGE'; Cls: 'blob'; Memo: False),
+    (Name: 'LONGBLOB'; Cls: 'blob'; Memo: False),
+    (Name: 'BYTE'; Cls: 'blob'; Memo: False)
+  );
+
+function NormTypeName(const JdbcType: string): string;
+var
+  t: string;
+  p: Integer;
+begin
+  t := UpperCase(Trim(JdbcType));
+  p := Pos('(', t);
+  if p > 0 then
+    t := Copy(t, 1, p - 1);
+  p := Pos(' ', t);
+  if p > 0 then
+    t := Copy(t, 1, p - 1);
+  Result := Trim(t);
+end;
+
+function ClassToFieldType(const Cls: string; out AsMemo: Boolean): TFieldType;
+var
+  c: string;
+begin
+  AsMemo := False;
+  c := LowerCase(Trim(Cls));
+  if c = 'widestring' then Exit(ftWideString);
+  if c = 'integer' then Exit(ftInteger);
+  if c = 'largeint' then Exit(ftLargeint);
+  if c = 'fmtbcd' then Exit(ftFmtBCD);
+  if c = 'float' then Exit(ftFloat);
+  if c = 'boolean' then Exit(ftBoolean);
+  if c = 'date' then Exit(ftDate);
+  if c = 'time' then Exit(ftTime);
+  if c = 'datetime' then Exit(ftDateTime);
+  if c = 'blob' then Exit(ftBlob);
+  if c = 'widememo' then begin AsMemo := True; Exit(ftWideMemo); end;
+  raise EJDBCError.CreateChain('unknown type class', 'HY000', 45, Cls);
+end;
 
 constructor TDatasetAdapter.Create;
 begin
@@ -37,58 +140,16 @@ end;
 
 function TDatasetAdapter.MapType(const JdbcType: string; out AsMemo: Boolean): TFieldType;
 var
-  t, base: string;
-  p: Integer;
+  base: string;
+  i: Integer;
 begin
-  AsMemo := False;
-  t := UpperCase(Trim(JdbcType));
-  p := Pos('(', t);
-  if p > 0 then
-    t := Copy(t, 1, p - 1);
-  p := Pos(' ', t);
-  if p > 0 then
-    t := Copy(t, 1, p - 1);
-  t := Trim(t);
-  base := t;
-  if (base = 'VARCHAR') or (base = 'CHARACTER VARYING') or (base = 'NVARCHAR') or
-    (base = 'CHAR') or (base = 'CHARACTER') or (base = 'NCHAR') then
-    Exit(ftWideString);
-  if (base = 'CLOB') or (base = 'NCLOB') or (base = 'TEXT') or (base = 'NTEXT') or
-    (base = 'SQLXML') or (base = 'JSON') or (base = 'JSONB') or (base = 'UUID') or
-    (base = 'XML') then
-  begin
-    AsMemo := True;
-    Exit(ftWideMemo);
-  end;
-  if (base = 'INTEGER') or (base = 'INT') or (base = 'SMALLINT') or (base = 'INT2') or
-    (base = 'SERIAL') or (base = 'TINYINT') or (base = 'MEDIUMINT') or (base = 'YEAR') then
-    Exit(ftInteger);
-  if (base = 'BIGINT') or (base = 'INT8') or (base = 'BIGSERIAL') or
-    (base = 'SMALLSERIAL') then
-    Exit(ftLargeint);
-  if (base = 'NUMERIC') or (base = 'DECIMAL') or (base = 'MONEY') or
-    (base = 'SMALLMONEY') then
-    Exit(ftFmtBCD);
-  if (base = 'FLOAT') or (base = 'FLOAT8') or (base = 'DOUBLE') or
-    (base = 'DOUBLE PRECISION') or (base = 'REAL') or (base = 'FLOAT4') then
-    Exit(ftFloat);
-  if (base = 'BOOLEAN') or (base = 'BOOL') or (base = 'BIT') then
-    Exit(ftBoolean);
-  if base = 'DATE' then
-    Exit(ftDate);
-  if (base = 'TIME') or (base = 'TIMETZ') then
-    Exit(ftTime);
-  if (base = 'TIMESTAMP') or (base = 'TIMESTAMPTZ') or (base = 'DATETIME') or
-    (base = 'SMALLDATETIME') then
-    Exit(ftDateTime);
-  if (base = 'BLOB') or (base = 'BYTEA') or (base = 'BINARY') or (base = 'VARBINARY') or
-    (base = 'IMAGE') or (base = 'LONGBLOB') or (base = 'BYTE') then
-    Exit(ftBlob);
-  if (base = 'ARRAY') or (base = 'STRUCT') or (base = 'OTHER') then
-  begin
-    AsMemo := True;
-    Exit(ftWideMemo);
-  end;
+  base := NormTypeName(JdbcType);
+  for i := 0 to High(GlobalTypeAliases) do
+    if GlobalTypeAliases[i].Name = base then
+    begin
+      AsMemo := GlobalTypeAliases[i].Memo;
+      Exit(ClassToFieldType(GlobalTypeAliases[i].Cls, AsMemo));
+    end;
   case UnknownTypeFallback of
     ufString: Exit(ftWideString);
     ufBytes: Exit(ftBlob);
@@ -96,6 +157,36 @@ begin
     // single truth table with MapByCode
     raise EJDBCError.CreateChain('unknown jdbc type', 'HY000', 45, JdbcType);
   end;
+end;
+
+function TDatasetAdapter.MapTypeFor(const DriverId, JdbcType: string;
+  out AsMemo: Boolean): TFieldType;
+var
+  e: TDriverEntry;
+  base, item, nm: string;
+  i, q: Integer;
+begin
+  base := NormTypeName(JdbcType);
+  try
+    e := TDriverRegistry.Find(DriverId);
+  except
+    Result := MapType(JdbcType, AsMemo);
+    Exit;
+  end;
+  for i := 0 to High(e.TypeAliases) do
+  begin
+    item := e.TypeAliases[i];
+    q := Pos('=', item);
+    if q <= 0 then
+      Continue;
+    nm := UpperCase(Trim(Copy(item, 1, q - 1)));
+    if nm = base then
+    begin
+      Result := ClassToFieldType(Trim(Copy(item, q + 1, MaxInt)), AsMemo);
+      Exit;
+    end;
+  end;
+  Result := MapType(JdbcType, AsMemo);
 end;
 
 function TDatasetAdapter.MapByCode(Code: Integer; out AsMemo: Boolean): TFieldType;
