@@ -170,6 +170,7 @@ begin
       eng.Release(conn);
       eng.ClosePool(pool);
       Ok('handles-zero', eng.HandleCount = 0);
+      Ok('audit-zero', eng.AuditReport = 'pools=0 conns=0 stmts=0 cursors=0');
     finally
       eng.Free;
     end;

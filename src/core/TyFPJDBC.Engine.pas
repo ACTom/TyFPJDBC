@@ -19,6 +19,11 @@ type
     constructor Create(ABridge: TBridge);
     destructor Destroy; override;
     function HandleCount: Integer;
+    function PoolCount: Integer;
+    function ConnCount: Integer;
+    function StmtCount: Integer;
+    function CursorCount: Integer;
+    function AuditReport: string;
     function OpenPool(const Cfg: TPoolCfgRec): Int64;
     procedure ClosePool(PoolId: Int64);
     function Borrow(PoolId: Int64): Int64;
@@ -89,6 +94,32 @@ end;
 function TJdbcEngine.HandleCount: Integer;
 begin
   Result := FPools.Count + FConns.Count + FStmts.Count + FCursors.Count;
+end;
+
+function TJdbcEngine.PoolCount: Integer;
+begin
+  Result := FPools.Count;
+end;
+
+function TJdbcEngine.ConnCount: Integer;
+begin
+  Result := FConns.Count;
+end;
+
+function TJdbcEngine.StmtCount: Integer;
+begin
+  Result := FStmts.Count;
+end;
+
+function TJdbcEngine.CursorCount: Integer;
+begin
+  Result := FCursors.Count;
+end;
+
+function TJdbcEngine.AuditReport: string;
+begin
+  Result := 'pools=' + IntToStr(PoolCount) + ' conns=' + IntToStr(ConnCount) +
+    ' stmts=' + IntToStr(StmtCount) + ' cursors=' + IntToStr(CursorCount);
 end;
 
 function TJdbcEngine.OpenPool(const Cfg: TPoolCfgRec): Int64;
