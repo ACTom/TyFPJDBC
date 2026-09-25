@@ -38,6 +38,10 @@
         <UnitName Value="TyFPJDBC.LCL.Query"/>
       </Item>
       <Item>
+        <Filename Value="TyFPJDBC.LCL.Wizard.pas"/>
+        <UnitName Value="TyFPJDBC.LCL.Wizard"/>
+      </Item>
+      <Item>
         <Filename Value="TyFPJDBC.LCL.ConnDialog.pas"/>
         <UnitName Value="TyFPJDBC.LCL.ConnDialog"/>
       </Item>

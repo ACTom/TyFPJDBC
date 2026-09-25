@@ -10,7 +10,63 @@ program TestLcl;
 uses
   SysUtils, Classes, TyFPJDBC.Handles, TyFPJDBC.JVM.Manager,
   TyFPJDBC.JNI.Bridge, TyFPJDBC.Engine, TyFPJDBC.Driver.Registry,
-  TyFPJDBC.Config, TyFPJDBC.LCL.Conn, TyFPJDBC.LCL.Query, TyFPJDBC.Query;
+  TyFPJDBC.Driver.Fetch, TyFPJDBC.Config, TyFPJDBC.LCL.Conn,
+  TyFPJDBC.LCL.Query, TyFPJDBC.LCL.Wizard, TyFPJDBC.Query;
+
+type
+  TWizProbe = class
+    Eng: TJdbcEngine;
+    Conn: Int64;
+    SrcJar: string;
+    function MockFetch(const URL, ExpectSha, Target: string): Boolean;
+    function RealTest(const DriverId, Url: string): Boolean;
+  end;
+
+function TWizProbe.MockFetch(const URL, ExpectSha, Target: string): Boolean;
+var
+  src, dst: TFileStream;
+begin
+  ForceDirectories(ExtractFilePath(Target));
+  Result := False;
+  try
+    src := TFileStream.Create(SrcJar, fmOpenRead or fmShareDenyWrite);
+    try
+      dst := TFileStream.Create(Target, fmCreate);
+      try
+        dst.CopyFrom(src, src.Size);
+        Result := True;
+      finally
+        dst.Free;
+      end;
+    finally
+      src.Free;
+    end;
+  except
+    Result := False;
+  end;
+end;
+
+function TWizProbe.RealTest(const DriverId, Url: string): Boolean;
+var
+  e: TDriverEntry;
+  stmt, cur: Int64;
+  rows: TJdbcRows;
+begin
+  Result := False;
+  e := TDriverRegistry.Find(DriverId);
+  stmt := Eng.Bridge.Prepare(Conn, e.TestQuery);
+  try
+    cur := Eng.Bridge.QueryOpen(stmt, 10);
+    try
+      rows := Eng.Bridge.FetchWindow(cur, 10);
+      Result := (Length(rows) = 1) and (rows[0][0] = '1');
+    finally
+      Eng.Bridge.CloseCursor(cur);
+    end;
+  finally
+    Eng.Bridge.CloseStmt(stmt);
+  end;
+end;
 
 var
   Fails: Integer = 0;
@@ -49,6 +105,10 @@ var
   pool, conn: Int64;
   q: TJdbcQuery;
   def: TJdbcConfig;
+  wiz: TJdbcDriverWizard;
+  probe: TWizProbe;
+  wizDir: string;
+  c2: TJdbcConnection;
 begin
   def := TJdbcConfig.Default;
   try
@@ -113,6 +173,48 @@ begin
       finally
         q.Free;
       end;
+      wizDir := IncludeTrailingPathDelimiter(GetTempDir) + 'tjwiz';
+      DeleteFile(wizDir + PathDelim + 'drivers' + PathDelim + 'h2-2.2.224.jar');
+      DeleteFile(wizDir + PathDelim + 'drivers' + PathDelim + 'mysql-connector-j-8.3.0.jar');
+      DeleteFile(wizDir + PathDelim + 'license-mysql.accepted');
+      ForceDirectories(wizDir + PathDelim + 'drivers');
+      TDriverFetch.SetMarkerDir(wizDir);
+      wiz := TJdbcDriverWizard.Create;
+      probe := TWizProbe.Create;
+      try
+        probe.Eng := eng;
+        probe.Conn := conn;
+        probe.SrcJar := LibJar('h2-2.2.224.jar');
+        wiz.Root := wizDir;
+        wiz.OnFetch := @probe.MockFetch;
+        wiz.OnTest := @probe.RealTest;
+        Ok('wiz-drivers', Length(wiz.DriverIds) >= 25);
+        Ok('wiz-missing', wiz.JarState('h2') = jsMissing);
+        Ok('wiz-noconfirm', not wiz.CanConfirm);
+        Ok('wiz-gpl-gated', not wiz.Fetch('mysql', False));
+        Ok('wiz-fetch', wiz.Fetch('h2', False));
+        Ok('wiz-ready', wiz.JarState('h2') = jsReady);
+        wiz.DriverId := 'h2';
+        wiz.Database := 'lcl';
+        Ok('wiz-test', wiz.Test);
+        Ok('wiz-confirm', wiz.CanConfirm);
+        c2 := TJdbcConnection.Create(nil);
+        try
+          wiz.ApplyTo(c2);
+          Ok('wiz-apply', (c2.DriverId = 'h2') and (c2.Database = 'lcl'));
+        finally
+          c2.Free;
+        end;
+      finally
+        probe.Free;
+        wiz.Free;
+        TDriverFetch.SetMarkerDir('');
+      end;
+      DeleteFile(wizDir + PathDelim + 'drivers' + PathDelim + 'h2-2.2.224.jar');
+      DeleteFile(wizDir + PathDelim + 'drivers' + PathDelim + 'mysql-connector-j-8.3.0.jar');
+      DeleteFile(wizDir + PathDelim + 'license-mysql.accepted');
+      RemoveDir(wizDir + PathDelim + 'drivers');
+      RemoveDir(wizDir);
       eng.Release(conn);
       eng.ClosePool(pool);
       Ok('handles-zero', eng.HandleCount = 0);
