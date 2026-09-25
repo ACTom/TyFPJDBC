@@ -63,7 +63,7 @@ Section "live-h2-sqlite"
 # Live loopback on the drivers present on this host (H2 + SQLite jars).
 # PG/MySQL/MSSQL/Oracle have no local servers here: recorded as env-missing,
 # covered by dialect pure-logic asserts in TestDialect instead of faked.
-foreach ($t in @("TestHandles","TestJvm","TestEngine","TestData","TestInjection","TestDialect","TestProcBlob","TestDistrib","TestLcl","TestSoak")) {
+foreach ($t in @("TestHandles","TestJvm","TestEngine","TestData","TestInjection","TestTx","TestDialect","TestProcBlob","TestDistrib","TestLcl","TestSoak")) {
   Write-Output ("--- " + $t + " ---")
   $exe = Join-Path $bin ($t.ToLower() + ".exe")
   $lpr = Join-Path $ws ("tests\" + $t + ".lpr")
