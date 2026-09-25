@@ -10,7 +10,7 @@ program TestLcl;
 uses
   SysUtils, Classes, TyFPJDBC.Handles, TyFPJDBC.JVM.Manager,
   TyFPJDBC.JNI.Bridge, TyFPJDBC.Engine, TyFPJDBC.Driver.Registry,
-  TyFPJDBC.LCL.Conn, TyFPJDBC.LCL.Query, TyFPJDBC.Query;
+  TyFPJDBC.Config, TyFPJDBC.LCL.Conn, TyFPJDBC.LCL.Query, TyFPJDBC.Query;
 
 var
   Fails: Integer = 0;
@@ -48,26 +48,33 @@ var
   cfg: TPoolCfgRec;
   pool, conn: Int64;
   q: TJdbcQuery;
+  def: TJdbcConfig;
 begin
-  c := TJdbcConnection.Create(nil);
+  def := TJdbcConfig.Default;
   try
-    Ok('conn-defaults', (c.DriverId = 'sqlite') and (c.MaxPool = 10) and (c.LoginTimeoutSecs = 15));
-    c.DriverId := 'postgresql';
-    c.Host := 'db';
-    c.Port := 0;
-    c.Database := 'app';
-    Ok('conn-url', c.BuiltUrl(@TDriverRegistry.BuildUrlNil) = 'jdbc:postgresql://db:5432/app');
+    c := TJdbcConnection.Create(nil);
+    try
+      Ok('conn-defaults', (c.DriverId = 'sqlite') and
+        (c.MaxPool = def.Pool_MaxPool) and (c.MinIdle = def.Pool_MinIdle));
+      c.DriverId := 'postgresql';
+      c.Host := 'db';
+      c.Port := 0;
+      c.Database := 'app';
+      Ok('conn-url', c.BuiltUrl(@TDriverRegistry.BuildUrlNil) = 'jdbc:postgresql://db:5432/app');
+    finally
+      c.Free;
+    end;
+    qd := TJdbcConnQuery.Create(nil);
+    try
+      Ok('query-defaults', (qd.WindowSize = def.Exec_WindowSize) and (qd.KeyField = ''));
+      qd.SQLText := 'SELECT 1';
+      qd.KeyField := 'id';
+      Ok('query-props', (qd.SQLText = 'SELECT 1') and (qd.KeyField = 'id'));
+    finally
+      qd.Free;
+    end;
   finally
-    c.Free;
-  end;
-  qd := TJdbcConnQuery.Create(nil);
-  try
-    Ok('query-defaults', (qd.WindowSize = 1000) and (qd.KeyField = ''));
-    qd.SQLText := 'SELECT 1';
-    qd.KeyField := 'id';
-    Ok('query-props', (qd.SQLText = 'SELECT 1') and (qd.KeyField = 'id'));
-  finally
-    qd.Free;
+    def.Free;
   end;
 
   if ParamCount < 1 then

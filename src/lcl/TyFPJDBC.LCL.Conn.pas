@@ -2,7 +2,7 @@ unit TyFPJDBC.LCL.Conn;
 {$mode objfpc}{$H+}
 interface
 uses
-  SysUtils, Classes, DB;
+  SysUtils, Classes, DB, TyFPJDBC.Config;
 type
   TUrlForFunc = function(const DriverId, Host: string; Port: Integer;
     const Database: string): string;
@@ -39,17 +39,24 @@ type
 implementation
 
 constructor TJdbcConnection.Create(AOwner: TComponent);
+var
+  cfg: TJdbcConfig;
 begin
   inherited Create(AOwner);
-  FDriverId := 'sqlite';
-  FHost := '';
-  FPort := 0;
-  FDatabase := '';
-  FUser := '';
-  FPassword := '';
-  FMaxPool := 10;
-  FMinIdle := 2;
-  FLoginTimeoutSecs := 15;
+  cfg := TJdbcConfig.Default;
+  try
+    FDriverId := 'sqlite';
+    FHost := '';
+    FPort := 0;
+    FDatabase := '';
+    FUser := '';
+    FPassword := '';
+    FMaxPool := cfg.Pool_MaxPool;
+    FMinIdle := cfg.Pool_MinIdle;
+    FLoginTimeoutSecs := 15;
+  finally
+    cfg.Free;
+  end;
 end;
 
 function TJdbcConnection.BuiltUrl(UrlFor: TUrlForFunc): string;

@@ -2,7 +2,7 @@ unit TyFPJDBC.LCL.Query;
 {$mode objfpc}{$H+}
 interface
 uses
-  SysUtils, Classes, DB, BufDataset;
+  SysUtils, Classes, DB, BufDataset, TyFPJDBC.Config;
 type
   { Design-time query component: SQL text + key field + window size. At
     runtime pair it with TJdbcQuery (src/db) against a live connection;
@@ -23,11 +23,18 @@ type
 implementation
 
 constructor TJdbcConnQuery.Create(AOwner: TComponent);
+var
+  cfg: TJdbcConfig;
 begin
   inherited Create(AOwner);
   FSQLText := '';
   FKeyField := '';
-  FWindowSize := 1000;
+  cfg := TJdbcConfig.Default;
+  try
+    FWindowSize := cfg.Exec_WindowSize;
+  finally
+    cfg.Free;
+  end;
 end;
 
 end.
