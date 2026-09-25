@@ -4,7 +4,7 @@ interface
 uses
   SysUtils, Classes;
 type
-  { V2 opaque handles: Java owns pool/conn/stmt/cursor, Pascal holds ids only. }
+  { Opaque handles: Java owns pool/conn/stmt/cursor, Pascal holds ids only. }
   TJdbcPoolId = Int64;
   TJdbcConnId = Int64;
   TJdbcStmtId = Int64;

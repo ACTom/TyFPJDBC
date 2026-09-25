@@ -223,7 +223,7 @@ var
   end;
 
 begin
-  { Merged lookup (was FindLibJvm + FindLibJvmV2): explicit path first,
+  { Merged lookup (legacy registry/PATH probe kept as fallback): explicit path first,
     then bundled runtime, JAVA_HOME, registry/PATH probe, macOS dylib. }
   if TryPath(CustomPath) then
     Exit;

@@ -66,4 +66,4 @@ mautool.exe --verify-runtime --platform win64 --sha256 <hex> --out <dir>
 mautool.exe --verify-runtime --platform win64 --sha256 000... --out <dir>  # 必 MISMATCH
 ```
 
-`configs/runtimes.json` 固定 5 平台、`bridgeVersion 2.0.0`、`sha256` 64 位 hex。
+`configs/runtimes.json` 固定 5 平台、`bridgeVersion 0.9.0`、`sha256` 64 位 hex。

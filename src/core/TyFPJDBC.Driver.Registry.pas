@@ -4,7 +4,7 @@ interface
 uses
   SysUtils, Classes, TyFPJDBC.Handles;
 type
-  { V2 driver entry: arbitrary JDBC drivers register here. Unknown ids
+  { Driver entry: arbitrary JDBC drivers register here. Unknown ids
     raise 08000; no silent fallback. }
   TDriverEntry = record
     Id, DriverClass, UrlTemplate: string;

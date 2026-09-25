@@ -1,6 +1,6 @@
 package tyfpjdbc;
 
-/** V2 pool/connection configuration. Public fields keep JNI signatures flat. */
+/** Pool/connection configuration. Public fields keep JNI signatures flat. */
 public class PoolCfg {
   public String jdbcUrl = "";
   public String user = "";

@@ -4,7 +4,7 @@ interface
 uses
   SysUtils, Classes, Forms, Controls, Dialogs, StdCtrls;
 type
-  { V2 connection dialog: driver select, host/port/database, user/password
+  { Connection dialog: driver select, host/port/database, user/password
     (masked), timeouts, Test button. Confirm is only enabled after a
     successful Test against the real engine. }
   TJdbcConnDialog = class(TForm)

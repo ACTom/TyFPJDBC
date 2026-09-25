@@ -67,7 +67,7 @@ begin
 
   bridge := TBridge.Create;
   try
-    Ok('bridge-version-2', bridge.GetVersion = '2.0.0');
+    Ok('bridge-version', bridge.GetVersion = '0.9.0');
     try
       bridge.BorrowConn(0);
       Ok('bad-handle-local', False);

@@ -29,7 +29,7 @@ type
 function DefaultPoolCfg(const Url, DriverClass: UTF8String): TPoolCfgRec;
 
 type
-  { Thin JNI client over tyfpjdbc.Bridge (VERSION 2.0.0). Every call first
+  { Thin JNI client over tyfpjdbc.Bridge (VERSION 0.9.0). Every call first
     validates handles locally (HY000/99); driver errors surface with the
     ThreadLocal chain from getErrorChain. }
   TBridge = class
@@ -171,7 +171,7 @@ begin
     chain := SafeErrorChain;
     if chain = '' then
       chain := 'jni exception';
-    raise EJDBCError.CreateChain('bridgev2.' + What + ' failed', 'HY000', 99, chain);
+    raise EJDBCError.CreateChain('bridge.' + What + ' failed', 'HY000', 99, chain);
   end;
 end;
 
@@ -186,7 +186,7 @@ begin
     Result := e^^.NewStringUTF(e, PChar(S));
   CheckJ('newstring');
   if Result = nil then
-    raise EJDBCError.CreateChain('bridgev2.newstring failed', 'HY000', 99, 'null jstring');
+    raise EJDBCError.CreateChain('bridge.newstring failed', 'HY000', 99, 'null jstring');
 end;
 
 function TBridge.FromJStr(JS: jstring): UTF8String;
@@ -252,7 +252,7 @@ begin
   Result := e^^.GetMethodID(e, FClass, PChar(Name), PChar(Sig));
   CheckJ('method ' + Name);
   if Result = nil then
-    raise EJDBCError.CreateChain('bridgev2.method missing', 'HY000', 99, Name);
+    raise EJDBCError.CreateChain('bridge.method missing', 'HY000', 99, Name);
 end;
 
 function TBridge.CallJString0(M: jmethodID): UTF8String;
@@ -701,9 +701,9 @@ begin
   FMHeapUsed := Mid('heapUsedBytes', '()J');
   FMHeapMax := Mid('heapMaxBytes', '()J');
   FMErrorChain := Mid('getErrorChain', '()Ljava/lang/String;');
-  if GetVersion <> '2.0.0' then
-    raise EJDBCError.CreateChain('bridgev2 version mismatch', 'HY000', 99,
-      'expected 2.0.0 got ' + string(GetVersion));
+  if GetVersion <> '0.9.0' then
+    raise EJDBCError.CreateChain('bridge version mismatch', 'HY000', 99,
+      'expected 0.9.0 got ' + string(GetVersion));
 end;
 
 destructor TBridge.Destroy;

@@ -5,7 +5,7 @@ uses
   SysUtils, TyFPJDBC.Handles;
 
 type
-  { V2 dialect contract: paging, identifier quoting, key-return strategy.
+  { Dialect contract: paging, identifier quoting, key-return strategy.
     Implementations are pure logic (no I/O), unknown driver ids raise 08000. }
   IJdbcDialect = interface
     ['{A1B2C3D4-1111-4222-8333-444455556666}']
