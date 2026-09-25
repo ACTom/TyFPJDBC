@@ -21,7 +21,7 @@ procedure RegisterDialect(D: IJdbcDialect);
 implementation
 
 uses
-  Classes;
+  Classes, TyFPJDBC.Driver.Registry, TyFPJDBC.Dialect.Base;
 
 var
   GDialects: TInterfaceList = nil;
@@ -47,7 +47,7 @@ begin
   for i := 0 to List.Count - 1 do
     if IJdbcDialect(List[i]).DialectId = id then
       Exit(IJdbcDialect(List[i]));
-  raise EJDBCError.CreateChain('unknown dialect', '08000', 40, DriverId);
+  Result := DialectForEntry(TDriverRegistry.Find(DriverId));
 end;
 
 end.

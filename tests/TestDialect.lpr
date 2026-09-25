@@ -6,9 +6,7 @@ program TestDialect;
 
 uses
   SysUtils, Classes, TyFPJDBC.Handles, TyFPJDBC.Dialect.Api,
-  TyFPJDBC.Dialect.Base, TyFPJDBC.Dialect.Pg, TyFPJDBC.Dialect.Mysql,
-  TyFPJDBC.Dialect.Mssql, TyFPJDBC.Dialect.Oracle, TyFPJDBC.Dialect.Sqlite,
-  TyFPJDBC.Dialect.H2, TyFPJDBC.Driver.Registry;
+  TyFPJDBC.Dialect.Base, TyFPJDBC.Driver.Registry;
 
 var
   Fails: Integer = 0;
@@ -96,6 +94,7 @@ begin
   e.License := 'MIT'; e.Maven := 'com.example:mydb:1.0'; e.Sha := '';
   e.Embedded := False; e.Paging := psLimitOffset; e.Quote := qsDouble;
   e.KeyReturn := krNone; e.ParamSep := ';'; SetLength(e.TypeAliases, 0);
+  e.Paging := psOffsetFetchNext; e.Quote := qsBracket; e.KeyReturn := krReturning;
   TDriverRegistry.Register(e);
   Ok('custom-driver', TDriverRegistry.BuildUrl('mydb', 'h', 0, 'd', nil) =
     'jdbc:mydb://h:1234/d');
@@ -107,6 +106,10 @@ begin
   finally
     extra.Free;
   end;
+  Ok('mydb-page', DialectFor('mydb').PagedSQL('SELECT * FROM t ORDER BY id', 10, 20) =
+    'SELECT * FROM t ORDER BY id OFFSET 20 ROWS FETCH NEXT 10 ROWS ONLY');
+  Ok('mydb-quote', DialectFor('mydb').QuoteIdent('a]b') = '[a]]b]');
+  Ok('mydb-returning', DialectFor('mydb').KeyReturn('t', 'id') = ' RETURNING [id]');
   Ok('embedded-sqlite', TDriverRegistry.IsEmbedded('sqlite'));
   Ok('embedded-mydb-false', not TDriverRegistry.IsEmbedded('mydb'));
   Ok('embedded-unknown-false', not TDriverRegistry.IsEmbedded('nosuchdb'));
