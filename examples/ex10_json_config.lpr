@@ -35,6 +35,18 @@ begin
       PathDelim + 'configs';
 end;
 
+function JStr(P: TJSONData; const K: string): string;
+var
+  d: TJSONData;
+begin
+  Result := '';
+  if (P = nil) or not (P is TJSONObject) then
+    Exit;
+  d := TJSONObject(P).Find(K);
+  if (d <> nil) and (d.JSONType = jtString) then
+    Result := d.AsString;
+end;
+
 var
   drivers, runtimes, entry: TJSONData;
   arr: TJSONArray;
@@ -52,12 +64,12 @@ begin
     for i := 0 to arr.Count - 1 do
     begin
       entry := arr.Items[i];
-      WriteLn('driver id=', entry.FindPath('id').AsString,
-        ' maven=', entry.FindPath('maven').AsString,
-        ' sha1=', entry.FindPath('sha1').AsString,
-        ' testQuery=', entry.FindPath('testQuery').AsString);
-      if entry.FindPath('id').AsString = 'sqlite' then
-        sqliteSha1 := entry.FindPath('sha1').AsString;
+      WriteLn('driver id=', JStr(entry, 'id'),
+        ' maven=', JStr(entry, 'maven'),
+        ' sha1=', JStr(entry, 'sha1'),
+        ' testQuery=', JStr(entry, 'testQuery'));
+      if JStr(entry, 'id') = 'sqlite' then
+        sqliteSha1 := JStr(entry, 'sha1');
     end;
     if sqliteSha1 = '' then
     begin
