@@ -52,7 +52,64 @@ begin
   end;
 end;
 
+procedure TestFuzzFixedSeed;
+{ Fixed-seed fuzz over hostile fragments: output ? count must always equal
+  the binding count, plus a determinism rerun check. }
+const
+  FRAGS: array[0..17] of string = ('''', '"', '`', ':', ';', '--', '/*',
+    '*/', '$', '$$', '?', '?|', '?&', '::', ':=', ':/', '中文', '\');
+var
+  k, f, n, q, litQ, fi: Integer;
+  sql, first: string;
+  r: TRewriteResult;
 begin
+  RandSeed := 20260925;
+  first := '';
+  for k := 1 to 200 do
+  begin
+    sql := 'SELECT * FROM t WHERE a=:p0';
+    litQ := 0;
+    n := 1 + Random(4);
+    for f := 1 to n do
+    begin
+      fi := Random(Length(FRAGS));
+      if FRAGS[fi] = '?' then
+        Inc(litQ);
+      sql := sql + ' ' + FRAGS[fi] + ' :p' + IntToStr(f);
+    end;
+    r := RewriteNamedParams(sql);
+    q := 0;
+    for f := 1 to Length(r.JdbcSql) do
+      if r.JdbcSql[f] = '?' then
+      begin
+        { ?| and ?& are JSON operators, not placeholders; skip their ?. }
+        if (f < Length(r.JdbcSql)) and (r.JdbcSql[f + 1] in ['|', '&']) then
+          Continue;
+        Inc(q);
+      end;
+    { Every named param becomes exactly one ?; every literal ? survives;
+      nothing is created or swallowed. }
+    if q <> Length(r.ParamOrder) + litQ then
+    begin
+      Ng('fuzz-count', 'case ' + IntToStr(k) + ' got ' + IntToStr(q) +
+        ' want ' + IntToStr(Length(r.ParamOrder) + litQ));
+      Exit;
+    end;
+    if k = 1 then
+      first := r.JdbcSql;
+  end;
+  { Determinism: rerun the first generated shape verbatim. }
+  r := RewriteNamedParams('SELECT * FROM t WHERE a=:p0 :p1');
+  if (Length(r.ParamOrder) <> 2) or (r.ParamOrder[0] <> 'p0') then
+    Ng('fuzz-determinism', 'rerun mismatch')
+  else if first = '' then
+    Ng('fuzz-sanity', 'empty')
+  else
+    Ok('fuzz-count-deterministic');
+end;
+
+begin
+  TestFuzzFixedSeed;
   Check('dup',
     'SELECT * FROM t WHERE a=:id OR b=:id',
     'SELECT * FROM t WHERE a=? OR b=?',

@@ -53,7 +53,7 @@ foreach ($t in @("TestRewrite","TestTypes","TestRealWorld")) {
   Check "$t-compile" ($LASTEXITCODE -eq 0)
   $out = & $exe 2>&1 | Out-String
   Write-Output $out
-  if ($t -eq "TestRewrite") { Check "$t-60-0" ($out -match "TOTAL pass=60 fail=0") }
+  if ($t -eq "TestRewrite") { Check "$t-61-0" ($out -match "TOTAL pass=61 fail=0") }
   if ($t -eq "TestTypes") { Check "$t-50-0" ($out -match "TOTAL pass=50 fail=0") }
   if ($t -eq "TestRealWorld") { Check "$t-88-0" ($out -match "TOTAL pass=88 fail=0") }
   if ($out -cmatch "FAIL") { Check "$t-no-fail-lines" $false } else { Check "$t-no-fail-lines" $true }
@@ -63,7 +63,7 @@ Section "live-h2-sqlite"
 # Live loopback on the drivers present on this host (H2 + SQLite jars).
 # PG/MySQL/MSSQL/Oracle have no local servers here: recorded as env-missing,
 # covered by dialect pure-logic asserts in TestDialect instead of faked.
-foreach ($t in @("TestHandles","TestJvm","TestEngine","TestData","TestDialect","TestProcBlob","TestDistrib","TestLcl","TestSoak")) {
+foreach ($t in @("TestHandles","TestJvm","TestEngine","TestData","TestInjection","TestDialect","TestProcBlob","TestDistrib","TestLcl","TestSoak")) {
   Write-Output ("--- " + $t + " ---")
   $exe = Join-Path $bin ($t.ToLower() + ".exe")
   $lpr = Join-Path $ws ("tests\" + $t + ".lpr")
