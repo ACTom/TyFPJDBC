@@ -2,21 +2,21 @@ unit TyFPJDBC.Engine;
 {$mode objfpc}{$H+}
 interface
 uses
-  SysUtils, Classes, TyFPJDBC.Handles, TyFPJDBC.JNI.BridgeV2;
+  SysUtils, Classes, TyFPJDBC.Handles, TyFPJDBC.JNI.Bridge;
 
 type
-  { V2 engine: thin handle facade. No pool/conn/tx state lives here; every
-    call validates handles locally then forwards to BridgeV2, which is the
+  { Engine: thin handle facade. No pool/conn/tx state lives here; every
+    call validates handles locally then forwards to Bridge, which is the
     single state machine. Counts only track open handles for leak asserts. }
   TJdbcEngine = class
   private
-    FBridge: TBridgeV2;
+    FBridge: TBridge;
     FPools, FConns, FStmts, FCursors: TList;
     function IdxOf(L: TList; Id: Int64): Integer;
     procedure Track(L: TList; Id: Int64);
     procedure Untrack(L: TList; Id: Int64);
   public
-    constructor Create(ABridge: TBridgeV2);
+    constructor Create(ABridge: TBridge);
     destructor Destroy; override;
     function HandleCount: Integer;
     function OpenPool(const Cfg: TPoolCfgRec): Int64;
@@ -32,12 +32,12 @@ type
     function PoolActive(PoolId: Int64): Integer;
     function PoolIdle(PoolId: Int64): Integer;
     function PoolWaiting(PoolId: Int64): Integer;
-    property Bridge: TBridgeV2 read FBridge;
+    property Bridge: TBridge read FBridge;
   end;
 
 implementation
 
-constructor TJdbcEngine.Create(ABridge: TBridgeV2);
+constructor TJdbcEngine.Create(ABridge: TBridge);
 begin
   inherited Create;
   if ABridge = nil then

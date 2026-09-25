@@ -1,4 +1,4 @@
-program TestPerfTiers;
+program TestTiers;
 
 {$mode objfpc}{$H+}
 {$codepage UTF8}
@@ -12,7 +12,8 @@ program TestPerfTiers;
   are comparable; prints PERF lines plus FPC WorkingSet peak. }
 
 uses
-  SysUtils, Classes, TyFPJDBC.JVM.Manager, TyFPJDBC.JNI.Bridge;
+  SysUtils, Classes, TyFPJDBC.Handles, TyFPJDBC.JVM.Manager,
+  TyFPJDBC.JNI.Bridge, TyFPJDBC.Engine, TyFPJDBC.Command;
 
 var
   Fails: Integer = 0;
@@ -48,63 +49,107 @@ begin
   Result := GetHeapStatus.TotalAllocated div 1024;
 end;
 
-procedure RunTier(bridge: TBridgeClient; const WorkDir: string; NRows: Integer);
+procedure RunTier(B: TBridge; Eng: TJdbcEngine; const WorkDir: string; NRows: Integer);
 var
   db: string;
-  pool, c: Int64;
-  batch: TJavaRows;
-  nulls: TJavaNulls;
+  pool, c, stmt, cur: Int64;
+  cfg: TPoolCfgRec;
+  cmd: TJdbcCommand;
+  batch: array of TBoundRow;
   i, off, cnt, pages: Integer;
-  fetched: TJavaRows;
+  fetched: TJdbcRows;
   t0, msIns, msScan, msPage, msUpd: Int64;
   cntStr, sumStr, want: string;
+
+  procedure FetchAll(const SQL: string; Size: Integer; out Rows: TJdbcRows);
+  var
+    s2, c2: Int64;
+    w: TJdbcRows;
+    k: Integer;
+  begin
+    SetLength(Rows, 0);
+    s2 := B.Prepare(c, SQL);
+    try
+      c2 := B.QueryOpen(s2, Size);
+      try
+        repeat
+          w := B.FetchWindow(c2, Size);
+          if Length(w) = 0 then
+            Break;
+          for k := 0 to High(w) do
+          begin
+            SetLength(Rows, Length(Rows) + 1);
+            Rows[High(Rows)] := w[k];
+          end;
+        until False;
+      finally
+        B.CloseCursor(c2);
+      end;
+    finally
+      B.CloseStmt(s2);
+    end;
+  end;
+
 begin
   db := WorkDir + PathDelim + 'tier-' + IntToStr(NRows) + '-' +
     IntToStr(GetProcessID) + '.db';
   if FileExists(db) then
     DeleteFile(db);
-  pool := bridge.CreatePool('jdbc:sqlite:' + db, '', '', 4, 1);
-  c := bridge.BorrowConnection(pool);
+  cfg := DefaultPoolCfg('jdbc:sqlite:' + db, 'org.sqlite.JDBC');
+  cfg.MaximumPoolSize := 4;
+  cfg.MinimumIdle := 1;
+  pool := Eng.OpenPool(cfg);
+  c := Eng.Borrow(pool);
   try
-    bridge.ExecUpdate(c,
+    B.ExecDirect(c,
       'CREATE TABLE bench(id INTEGER PRIMARY KEY, name TEXT, payload TEXT, qty INT)');
-    SetLength(batch, 100);
-    SetLength(nulls, 100);
-    for i := 0 to 99 do
-    begin
-      batch[i] := TJavaRow.Create(IntToStr(i + 1), 'w-' + IntToStr(i + 1),
-        UTF8String('预热-') + UTF8String(IntToStr(i + 1)), IntToStr(i mod 100));
-      nulls[i] := TJavaNullRow.Create(False, False, False, False);
+    cmd := TJdbcCommand.Create(Eng, c);
+    try
+      cmd.SetSQL('INSERT INTO bench VALUES(:id,:name,:payload,:qty)');
+      SetLength(batch, 100);
+      for i := 0 to 99 do
+      begin
+        SetLength(batch[i], 4);
+        batch[i][0] := BInt64(i + 1);
+        batch[i][1] := BStr('w-' + IntToStr(i + 1));
+        batch[i][2] := BStr('预热-' + IntToStr(i + 1));
+        batch[i][3] := BInt64(i mod 100);
+      end;
+      cmd.ExecBatch(batch, 1000);
+    finally
+      cmd.Free;
     end;
-    bridge.ExecBatch(c, 'INSERT INTO bench VALUES(?,?,?,?)', batch, nulls);
-    bridge.FetchBatch(c, 'SELECT COUNT(*) FROM bench', 0, 10, 100);
-    bridge.ExecUpdate(c, 'DELETE FROM bench');
+    FetchAll('SELECT COUNT(*) FROM bench', 10, fetched);
+    B.ExecDirect(c, 'DELETE FROM bench');
 
     t0 := GetTickCount64;
-    { One execBatch per 1000-row chunk: each call is one transaction, so
+    { One ExecBatch per 1000-row chunk: each call is one transaction, so
       chunk count = commit count and Java-side batch memory stays bounded. }
-    for off := 0 to (NRows div 1000) - 1 do
-    begin
-      SetLength(batch, 1000);
-      SetLength(nulls, 1000);
-      for i := 0 to 999 do
+    cmd := TJdbcCommand.Create(Eng, c);
+    try
+      cmd.SetSQL('INSERT INTO bench VALUES(:id,:name,:payload,:qty)');
+      for off := 0 to (NRows div 1000) - 1 do
       begin
-        batch[i] := TJavaRow.Create(IntToStr(off * 1000 + i + 1),
-          'row-' + IntToStr(off * 1000 + i + 1),
-          UTF8String('payload-中文-') +
-          UTF8String(IntToStr(off * 1000 + i + 1)),
-          IntToStr((off * 1000 + i + 1) mod 100));
-        nulls[i] := TJavaNullRow.Create(False, False, False, False);
+        SetLength(batch, 1000);
+        for i := 0 to 999 do
+        begin
+          SetLength(batch[i], 4);
+          batch[i][0] := BInt64(off * 1000 + i + 1);
+          batch[i][1] := BStr('row-' + IntToStr(off * 1000 + i + 1));
+          batch[i][2] := BStr('payload-中文-' + IntToStr(off * 1000 + i + 1));
+          batch[i][3] := BInt64((off * 1000 + i + 1) mod 100);
+        end;
+        if cmd.ExecBatch(batch, 1000) <> 1000 then
+          raise Exception.Create('short batch write');
       end;
-      if bridge.ExecBatch(c, 'INSERT INTO bench VALUES(?,?,?,?)',
-        batch, nulls) <> 1000 then
-        raise Exception.Create('short batch write');
+    finally
+      cmd.Free;
     end;
     msIns := GetTickCount64 - t0;
     WriteLn('PERF tier=', NRows, ' insert ms=', msIns, ' rows_per_sec=',
       (Int64(NRows) * 1000) div (msIns + 1));
 
-    fetched := bridge.FetchBatch(c, 'SELECT COUNT(*) FROM bench', 0, 10, 100);
+    FetchAll('SELECT COUNT(*) FROM bench', 10, fetched);
     cntStr := string(fetched[0][0]);
     Ok('tier-' + IntToStr(NRows) + '-count', cntStr = IntToStr(NRows));
 
@@ -112,9 +157,19 @@ begin
     off := 0; cnt := 0;
     while True do
     begin
-      fetched := bridge.FetchBatch(c,
+      stmt := B.Prepare(c,
         'SELECT id, name, payload, qty FROM bench ORDER BY id LIMIT 1000 OFFSET ' +
-        IntToStr(off), 0, 1000, 1000);
+        IntToStr(off));
+      try
+        cur := B.QueryOpen(stmt, 1000);
+        try
+          fetched := B.FetchWindow(cur, 1000);
+        finally
+          B.CloseCursor(cur);
+        end;
+      finally
+        B.CloseStmt(stmt);
+      end;
       if Length(fetched) = 0 then
         Break;
       for i := 0 to High(fetched) do
@@ -130,9 +185,19 @@ begin
     off := 0; cnt := 0; pages := 0;
     while off < NRows do
     begin
-      fetched := bridge.FetchBatch(c,
+      stmt := B.Prepare(c,
         'SELECT id, name FROM bench ORDER BY id LIMIT 1000 OFFSET ' +
-        IntToStr(off), 0, 1000, 1000);
+        IntToStr(off));
+      try
+        cur := B.QueryOpen(stmt, 1000);
+        try
+          fetched := B.FetchWindow(cur, 1000);
+        finally
+          B.CloseCursor(cur);
+        end;
+      finally
+        B.CloseStmt(stmt);
+      end;
       if Length(fetched) = 0 then
         Break;
       Inc(cnt, Length(fetched));
@@ -145,20 +210,20 @@ begin
     WriteLn('PERF tier=', NRows, ' paged ms=', msPage, ' pages=', pages);
 
     t0 := GetTickCount64;
-    bridge.ExecUpdate(c, 'UPDATE bench SET qty=qty+1 WHERE id%2=0');
+    B.ExecDirect(c, 'UPDATE bench SET qty=qty+1 WHERE id%2=0');
     msUpd := GetTickCount64 - t0;
-    fetched := bridge.FetchBatch(c, 'SELECT SUM(qty) FROM bench', 0, 10, 100);
+    FetchAll('SELECT SUM(qty) FROM bench', 10, fetched);
     sumStr := string(fetched[0][0]);
     want := IntToStr((Int64(NRows div 100) * 4950) + (NRows div 2));
     Ok('tier-' + IntToStr(NRows) + '-checksum', sumStr = want);
     WriteLn('PERF tier=', NRows, ' update ms=', msUpd, ' checksum=', sumStr);
 
     WriteLn('PERF tier=', NRows, ' fpc-peak-kb=', FpcPeakKB,
-      ' heap-used=', bridge.HeapUsedBytes,
-      ' heap-max=', bridge.HeapMaxBytes);
-    bridge.ReleaseConnection(c);
+      ' heap-used=', B.HeapUsed,
+      ' heap-max=', B.HeapMax);
+    Eng.Release(c);
   finally
-    bridge.DestroyPool(pool);
+    Eng.ClosePool(pool);
   end;
   if FileExists(db) then
     DeleteFile(db);
@@ -166,7 +231,8 @@ end;
 
 var
   classesDir, workDir: string;
-  bridge: TBridgeClient;
+  eng: TJdbcEngine;
+  bridge: TBridge;
   rep, tier, maxTier: Integer;
 begin
   if ParamStr(1) <> '' then
@@ -191,16 +257,18 @@ begin
     ';' + LibJar('sqlite-jdbc-3.46.1.0.jar'));
   TJVMManager.EnsureStarted(FindJvmDll, TJVMManager.BuildDesktopArgs);
   TJVMManager.AttachThread;
-  bridge := TBridgeClient.Create;
+  bridge := TBridge.Create;
+  eng := TJdbcEngine.Create(bridge);
   try
     for tier := 1 to maxTier do
       case tier of
-        1: RunTier(bridge, workDir, 10000);
-        2: RunTier(bridge, workDir, 100000);
-        3: RunTier(bridge, workDir, 1000000);
+        1: RunTier(bridge, eng, workDir, 10000);
+        2: RunTier(bridge, eng, workDir, 100000);
+        3: RunTier(bridge, eng, workDir, 1000000);
       end;
     WriteLn('PERF-REP rep=', rep, ' done');
   finally
+    eng.Free;
     bridge.Free;
   end;
   TJVMManager.DetachThread;

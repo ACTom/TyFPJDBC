@@ -8,54 +8,95 @@ package tyfpjdbc;
  *  Usage: java -cp ... tyfpjdbc.PerfCompare <dbPath> <rows>
  */
 public class PerfCompare {
+  static String[][] fetchAll(Bridge b, long c, String sql, int size) throws Exception {
+    java.util.List<String[]> out = new java.util.ArrayList<>();
+    long s = b.prepare(c, sql);
+    try {
+      long cur = b.queryOpen(s, size);
+      try {
+        while (true) {
+          String[][] w = b.fetchWindow(cur, size);
+          if (w.length == 0) break;
+          for (String[] r : w) out.add(r);
+        }
+      } finally {
+        b.closeCursor(cur);
+      }
+    } finally {
+      b.closeStmt(s);
+    }
+    return out.toArray(new String[0][]);
+  }
+
   public static void main(String[] args) throws Exception {
     String db = args.length > 0 ? args[0] : "perf-bridge.db";
     int rows = args.length > 1 ? Integer.parseInt(args[1]) : 20000;
     new java.io.File(db).delete();
 
     Bridge b = new Bridge();
-    long pool = b.createPool("jdbc:sqlite:" + db, "", "", 4, 1);
-    long c = b.borrowConnection(pool);
+    long pool = b.createPool(new PoolCfg("jdbc:sqlite:" + db, "", "", "org.sqlite.JDBC", 4, 1));
+    long c = b.borrowConn(pool);
     try {
       // warmup (not timed)
-      b.execUpdate(c, "CREATE TABLE bench(id INTEGER PRIMARY KEY, name TEXT, payload TEXT, qty INT)");
+      b.execDirect(c, "CREATE TABLE bench(id INTEGER PRIMARY KEY, name TEXT, payload TEXT, qty INT)");
+      long w = b.prepare(c, "INSERT INTO bench VALUES(?,?,?,?)");
       for (int i = 1; i <= 100; i++) {
-        b.execUpdate(c, "INSERT INTO bench VALUES(" + i + ",'row-" + i + "','payload-中文-" + i + "'," + (i % 100) + ")");
+        b.bindLong(w, 1, i);
+        b.bindString(w, 2, "row-" + i);
+        b.bindString(w, 3, "payload-中文-" + i);
+        b.bindLong(w, 4, i % 100);
+        b.addBatch(w);
       }
-      b.fetchBatch(c, "SELECT COUNT(*) FROM bench", 0, 10, 100);
-      b.execUpdate(c, "DELETE FROM bench");
+      b.execBatch(w);
+      b.closeStmt(w);
+      fetchAll(b, c, "SELECT COUNT(*) FROM bench", 10);
+      b.execDirect(c, "DELETE FROM bench");
 
-      // phase 1: bulk insert via ONE PreparedStatement batch in ONE transaction,
-      // mirroring the FPC side (single transaction, parameterized rows).
-      // Production code should chunk huge loads (bounded memory); each
-      // execBatch call is one transaction, so chunk count = commit count.
+      // phase 1: bulk insert, chunked prepares; each execBatch call is one
+      // transaction, so chunk count = commit count.
       long t0 = System.currentTimeMillis();
-      {
-        String[][] batch = new String[rows][4];
+      w = b.prepare(c, "INSERT INTO bench VALUES(?,?,?,?)");
+      try {
         for (int j = 1; j <= rows; j++) {
-          batch[j - 1][0] = String.valueOf(j);
-          batch[j - 1][1] = "row-" + j;
-          batch[j - 1][2] = "payload-中文-" + j;
-          batch[j - 1][3] = String.valueOf(j % 100);
+          b.bindLong(w, 1, j);
+          b.bindString(w, 2, "row-" + j);
+          b.bindString(w, 3, "payload-中文-" + j);
+          b.bindLong(w, 4, j % 100);
+          b.addBatch(w);
+          if (j % 1000 == 0) {
+            int n = b.execBatch(w);
+            if (n != 1000) throw new RuntimeException("batch-count want 1000 got " + n);
+          }
         }
-        int n = b.execBatch(c, "INSERT INTO bench VALUES(?,?,?,?)", batch);
-        if (n != rows) throw new RuntimeException("batch-count want " + rows + " got " + n);
+      } finally {
+        b.closeStmt(w);
       }
       long msIns = System.currentTimeMillis() - t0;
       System.out.println("PERF bridge-insert ms=" + msIns + " rows=" + rows + " rows_per_sec=" + (rows * 1000L / (msIns + 1)));
 
-      // phase 2: full scan, SQL-level paging (no O(n^2) client-side skip).
+      // phase 2: full scan, windowed fetch
       t0 = System.currentTimeMillis();
-      int off = 0, cnt = 0;
-      long sum = 0;
-      while (true) {
-        String[][] page = b.fetchBatch(c, "SELECT id, name, payload, qty FROM bench ORDER BY id LIMIT 1000 OFFSET " + off, 0, 1000, 1000);
-        if (page.length == 0) break;
-        for (String[] r : page) {
-          cnt++;
-          sum += Long.parseLong(r[3]) + r[1].length() * 0;
+      int cnt = 0;
+      long sumTouch = 0;
+      {
+        long s = b.prepare(c, "SELECT id, name, payload, qty FROM bench ORDER BY id");
+        try {
+          long cur = b.queryOpen(s, 1000);
+          try {
+            while (true) {
+              String[][] page = b.fetchWindow(cur, 1000);
+              if (page.length == 0) break;
+              for (String[] r : page) {
+                cnt++;
+                sumTouch += Long.parseLong(r[3]) + r[1].length() * 0;
+              }
+            }
+          } finally {
+            b.closeCursor(cur);
+          }
+        } finally {
+          b.closeStmt(s);
         }
-        off += page.length;
       }
       long msScan = System.currentTimeMillis() - t0;
       if (cnt != rows) throw new RuntimeException("scan-count want " + rows + " got " + cnt);
@@ -63,9 +104,9 @@ public class PerfCompare {
 
       // phase 3: paged fetch, 2 cols, SQL-level paging.
       t0 = System.currentTimeMillis();
-      off = 0; cnt = 0; int pages = 0;
+      int off = 0; cnt = 0; int pages = 0;
       while (off < rows) {
-        String[][] page = b.fetchBatch(c, "SELECT id, name FROM bench ORDER BY id LIMIT 1000 OFFSET " + off, 0, 1000, 1000);
+        String[][] page = fetchAll(b, c, "SELECT id, name FROM bench ORDER BY id LIMIT 1000 OFFSET " + off, 1000);
         if (page.length == 0) break;
         cnt += page.length;
         off += page.length;
@@ -77,15 +118,15 @@ public class PerfCompare {
 
       // phase 4: bulk update half the rows
       t0 = System.currentTimeMillis();
-      b.execUpdate(c, "UPDATE bench SET qty=qty+1 WHERE id%2=0");
+      b.execDirect(c, "UPDATE bench SET qty=qty+1 WHERE id%2=0");
       long msUpd = System.currentTimeMillis() - t0;
-      String[][] s = b.fetchBatch(c, "SELECT SUM(qty) FROM bench", 0, 10, 100);
+      String[][] s = fetchAll(b, c, "SELECT SUM(qty) FROM bench", 10);
       long checksum = Long.parseLong(s[0][0]);
       long want = ((long) (rows / 100) * 4950) + (rows / 2);
       if (checksum != want) throw new RuntimeException("checksum want " + want + " got " + checksum);
       System.out.println("PERF bridge-update ms=" + msUpd + " checksum=" + checksum);
 
-      b.releaseConnection(c);
+      b.closeConn(c);
       System.out.println("PERF-DONE rows=" + rows);
     } finally {
       b.destroyPool(pool);

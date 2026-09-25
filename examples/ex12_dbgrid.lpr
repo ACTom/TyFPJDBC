@@ -3,13 +3,13 @@ program ex12_dbgrid;
 {$mode objfpc}{$H+}
 {$codepage UTF8}
 
-{ V2 DBGrid 示例：TJV2Query 绑定 TDataSource，模拟网格浏览、编辑、批量
+{ DBGrid 示例：TJdbcQuery 绑定 TDataSource，模拟网格浏览、编辑、批量
   新增与 ApplyUpdates2 落库，最后重查验证。用法：ex12_dbgrid <classesDir>. }
 
 uses
   SysUtils, Classes, DB, TyFPJDBC.Handles, TyFPJDBC.JVM.Manager,
-  TyFPJDBC.JNI.BridgeV2, TyFPJDBC.Engine, TyFPJDBC.Command,
-  TyFPJDBC.V2.Query;
+  TyFPJDBC.JNI.Bridge, TyFPJDBC.Engine, TyFPJDBC.Command,
+  TyFPJDBC.Query;
 
 function LibJar(const Name: string): string;
 begin
@@ -31,11 +31,11 @@ begin
 end;
 
 var
-  bridge: TBridgeV2;
+  bridge: TBridge;
   eng: TJdbcEngine;
   cfg: TPoolCfgRec;
   pool, conn: Int64;
-  q: TJV2Query;
+  q: TJdbcQuery;
   ds: TDataSource;
   gridRows, baseRows: Integer;
 begin
@@ -49,7 +49,7 @@ begin
     ';' + LibJar('slf4j-api-2.0.9.jar') + ';' + LibJar('h2-2.2.224.jar') +
     ';' + LibJar('sqlite-jdbc-3.46.1.0.jar'));
   TJVMManager.EnsureStarted(FindJvmDll, TJVMManager.BuildDesktopArgs);
-  bridge := TBridgeV2.Create;
+  bridge := TBridge.Create;
   try
     eng := TJdbcEngine.Create(bridge);
     try
@@ -58,7 +58,7 @@ begin
       conn := eng.Borrow(pool);
       bridge.ExecDirect(conn, 'CREATE TABLE people(id BIGINT PRIMARY KEY, name VARCHAR(50))');
       bridge.ExecDirect(conn, 'INSERT INTO people VALUES(1, ''a''),(2, ''b'')');
-      q := TJV2Query.Create(nil);
+      q := TJdbcQuery.Create(nil);
       ds := TDataSource.Create(nil);
       try
         q.KeyField := 'id';

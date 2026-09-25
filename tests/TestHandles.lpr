@@ -1,4 +1,4 @@
-program TestV2Handles;
+program TestHandles;
 {$mode objfpc}{$H+}
 uses
   SysUtils, TyFPJDBC.Handles;

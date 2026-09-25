@@ -3,13 +3,13 @@ program ex11_code_first;
 {$mode objfpc}{$H+}
 {$codepage UTF8}
 
-{ V2 代码优先示例：JVM -> BridgeV2 -> H2，建表、类型化插入、窗口查询、
+{ 代码优先示例：JVM -> Bridge -> H2，建表、类型化插入、窗口查询、
   编辑回写、事务回滚。用法：ex11_code_first <classesDir>. }
 
 uses
   SysUtils, Classes, TyFPJDBC.Handles, TyFPJDBC.JVM.Manager,
-  TyFPJDBC.JNI.BridgeV2, TyFPJDBC.Engine, TyFPJDBC.Command,
-  TyFPJDBC.V2.Query;
+  TyFPJDBC.JNI.Bridge, TyFPJDBC.Engine, TyFPJDBC.Command,
+  TyFPJDBC.Query;
 
 function LibJar(const Name: string): string;
 begin
@@ -31,12 +31,12 @@ begin
 end;
 
 var
-  bridge: TBridgeV2;
+  bridge: TBridge;
   eng: TJdbcEngine;
   cfg: TPoolCfgRec;
   pool, conn: Int64;
   cmd: TJdbcCommand;
-  q: TJV2Query;
+  q: TJdbcQuery;
   r: TBoundRow;
   rows: array of TBoundRow;
   i: Integer;
@@ -46,7 +46,7 @@ begin
     ';' + LibJar('slf4j-api-2.0.9.jar') + ';' + LibJar('h2-2.2.224.jar') +
     ';' + LibJar('sqlite-jdbc-3.46.1.0.jar'));
   TJVMManager.EnsureStarted(FindJvmDll, TJVMManager.BuildDesktopArgs);
-  bridge := TBridgeV2.Create;
+  bridge := TBridge.Create;
   try
     eng := TJdbcEngine.Create(bridge);
     try
@@ -68,7 +68,7 @@ begin
       finally
         cmd.Free;
       end;
-      q := TJV2Query.Create(nil);
+      q := TJdbcQuery.Create(nil);
       try
         q.KeyField := 'id';
         q.OpenQuery(eng, conn, 'goods', 'SELECT id,name FROM goods ORDER BY id', 100);

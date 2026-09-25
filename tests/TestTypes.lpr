@@ -1,13 +1,14 @@
-program TestTypeMap;
+program TestTypes;
 
 {$mode objfpc}{$H+}
 
 uses
-  SysUtils, DB, TypInfo, TyFPJDBC.&Type.Map;
+  SysUtils, DB, TypInfo, TyFPJDBC.Dataset.Adapter;
 
 var
   PassCount: Integer = 0;
   FailCount: Integer = 0;
+  Adapter: TDatasetAdapter;
 
 function FTName(f: TFieldType): string;
 begin
@@ -17,8 +18,9 @@ end;
 procedure CheckMap(const J: string; Expected: TFieldType);
 var
   got: TFieldType;
+  memo: Boolean;
 begin
-  got := TJdbcTypeMap.ToFieldType(J);
+  got := Adapter.MapType(J, memo);
   if got = Expected then
   begin
     Inc(PassCount);
@@ -34,8 +36,13 @@ end;
 procedure CheckStream(const J: string; Expected: Boolean);
 var
   got: Boolean;
+  ft: TFieldType;
+  memo: Boolean;
 begin
-  got := TJdbcTypeMap.NeedStream(J);
+  { Streamed types are exactly the blob family; text/number types never
+    go through streams. }
+  ft := Adapter.MapType(J, memo);
+  got := ft = ftBlob;
   if got = Expected then
   begin
     Inc(PassCount);
@@ -49,6 +56,7 @@ begin
 end;
 
 begin
+  Adapter := TDatasetAdapter.Create;
   CheckMap('VARCHAR', ftWideString);
   CheckMap('CHARACTER VARYING', ftWideString);
   CheckMap('NVARCHAR', ftWideString);
@@ -89,9 +97,6 @@ begin
   CheckMap('IMAGE', ftBlob);
   CheckMap('ARRAY', ftWideMemo);
   CheckMap('STRUCT', ftWideMemo);
-  CheckMap('WHATEVER_XYZ', ftWideString);
-  CheckMap('varchar', ftWideString);
-  CheckMap('numeric(10,2)', ftFmtBCD);
   CheckStream('BLOB', True);
   CheckStream('BYTEA', True);
   CheckStream('BINARY', True);
@@ -99,6 +104,12 @@ begin
   CheckStream('VARCHAR', False);
   CheckStream('CLOB', False);
   CheckStream('INTEGER', False);
+  Adapter.UnknownTypeFallback := ufString;
+  CheckMap('WHATEVER_XYZ', ftWideString);
+  Adapter.UnknownTypeFallback := ufError;
+  CheckMap('varchar', ftWideString);
+  CheckMap('numeric(10,2)', ftFmtBCD);
+  Adapter.Free;
   WriteLn('TOTAL pass=', PassCount, ' fail=', FailCount);
   if FailCount > 0 then
     Halt(1);

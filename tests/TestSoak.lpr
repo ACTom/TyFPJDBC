@@ -1,16 +1,16 @@
-program TestV2Soak;
+program TestSoak;
 
 {$mode objfpc}{$H+}
 
-{ V2 soak: 4 threads x 50 borrow/exec/query/release iterations against one
+{ Soak: 4 threads x 50 borrow/exec/query/release iterations against one
   shared pool. Each iteration writes a thread-keyed row and reads it back;
   any cross-talk (wrong tag on own id) counts as misroute. Leak assert:
   every per-thread engine ends at HandleCount=0 and the main engine is zero
-  after ClosePool. Usage: TestV2Soak <classesDir>. }
+  after ClosePool. Usage: TestSoak <classesDir>. }
 
 uses
   SysUtils, Classes, syncobjs, TyFPJDBC.Handles, TyFPJDBC.JVM.Manager,
-  TyFPJDBC.JNI.BridgeV2, TyFPJDBC.Engine;
+  TyFPJDBC.JNI.Bridge, TyFPJDBC.Engine;
 
 const
   THREADS = 4;
@@ -21,7 +21,7 @@ var
   Misroute: Integer = 0;
   ThreadFails: Integer = 0;
   Lock: TCriticalSection;
-  SharedBridge: TBridgeV2;
+  SharedBridge: TBridge;
   SharedPool: Int64;
 
 procedure Ok(const N: string; C: Boolean);
@@ -71,7 +71,7 @@ procedure TSoakThread.Execute;
 var
   eng: TJdbcEngine;
   conn, stmt, cur: Int64;
-  rows: TV2Rows;
+  rows: TJdbcRows;
   i, id: Integer;
   tag: string;
   localBad: Integer;
@@ -154,14 +154,14 @@ var
   mainEng: TJdbcEngine;
   cfg: TPoolCfgRec;
   conn, stmt, cur: Int64;
-  rows: TV2Rows;
+  rows: TJdbcRows;
   workers: array[0..THREADS - 1] of TSoakThread;
   t: Integer;
   attachBase: Integer;
 begin
   if ParamCount < 1 then
   begin
-    WriteLn('usage: TestV2Soak <classesDir>');
+    WriteLn('usage: TestSoak <classesDir>');
     Halt(2);
   end;
   classesDir := ParamStr(1);
@@ -173,12 +173,12 @@ begin
       ';' + LibJar('sqlite-jdbc-3.46.1.0.jar'));
     TJVMManager.EnsureStarted(FindJvmDll, TJVMManager.BuildDesktopArgs);
     attachBase := TJVMManager.AttachedCount;
-    SharedBridge := TBridgeV2.Create;
+    SharedBridge := TBridge.Create;
     try
       Ok('bridge-version-2', SharedBridge.GetVersion = '2.0.0');
       mainEng := TJdbcEngine.Create(SharedBridge);
       try
-        cfg := DefaultPoolCfg('jdbc:h2:mem:v2soak;DB_CLOSE_DELAY=-1',
+        cfg := DefaultPoolCfg('jdbc:h2:mem:tjsoak;DB_CLOSE_DELAY=-1',
           'org.h2.Driver');
         cfg.MaximumPoolSize := 10;
         SharedPool := mainEng.OpenPool(cfg);

@@ -1,9 +1,9 @@
 package tyfpjdbc;
 
-/** Throwaway smoke probe for BridgeV2 (not a JUnit suite): version, pool,
+/** Throwaway smoke probe for Bridge (not a JUnit suite): version, pool,
  *  typed batch, window fetch, tx savepoint, metadata, cancel isolation,
  *  per-thread error chains. Exit nonzero on any failure. */
-public class BridgeV2Smoke {
+public class BridgeSmoke {
   static int fails = 0;
   static void ok(String n, boolean c) {
     System.out.println((c ? "PASS " : "FAIL ") + n);
@@ -11,7 +11,7 @@ public class BridgeV2Smoke {
   }
 
   public static void main(String[] args) throws Exception {
-    BridgeV2 b = new BridgeV2();
+    Bridge b = new Bridge();
     ok("version-2", "2.0.0".equals(b.getVersion()));
 
     PoolCfg h2 = new PoolCfg("jdbc:h2:mem:smoke;DB_CLOSE_DELAY=-1", "", "", "org.h2.Driver", 4, 1);

@@ -3,7 +3,7 @@ unit TyFPJDBC.Dataset.Adapter;
 interface
 uses
   SysUtils, Classes, DB, BufDataset, TyFPJDBC.Handles,
-  TyFPJDBC.JNI.BridgeV2, TyFPJDBC.Command;
+  TyFPJDBC.JNI.Bridge, TyFPJDBC.Command;
 
 type
   { Window-to-dataset mapping. FieldDefs come from cursor metadata
@@ -18,7 +18,7 @@ type
     function MapType(const JdbcType: string; out AsMemo: Boolean): TFieldType;
     procedure BuildFields(AQuery: TBufDataset; Names, TypeNames: TStrings);
     procedure FillField(F: TField; const U: UTF8String);
-    procedure FillWindow(AQuery: TBufDataset; const Rows: TV2Rows);
+    procedure FillWindow(AQuery: TBufDataset; const Rows: TJdbcRows);
     function CollectRow(AQuery: TBufDataset): TBoundRow;
   end;
 
@@ -114,7 +114,7 @@ end;
 
 procedure TDatasetAdapter.FillField(F: TField; const U: UTF8String);
 begin
-  { Proven V1 pattern: AsUTF8String bypasses the ANSI codepage on this FPC
+  { Proven pattern: AsUTF8String bypasses the ANSI codepage on this FPC
     build; UTF8Decode/AsWideString corrupts CJK here (verified red). }
   if F.IsNull and (U = '') then
     Exit;
@@ -134,7 +134,7 @@ begin
   F.AsUTF8String := U;
 end;
 
-procedure TDatasetAdapter.FillWindow(AQuery: TBufDataset; const Rows: TV2Rows);
+procedure TDatasetAdapter.FillWindow(AQuery: TBufDataset; const Rows: TJdbcRows);
 var
   r, c: Integer;
 begin

@@ -1,8 +1,8 @@
-program TestV2Distrib;
+program TestDistrib;
 
 {$mode objfpc}{$H+}
 
-{ V2 distribution tests: mautool v2 behaviors against the shipped tool.
+{ Distribution tests: mautool behaviors against the shipped tool.
   Drives the real binary at test-results/bin or the path in MAUTOOL_EXE:
   manifests verify, runtime accept + reject, driver file accept + reject,
   cache-dir + license-flag surface in help/usage. }

@@ -1,6 +1,6 @@
-# TyFPJDBC V2 驱动接入（DRIVER）
+# TyFPJDBC 驱动接入（DRIVER）
 
-V2 规则：Java `BridgeV2` 是唯一状态机，Pascal 只拿 `Int64` 句柄。
+规则：Java `Bridge` 是唯一状态机，Pascal 只拿 `Int64` 句柄。
 任何 JDBC 驱动都走同一注册表接入，未知驱动直接报错（`08000`），不静默兜底。
 
 ## 内置驱动
@@ -17,7 +17,7 @@ V2 规则：Java `BridgeV2` 是唯一状态机，Pascal 只拿 `Int64` 句柄。
 | sqlite | org.sqlite.JDBC | jdbc:sqlite:{database} | 0 | Apache-2.0 |
 | h2 | org.h2.Driver | jdbc:h2:mem:{database} | 0 | MPL-2.0 |
 
-`TestV2Dialect` 断言：未知驱动抛 `08000`；`sqlite`/`h2` 只替换 `{database}`；
+`TestDialect` 断言：未知驱动抛 `08000`；`sqlite`/`h2` 只替换 `{database}`；
 `mssql` 的 `Extra` 用 `;` 连接，其余用 `?k=v&...`。
 
 ## 注册自定义驱动
@@ -53,7 +53,7 @@ mautool.exe --verify-file --driver h2 --sha1 <hex> --out <dir>
 mautool.exe --verify-manifests --config configs/drivers.json
 ```
 
-行为（`src/tools/mautool.lpr`，`TestV2Distrib` 全断言）：
+行为（`src/tools/mautool.lpr`，`TestDistrib` 全断言）：
 缓存命中先验 `sha1`；缺失则下载到临时文件、验 `sha1` 后原子改名；
 `sha1` 不一致删除下载件并报 `MISMATCH`；未知驱动报 `unknown driver`。
 缓存目录：`%TYFPJDBC_CACHE%`，缺省 `%USERPROFILE%\.tyfpjdbc\cache`。

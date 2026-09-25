@@ -1,17 +1,17 @@
-program TestV2Data;
+program TestData;
 
 {$mode objfpc}{$H+}
 {$codepage UTF8}
 
-{ V2 data path live test on H2: named params, typed values incl. CJK,
+{ Data path live test on H2: named params, typed values incl. CJK,
   windowed 2500-row fetch (window=500 -> >=5 fetches, bounded pages),
   insert batches incl. BatchSize split, generated keys, two-batch reread,
   timeout/cancel classification, unkeyed-write refusal. }
 
 uses
   SysUtils, Classes, DB, TyFPJDBC.Handles, TyFPJDBC.JVM.Manager,
-  TyFPJDBC.JNI.BridgeV2, TyFPJDBC.Engine, TyFPJDBC.Command,
-  TyFPJDBC.Dataset.Adapter, TyFPJDBC.V2.Query;
+  TyFPJDBC.JNI.Bridge, TyFPJDBC.Engine, TyFPJDBC.Command,
+  TyFPJDBC.Dataset.Adapter, TyFPJDBC.Query;
 
 var
   Fails: Integer = 0;
@@ -44,24 +44,25 @@ end;
 
 var
   classesDir: string;
-  bridge: TBridgeV2;
+  bridge: TBridge;
   eng: TJdbcEngine;
   cfg: TPoolCfgRec;
   pool, conn: Int64;
   cmd, cmd2: TJdbcCommand;
-  q: TJV2Query;
+  q: TJdbcQuery;
   rows: array of TBoundRow;
   r: TBoundRow;
   i: Integer;
-  keys, keys2: TV2Row;
+  keys, keys2: TJdbcRow;
   stmt, cur: Int64;
-  back: TV2Rows;
+  back: TJdbcRows;
+  rw: TRewriteResult;
   raised: Boolean;
   st: EJDBCError;
 begin
   if ParamCount < 1 then
   begin
-    WriteLn('usage: TestV2Data <classesDir>');
+    WriteLn('usage: TestData <classesDir>');
     Halt(2);
   end;
   classesDir := ParamStr(1);
@@ -71,17 +72,34 @@ begin
     ';' + LibJar('sqlite-jdbc-3.46.1.0.jar'));
   TJVMManager.EnsureStarted(FindJvmDll, TJVMManager.BuildDesktopArgs);
 
-  bridge := TBridgeV2.Create;
+  bridge := TBridge.Create;
   try
     eng := TJdbcEngine.Create(bridge);
     try
-      cfg := DefaultPoolCfg('jdbc:h2:mem:v2data;DB_CLOSE_DELAY=-1', 'org.h2.Driver');
+      cfg := DefaultPoolCfg('jdbc:h2:mem:tjdata;DB_CLOSE_DELAY=-1', 'org.h2.Driver');
       pool := eng.OpenPool(cfg);
       conn := eng.Borrow(pool);
       Ok('ddl', bridge.ExecDirect(conn,
         'CREATE TABLE t(id BIGINT PRIMARY KEY, amt DECIMAL(10,2), name VARCHAR(50))') = 0);
 
-      { Named params skip strings/comments/::casts/:= . }
+      { Named params rewritten by the shipped pure function
+        RewriteNamedParams (no JNI): dup params kept in order, quoted
+        idents / $$ bodies / :: / := / :digit / JSON ?| ?& untouched. }
+      rw := RewriteNamedParams('SELECT * FROM t WHERE a=:id OR b=:id');
+      Ok('rewrite-dup', (rw.JdbcSql = 'SELECT * FROM t WHERE a=? OR b=?') and
+        (Length(rw.ParamOrder) = 2) and (rw.ParamOrder[0] = 'id') and (rw.ParamOrder[1] = 'id'));
+      rw := RewriteNamedParams('SELECT '':id'', ":id", `:id` FROM t WHERE a=:name');
+      Ok('rewrite-quoted', (rw.JdbcSql = 'SELECT '':id'', ":id", `:id` FROM t WHERE a=?') and
+        (Length(rw.ParamOrder) = 1) and (rw.ParamOrder[0] = 'name'));
+      rw := RewriteNamedParams('SELECT $$:nope$$ FROM t WHERE a=:id');
+      Ok('rewrite-dollar', (rw.JdbcSql = 'SELECT $$:nope$$ FROM t WHERE a=?') and
+        (Length(rw.ParamOrder) = 1));
+      rw := RewriteNamedParams('SELECT v::int, tm FROM t WHERE tm=12:30 AND a=:id -- :nope'#10'/* :no */');
+      Ok('rewrite-cast-time-comment', (rw.JdbcSql = 'SELECT v::int, tm FROM t WHERE tm=12:30 AND a=? -- :nope'#10'/* :no */') and
+        (Length(rw.ParamOrder) = 1));
+      rw := RewriteNamedParams('SELECT a := 1, j ? ''k'', k ?| a FROM t WHERE a=? AND b=:id');
+      Ok('rewrite-misc', (rw.JdbcSql = 'SELECT a := 1, j ? ''k'', k ?| a FROM t WHERE a=? AND b=?') and
+        (Length(rw.ParamOrder) = 1) and (rw.ParamOrder[0] = 'id'));
       cmd := TJdbcCommand.Create(eng, conn);
       try
         cmd.SetSQL('SELECT id FROM t WHERE name='':x'' AND id=:id -- :nope'#10'/* :nope2 */ AND amt > 0');
@@ -148,7 +166,7 @@ begin
       end;
 
       { Windowed dataset read: window=500 over 2501 rows. }
-      q := TJV2Query.Create(nil);
+      q := TJdbcQuery.Create(nil);
       try
         q.KeyField := 'id';
         q.OpenQuery(eng, conn, 't', 'SELECT id,amt,name FROM t ORDER BY id', 500);
@@ -168,7 +186,7 @@ begin
       { Append two batches via ApplyUpdates2 with re-read. Keys 9001/9002
         are outside the 1..2501 batch range; base snapshot advances per
         landed row so the second batch sends only its own row. }
-      q := TJV2Query.Create(nil);
+      q := TJdbcQuery.Create(nil);
       try
         q.KeyField := 'id';
         q.OpenQuery(eng, conn, 't', 'SELECT id,amt,name FROM t ORDER BY id', 1000);
@@ -212,7 +230,7 @@ begin
       end;
 
       { Unkeyed write refused. }
-      q := TJV2Query.Create(nil);
+      q := TJdbcQuery.Create(nil);
       try
         q.OpenQuery(eng, conn, 't', 'SELECT id FROM t ORDER BY id', 100);
         raised := False;

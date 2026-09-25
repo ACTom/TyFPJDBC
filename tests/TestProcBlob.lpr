@@ -1,15 +1,15 @@
-program TestV2ProcBlob;
+program TestProcBlob;
 
 {$mode objfpc}{$H+}
 {$codepage UTF8}
 
-{ V2 proc/script/blob/observe live test on H2: H2 ALIAS as stored function,
+{ Proc/script/blob/observe live test on H2: H2 ALIAS as stored function,
   script split incl. $$ body with inner semicolons + failure index, 2MB blob
   round trip via streaming writeBlob, slow-query auto log. }
 
 uses
   SysUtils, Classes, TyFPJDBC.Handles, TyFPJDBC.JVM.Manager,
-  TyFPJDBC.JNI.BridgeV2, TyFPJDBC.Engine, TyFPJDBC.Command,
+  TyFPJDBC.JNI.Bridge, TyFPJDBC.Engine, TyFPJDBC.Command,
   TyFPJDBC.StoredProc, TyFPJDBC.Script, TyFPJDBC.Observe;
 
 var
@@ -55,7 +55,7 @@ end;
 
 var
   classesDir: string;
-  bridge: TBridgeV2;
+  bridge: TBridge;
   eng: TJdbcEngine;
   cfg: TPoolCfgRec;
   pool, conn, stmt, cur: Int64;
@@ -67,13 +67,13 @@ var
   logger: TJdbcLogger;
   obs: TJdbcObserve;
   sink: TSink;
-  rows: TV2Rows;
+  rows: TJdbcRows;
   raised: Boolean;
   slow: Boolean;
 begin
   if ParamCount < 1 then
   begin
-    WriteLn('usage: TestV2ProcBlob <classesDir>');
+    WriteLn('usage: TestProcBlob <classesDir>');
     Halt(2);
   end;
   classesDir := ParamStr(1);
@@ -100,13 +100,13 @@ begin
     parts.Free;
   end;
 
-  bridge := TBridgeV2.Create;
+  bridge := TBridge.Create;
   try
     eng := TJdbcEngine.Create(bridge);
     try
       { Unique mem DB per run (DB_CLOSE_DELAY keeps mem DBs alive in one
         JVM; a fixed name collides with earlier runs' objects). }
-      cfg := DefaultPoolCfg('jdbc:h2:mem:v2proc' + IntToStr(GetProcessID) +
+      cfg := DefaultPoolCfg('jdbc:h2:mem:tjproc' + IntToStr(GetProcessID) +
         ';DB_CLOSE_DELAY=-1', 'org.h2.Driver');
       pool := eng.OpenPool(cfg);
       conn := eng.Borrow(pool);

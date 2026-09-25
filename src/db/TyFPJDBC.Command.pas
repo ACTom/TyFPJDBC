@@ -2,10 +2,10 @@ unit TyFPJDBC.Command;
 {$mode objfpc}{$H+}
 interface
 uses
-  SysUtils, Classes, TyFPJDBC.Handles, TyFPJDBC.JNI.BridgeV2, TyFPJDBC.Engine;
+  SysUtils, Classes, TyFPJDBC.Handles, TyFPJDBC.JNI.Bridge, TyFPJDBC.Engine;
 
 type
-  { Bound value kinds mirror the typed BridgeV2 setters. Values stay in
+  { Bound value kinds mirror the typed Bridge setters. Values stay in
     canonical string form on the Pascal side; JDBC uses the typed setter. }
   TBVKind = (bvInt, bvInt64, bvDouble, bvBigDec, bvStr, bvDate, bvTime,
     bvStamp, bvBytes, bvNull);
@@ -33,9 +33,18 @@ function BBytes(const V: TBytes): TBoundValue;
 function BNull(SqlType: Integer): TBoundValue;
 
 type
-  { Named-parameter command: converts :name to ? (%% and :: and strings
-    untouched), binds typed values positionally, executes via Engine stmt
-    handles with timeout/cancel support. }
+  TRewriteResult = record
+    JdbcSql: string;
+    ParamOrder: TStringArray;
+  end;
+
+function RewriteNamedParams(const S: string): TRewriteResult;
+
+type
+  { Named-parameter command: converts :name to ? (: casts, :=, strings,
+    quoted idents, comments, $$  bodies, ?|/?&  and lone ? untouched),
+    binds typed values positionally, executes via Engine stmt handles
+    with timeout/cancel support. }
   TJdbcCommand = class
   private
     FEngine: TJdbcEngine;
@@ -54,7 +63,7 @@ type
     procedure BindRow(const Row: TBoundRow);
     function ExecUpdate(const Row: TBoundRow): Integer;
     function ExecBatch(const Rows: array of TBoundRow; BatchSize: Integer): Integer;
-    function LastInsertKeys: TV2Row;
+    function LastInsertKeys: TJdbcRow;
     procedure SetTimeout(Secs: Integer);
     procedure Cancel;
     property StmtId: Int64 read FStmt;
@@ -69,6 +78,164 @@ const
   SQL_BLOB = 2004;
 
 implementation
+
+function IsRewriteNameStart(C: Char): Boolean;
+begin
+  Result := C in ['A'..'Z', 'a'..'z', '_'];
+end;
+
+function IsRewriteNameChar(C: Char): Boolean;
+begin
+  Result := C in ['A'..'Z', 'a'..'z', '0'..'9', '_'];
+end;
+
+{ Pure rewrite shared by TJdbcCommand.SetSQL and unit tests: no JNI, no
+  engine state, output feeds directly into Prepare. }
+function RewriteNamedParams(const S: string): TRewriteResult;
+var
+  i, n, k: Integer;
+  ch, q: Char;
+  inStr: Boolean;
+  outSql, name: string;
+  names: TStringList;
+begin
+  names := TStringList.Create;
+  try
+    outSql := '';
+    i := 1;
+    n := Length(S);
+    inStr := False;
+    q := #0;
+    while i <= n do
+    begin
+      ch := S[i];
+      if inStr then
+      begin
+        outSql := outSql + ch;
+        { Standard SQL strings end only on a lone quote ('' doubles).
+          Backslash stays literal so ESCAPE '\' never swallows the
+          closing quote. }
+        if ch = q then
+        begin
+          if (i < n) and (S[i + 1] = q) then
+          begin
+            outSql := outSql + S[i + 1];
+            Inc(i, 2);
+            Continue;
+          end;
+          inStr := False;
+        end;
+        Inc(i);
+        Continue;
+      end;
+      if (ch = '$') and (i < n) and (S[i + 1] = '$') then
+      begin
+        outSql := outSql + '$$';
+        Inc(i, 2);
+        while i <= n do
+        begin
+          if (S[i] = '$') and (i < n) and (S[i + 1] = '$') then
+          begin
+            outSql := outSql + '$$';
+            Inc(i, 2);
+            Break;
+          end;
+          outSql := outSql + S[i];
+          Inc(i);
+        end;
+        Continue;
+      end;
+      if (ch = '''') or (ch = '"') or (ch = '`') then
+      begin
+        inStr := True;
+        q := ch;
+        outSql := outSql + ch;
+        Inc(i);
+        Continue;
+      end;
+      if (ch = '-') and (i < n) and (S[i + 1] = '-') then
+      begin
+        while (i <= n) and (S[i] <> #10) do
+        begin
+          outSql := outSql + S[i];
+          Inc(i);
+        end;
+        Continue;
+      end;
+      if (ch = '/') and (i < n) and (S[i + 1] = '*') then
+      begin
+        outSql := outSql + '/*';
+        Inc(i, 2);
+        while i <= n do
+        begin
+          if (S[i] = '*') and (i < n) and (S[i + 1] = '/') then
+          begin
+            outSql := outSql + '*/';
+            Inc(i, 2);
+            Break;
+          end;
+          outSql := outSql + S[i];
+          Inc(i);
+        end;
+        Continue;
+      end;
+      if (ch = ':') and (i < n) and (S[i + 1] = ':') then
+      begin
+        outSql := outSql + '::';
+        Inc(i, 2);
+        Continue;
+      end;
+      if (ch = ':') and (i < n) and (S[i + 1] = '=') then
+      begin
+        outSql := outSql + ':=';
+        Inc(i, 2);
+        Continue;
+      end;
+      { :/ (host-style) and :digit (time literals, array slices) are not
+        named params: keep the colon, the tail copies verbatim below. }
+      if (ch = ':') and (i < n) and (S[i + 1] = '/') then
+      begin
+        outSql := outSql + ':';
+        Inc(i);
+        Continue;
+      end;
+      if (ch = ':') and (i < n) and IsRewriteNameStart(S[i + 1]) then
+      begin
+        name := '';
+        Inc(i);
+        while (i <= n) and IsRewriteNameChar(S[i]) do
+        begin
+          name := name + S[i];
+          Inc(i);
+        end;
+        names.Add(name);
+        outSql := outSql + '?';
+        Continue;
+      end;
+      { JSON ?| / ?& operators and an already-? placeholder stay literal. }
+      if ch = '?' then
+      begin
+        if (i < n) and (S[i + 1] in ['|', '&']) then
+        begin
+          outSql := outSql + '?' + S[i + 1];
+          Inc(i, 2);
+          Continue;
+        end;
+        outSql := outSql + '?';
+        Inc(i);
+        Continue;
+      end;
+      outSql := outSql + ch;
+      Inc(i);
+    end;
+    Result.JdbcSql := outSql;
+    SetLength(Result.ParamOrder, names.Count);
+    for k := 0 to names.Count - 1 do
+      Result.ParamOrder[k] := names[k];
+  finally
+    names.Free;
+  end;
+end;
 
 function BInt(V: Integer): TBoundValue;
 begin
@@ -167,115 +334,19 @@ end;
 
 procedure TJdbcCommand.SetSQL(const S: string);
 var
-  i, n: Integer;
-  ch: Char;
-  outSql, name: string;
-  names: TStringList;
-
-  function IsNameChar(C: Char): Boolean;
-  begin
-    Result := C in ['A'..'Z', 'a'..'z', '0'..'9', '_'];
-  end;
-
+  i: Integer;
+  rw: TRewriteResult;
 begin
-  { Rewrite :name to ? while skipping '...' strings, -- comments,
-    /*...*/ comments, :: casts, := assignments and %s-style verbs. }
   CloseStmt;
   FSql := S;
-  names := TStringList.Create;
-  try
-    outSql := '';
-    i := 1;
-    n := Length(S);
-    while i <= n do
-    begin
-      ch := S[i];
-      if ch = '''' then
-      begin
-        outSql := outSql + ch;
-        Inc(i);
-        while i <= n do
-        begin
-          outSql := outSql + S[i];
-          if S[i] = '''' then
-          begin
-            if (i < n) and (S[i + 1] = '''') then
-            begin
-              outSql := outSql + '''';
-              Inc(i, 2);
-              Continue;
-            end;
-            Inc(i);
-            Break;
-          end;
-          Inc(i);
-        end;
-        Continue;
-      end;
-      if (ch = '-') and (i < n) and (S[i + 1] = '-') then
-      begin
-        while (i <= n) and (S[i] <> #10) do
-        begin
-          outSql := outSql + S[i];
-          Inc(i);
-        end;
-        Continue;
-      end;
-      if (ch = '/') and (i < n) and (S[i + 1] = '*') then
-      begin
-        outSql := outSql + '/*';
-        Inc(i, 2);
-        while i <= n do
-        begin
-          if (S[i] = '*') and (i < n) and (S[i + 1] = '/') then
-          begin
-            outSql := outSql + '*/';
-            Inc(i, 2);
-            Break;
-          end;
-          outSql := outSql + S[i];
-          Inc(i);
-        end;
-        Continue;
-      end;
-      if (ch = ':') and (i < n) and (S[i + 1] = ':') then
-      begin
-        outSql := outSql + '::';
-        Inc(i, 2);
-        Continue;
-      end;
-      if (ch = ':') and (i < n) and (S[i + 1] = '=') then
-      begin
-        outSql := outSql + ':=';
-        Inc(i, 2);
-        Continue;
-      end;
-      if (ch = ':') and (i < n) and IsNameChar(S[i + 1]) then
-      begin
-        name := '';
-        Inc(i);
-        while (i <= n) and IsNameChar(S[i]) do
-        begin
-          name := name + S[i];
-          Inc(i);
-        end;
-        names.Add(name);
-        outSql := outSql + '?';
-        Continue;
-      end;
-      outSql := outSql + ch;
-      Inc(i);
-    end;
-    SetLength(FOrder, names.Count);
-    for i := 0 to names.Count - 1 do
-      FOrder[i] := names[i];
-    FStmt := FEngine.Bridge.Prepare(FConn, UTF8String(outSql));
-    CheckHandle('stmt', FStmt);
-    if FTimeoutSecs > 0 then
-      FEngine.Bridge.SetTimeout(FStmt, FTimeoutSecs);
-  finally
-    names.Free;
-  end;
+  rw := RewriteNamedParams(S);
+  SetLength(FOrder, Length(rw.ParamOrder));
+  for i := 0 to High(rw.ParamOrder) do
+    FOrder[i] := rw.ParamOrder[i];
+  FStmt := FEngine.Bridge.Prepare(FConn, UTF8String(rw.JdbcSql));
+  CheckHandle('stmt', FStmt);
+  if FTimeoutSecs > 0 then
+    FEngine.Bridge.SetTimeout(FStmt, FTimeoutSecs);
 end;
 
 function TJdbcCommand.ParamOrder: TStringArray;
@@ -294,7 +365,7 @@ end;
 procedure TJdbcCommand.BindRow(const Row: TBoundRow);
 var
   i: Integer;
-  b: TBridgeV2;
+  b: TBridge;
 begin
   CheckHandle('stmt', FStmt);
   b := FEngine.Bridge;
@@ -349,7 +420,7 @@ begin
   end;
 end;
 
-function TJdbcCommand.LastInsertKeys: TV2Row;
+function TJdbcCommand.LastInsertKeys: TJdbcRow;
 begin
   CheckHandle('stmt', FStmt);
   Result := FEngine.Bridge.GeneratedKeys(FStmt);

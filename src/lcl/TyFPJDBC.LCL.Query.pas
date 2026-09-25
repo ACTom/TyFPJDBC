@@ -5,9 +5,9 @@ uses
   SysUtils, Classes, DB, BufDataset;
 type
   { Design-time query component: SQL text + key field + window size. At
-    runtime the Engine prepares it against a live connection; the dataset
-    base is the design surface shared with DBGrid/DBEdit. }
-  TJdbcQuery = class(TBufDataset)
+    runtime pair it with TJdbcQuery (src/db) against a live connection;
+    the dataset base is the design surface shared with DBGrid/DBEdit. }
+  TJdbcConnQuery = class(TBufDataset)
   private
     FSQLText: string;
     FKeyField: string;
@@ -22,7 +22,7 @@ type
 
 implementation
 
-constructor TJdbcQuery.Create(AOwner: TComponent);
+constructor TJdbcConnQuery.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
   FSQLText := '';

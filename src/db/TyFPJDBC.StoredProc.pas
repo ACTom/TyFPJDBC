@@ -2,10 +2,10 @@ unit TyFPJDBC.StoredProc;
 {$mode objfpc}{$H+}
 interface
 uses
-  SysUtils, Classes, TyFPJDBC.Handles, TyFPJDBC.JNI.BridgeV2, TyFPJDBC.Engine;
+  SysUtils, Classes, TyFPJDBC.Handles, TyFPJDBC.JNI.Bridge, TyFPJDBC.Engine;
 
 type
-  { V2 stored procedure: CallableStatement via BridgeV2. In params bind by
+  { Stored procedure: CallableStatement via Bridge. In params bind by
     index, out params register by JDBC type, execute, then read outs. }
   TJDBCStoredProc = class
   private

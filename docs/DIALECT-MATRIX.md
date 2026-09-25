@@ -1,8 +1,8 @@
-# TyFPJDBC V2 方言矩阵（DIALECT-MATRIX）
+# TyFPJDBC 方言矩阵（DIALECT-MATRIX）
 
 接口 `src/core/TyFPJDBC.Dialect.Api.pas`：`IJdbcDialect`（`PagedSQL` /
 `QuoteIdent` / `KeyReturn` / `DialectId`），`DialectFor(DriverId)` 未知抛
-`08000`。全部行为由 `tests/TestV2Dialect.lpr`（19 项）断言。
+`08000`。全部行为由 `tests/TestDialect.lpr`（19 项）断言。
 
 ## 分页
 
@@ -27,14 +27,14 @@
 
 只有 `postgresql` 实现 `KeyReturn(Table, Key) = ' RETURNING "key"'`；
 其余方言返回空串，走 `getGeneratedKeys` 路径。
-`TJV2Query.ApplyUpdates2` 当前对无 `KeyField` 表直接抛 `HY092/47`，
-拒绝无键写（`TestV2Data` 的 `unkeyed-refused` 断言）。
+`TJdbcQuery.ApplyUpdates2` 当前对无 `KeyField` 表直接抛 `HY092/47`，
+拒绝无键写（`TestData` 的 `unkeyed-refused` 断言）。
 
 ## 已验证组合
 
-- `TestV2Dialect`：六方言分页/引用/`RETURNING`、未知方言 `08000`、
+- `TestDialect`：六方言分页/引用/`RETURNING`、未知方言 `08000`、
   URL 拼装（pg 默认端口、sqlite/h2、pg extra）、`BuildProperties`、
   自定义 `mydb` 注册。
-- 真库回环：H2（`TestV2Engine/Data/ProcBlob/Soak/Lcl`）、SQLite 驱动 jar
+- 真库回环：H2（`TestEngine/Data/ProcBlob/Soak/Lcl`）、SQLite 驱动 jar
   就绪（`sqlite-jdbc-3.46.1.0.jar`）。PG/MySQL/MSSQL/Oracle 无本地真库，
   本轮以方言纯逻辑断言 + URL 拼装覆盖，见矩阵日志环境缺失记录。

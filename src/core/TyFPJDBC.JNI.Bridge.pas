@@ -2,43 +2,55 @@ unit TyFPJDBC.JNI.Bridge;
 {$mode objfpc}{$H+}
 interface
 uses
-  SysUtils, Classes, jni, TyFPJDBC.JVM.Manager, TyFPJDBC.Connection;
+  SysUtils, Classes, jni, TyFPJDBC.JVM.Manager, TyFPJDBC.Handles;
 
 type
-  TJavaRow = array of UTF8String;
-  TJavaRows = array of TJavaRow;
-  TJavaNullRow = array of Boolean;
-  TJavaNulls = array of TJavaNullRow;
+  TJdbcRow = array of UTF8String;
+  TJdbcRows = array of TJdbcRow;
+  TIntArray = array of LongInt;
 
-  { Thin JNI wrapper over the shipped tyfpjdbc.Bridge facade jar.
-    Every value crosses as a bound string (setString); Java null maps to
-    Pascal '' on fetch (null-sensitive counts go through SQL IS NULL). }
-  TBridgeClient = class
+  { Config mirror of tyfpjdbc.PoolCfg: shipped to Java via createPoolFlat so
+    Pascal never builds Java objects field-by-field over JNI. }
+  TPoolCfgRec = record
+    Url, User, Password, DriverClass: UTF8String;
+    MaximumPoolSize, MinimumIdle: Integer;
+    ConnectionTimeoutMs, MaxLifetimeMs, KeepaliveTimeMs: Int64;
+    LeakDetectionThresholdMs: Int64;
+    ConnectionTestQuery: UTF8String;
+    ValidationTimeoutMs: Int64;
+    ReadOnly, AutoCommit: Boolean;
+    IsolationName, Catalog, Schema: UTF8String;
+  end;
+
+  TPoolStatRec = record
+    Active, Idle, Waiting, Leak: Integer;
+  end;
+
+function DefaultPoolCfg(const Url, DriverClass: UTF8String): TPoolCfgRec;
+
+type
+  { Thin JNI client over tyfpjdbc.Bridge (VERSION 2.0.0). Every call first
+    validates handles locally (HY000/99); driver errors surface with the
+    ThreadLocal chain from getErrorChain. }
+  TBridge = class
   private
     FObj: jobject;
     FClass: jclass;
-    FMGetVersion: jmethodID;
-    FMCreatePool: jmethodID;
-    FMDestroyPool: jmethodID;
-    FMBorrow: jmethodID;
-    FMRelease: jmethodID;
-    FMExecUpdate: jmethodID;
-    FMExecUpdateTimeout: jmethodID;
-    FMExecBatch: jmethodID;
-    FMFetchBatch: jmethodID;
-    FMCancel: jmethodID;
-    FMPoolStats: jmethodID;
-    FMErrorChain: jmethodID;
-    FMSetAutoCommit: jmethodID;
-    FMCommit: jmethodID;
-    FMRollback: jmethodID;
-    FMSavepoint: jmethodID;
-    FMRollbackTo: jmethodID;
-    FMReleaseSp: jmethodID;
-    FMWriteBlob: jmethodID;
-    FMFetchBlob: jmethodID;
-    FMHeapUsed: jmethodID;
-    FMHeapMax: jmethodID;
+    FMGetVersion, FMCreatePoolFlat, FMDestroyPool, FMBorrow, FMCloseConn: jmethodID;
+    FMSetAutoCommit, FMCommit, FMRollback, FMSavepoint, FMRollbackTo, FMReleaseSp: jmethodID;
+    FMSetReadOnly, FMSetCatalog, FMSetSchema, FMSetIsolation, FMIsValid, FMDbMeta: jmethodID;
+    FMPrepare, FMPrepareCall, FMSetTimeout: jmethodID;
+    FMBindLong, FMBindDouble, FMBindBD, FMBindStr, FMBindDate, FMBindTime: jmethodID;
+    FMBindTS, FMBindBytes, FMBindNull, FMAddBatch, FMExecUpdate, FMExecBatch: jmethodID;
+    FMGenKeys, FMExecDirect, FMExecDirectTimeout: jmethodID;
+    FMRegisterOut, FMExecProc, FMGetOut: jmethodID;
+    FMCancel, FMCloseStmt: jmethodID;
+    FMQueryOpen, FMCursorCols, FMCursorNames, FMCursorTypeNames, FMCursorTypeCodes: jmethodID;
+    FMFetchWindow, FMCloseCursor: jmethodID;
+    FMGetTables, FMGetColumns, FMGetPKs: jmethodID;
+    FMWriteBlob, FMFetchBlob: jmethodID;
+    FMPoolActive, FMPoolIdle, FMPoolWaiting, FMPoolLeak: jmethodID;
+    FMHeapUsed, FMHeapMax, FMErrorChain: jmethodID;
     function Env: PJNIEnv;
     function Mid(const Name, Sig: string): jmethodID;
     procedure CheckJ(const What: string);
@@ -47,47 +59,107 @@ type
     function SafeErrorChain: UTF8String;
     function CallJString0(M: jmethodID): UTF8String;
     function CallLong1(M: jmethodID; A: jlong): jlong;
+    function CallLongStr(M: jmethodID; A: jlong; const S: UTF8String): jlong;
+    function CallInt1(M: jmethodID; A: jlong): Integer;
+    function CallBool2(M: jmethodID; A: jlong; B: Boolean): Boolean;
     procedure CallVoid1J(M: jmethodID; A: jlong);
+    procedure CallVoidJZ(M: jmethodID; A: jlong; B: Boolean);
+    procedure CallVoidJS(M: jmethodID; A: jlong; const S: UTF8String);
+    function CallIntStr(M: jmethodID; A: jlong; const S: UTF8String): Integer;
+    function CallStrArray1(M: jmethodID; A: jlong): TStringList;
+    function CallStrMatrix(M: jmethodID; A: jlong; const S: UTF8String): TJdbcRows;
+    function CallWindow(M: jmethodID; A: jlong; Size: Integer): TJdbcRows;
+    function CallBytes(M: jmethodID; A: jlong; const S: UTF8String): TBytes;
   public
     constructor Create;
     destructor Destroy; override;
     function GetVersion: UTF8String;
-    function CreatePool(const Url, User, Pw: UTF8String;
-      MaxPool, MinIdle: Integer): Int64;
+    function CreatePool(const Cfg: TPoolCfgRec): Int64;
     procedure DestroyPool(PoolId: Int64);
-    function BorrowConnection(PoolId: Int64): Int64;
-    procedure ReleaseConnection(ConnId: Int64);
-    function ExecUpdate(ConnId: Int64; const SQL: UTF8String): Integer;
-    function ExecUpdateTimeout(ConnId: Int64; const SQL: UTF8String;
-      TimeoutSecs: Integer): Integer;
-    function ExecBatch(ConnId: Int64; const SQL: UTF8String;
-      const Rows: TJavaRows; const Nulls: TJavaNulls): Integer;
-    function FetchBatch(ConnId: Int64; const SQL: UTF8String;
-      Offset, Limit, FetchSize: Integer): TJavaRows;
-    procedure Cancel(ConnId: Int64);
-    function PoolStats(PoolId: Int64): UTF8String;
-    function GetErrorChain: UTF8String;
+    function BorrowConn(PoolId: Int64): Int64;
+    procedure CloseConn(ConnId: Int64);
     procedure SetAutoCommit(ConnId: Int64; Auto: Boolean);
     procedure Commit(ConnId: Int64);
     procedure Rollback(ConnId: Int64);
     procedure Savepoint(ConnId: Int64; const Name: UTF8String);
-    procedure RollbackToSavepoint(ConnId: Int64; const Name: UTF8String);
+    procedure RollbackTo(ConnId: Int64; const Name: UTF8String);
     procedure ReleaseSavepoint(ConnId: Int64; const Name: UTF8String);
-    function WriteBlob(ConnId: Int64; const SQL: UTF8String;
-      const Data: TBytes): Integer;
+    procedure SetReadOnly(ConnId: Int64; Ro: Boolean);
+    procedure SetCatalog(ConnId: Int64; const V: UTF8String);
+    procedure SetSchema(ConnId: Int64; const V: UTF8String);
+    procedure SetIsolation(ConnId: Int64; const Name: UTF8String);
+    function IsValid(ConnId: Int64; TimeoutSecs: Integer): Boolean;
+    function DatabaseMeta(ConnId: Int64): UTF8String;
+    function Prepare(ConnId: Int64; const SQL: UTF8String): Int64;
+    function PrepareCall(ConnId: Int64; const SQL: UTF8String): Int64;
+    procedure SetTimeout(StmtId: Int64; Secs: Integer);
+    procedure BindLong(StmtId: Int64; Idx: Integer; V: Int64);
+    procedure BindDouble(StmtId: Int64; Idx: Integer; V: Double);
+    procedure BindBigDecimal(StmtId: Int64; Idx: Integer; const V: UTF8String);
+    procedure BindString(StmtId: Int64; Idx: Integer; const V: UTF8String);
+    procedure BindDate(StmtId: Int64; Idx: Integer; const Iso: UTF8String);
+    procedure BindTime(StmtId: Int64; Idx: Integer; const Iso: UTF8String);
+    procedure BindTimestamp(StmtId: Int64; Idx: Integer; const Iso: UTF8String);
+    procedure BindBytes(StmtId: Int64; Idx: Integer; const V: TBytes);
+    procedure BindNull(StmtId: Int64; Idx: Integer; SqlType: Integer);
+    procedure AddBatch(StmtId: Int64);
+    function ExecUpdate(StmtId: Int64): Integer;
+    function ExecBatch(StmtId: Int64): Integer;
+    function GeneratedKeys(StmtId: Int64): TJdbcRow;
+    function ExecDirect(ConnId: Int64; const SQL: UTF8String): Integer;
+    function ExecDirectTimeout(ConnId: Int64; const SQL: UTF8String; Secs: Integer): Integer;
+    procedure RegisterOut(StmtId: Int64; Idx, SqlType: Integer);
+    function ExecProc(StmtId: Int64): Boolean;
+    function OutValue(StmtId: Int64; Idx: Integer): UTF8String;
+    procedure Cancel(StmtId: Int64);
+    procedure CloseStmt(StmtId: Int64);
+    function QueryOpen(StmtId: Int64; FetchSize: Integer): Int64;
+    function CursorCols(CursorId: Int64): Integer;
+    function CursorNames(CursorId: Int64): TStringList;
+    function CursorTypeNames(CursorId: Int64): TStringList;
+    function CursorTypeCodes(CursorId: Int64): TIntArray;
+    function FetchWindow(CursorId: Int64; Size: Integer): TJdbcRows;
+    procedure CloseCursor(CursorId: Int64);
+    function GetTables(ConnId: Int64; const Table: UTF8String): TJdbcRows;
+    function GetColumns(ConnId: Int64; const Table: UTF8String): TJdbcRows;
+    function GetPrimaryKeys(ConnId: Int64; const Table: UTF8String): TStringList;
+    function WriteBlob(ConnId: Int64; const SQL: UTF8String; const Data: TBytes): Integer;
     function FetchBlob(ConnId: Int64; const SQL: UTF8String): TBytes;
-    function HeapUsedBytes: Int64;
-    function HeapMaxBytes: Int64;
+    function PoolStats(PoolId: Int64): TPoolStatRec;
+    function HeapUsed: Int64;
+    function HeapMax: Int64;
+    function ErrorChain: UTF8String;
   end;
 
 implementation
 
-function TBridgeClient.Env: PJNIEnv;
+function DefaultPoolCfg(const Url, DriverClass: UTF8String): TPoolCfgRec;
+begin
+  Result.Url := Url;
+  Result.User := '';
+  Result.Password := '';
+  Result.DriverClass := DriverClass;
+  Result.MaximumPoolSize := 10;
+  Result.MinimumIdle := 2;
+  Result.ConnectionTimeoutMs := 30000;
+  Result.MaxLifetimeMs := 1800000;
+  Result.KeepaliveTimeMs := 30000;
+  Result.LeakDetectionThresholdMs := 0;
+  Result.ConnectionTestQuery := 'SELECT 1';
+  Result.ValidationTimeoutMs := 5000;
+  Result.ReadOnly := False;
+  Result.AutoCommit := True;
+  Result.IsolationName := 'READ_COMMITTED';
+  Result.Catalog := '';
+  Result.Schema := '';
+end;
+
+function TBridge.Env: PJNIEnv;
 begin
   Result := TJVMManager.GetJNIEnv;
 end;
 
-procedure TBridgeClient.CheckJ(const What: string);
+procedure TBridge.CheckJ(const What: string);
 var
   e: PJNIEnv;
   chain: UTF8String;
@@ -99,12 +171,50 @@ begin
     chain := SafeErrorChain;
     if chain = '' then
       chain := 'jni exception';
-    raise EJDBCError.CreateChain('bridge.' + What + ' failed',
-      'HY000', 99, chain);
+    raise EJDBCError.CreateChain('bridgev2.' + What + ' failed', 'HY000', 99, chain);
   end;
 end;
 
-function TBridgeClient.SafeErrorChain: UTF8String;
+function TBridge.JStr(const S: UTF8String): jstring;
+var
+  e: PJNIEnv;
+begin
+  e := TJVMManager.GetJNIEnv;
+  if S = '' then
+    Result := e^^.NewStringUTF(e, '')
+  else
+    Result := e^^.NewStringUTF(e, PChar(S));
+  CheckJ('newstring');
+  if Result = nil then
+    raise EJDBCError.CreateChain('bridgev2.newstring failed', 'HY000', 99, 'null jstring');
+end;
+
+function TBridge.FromJStr(JS: jstring): UTF8String;
+var
+  e: PJNIEnv;
+  p: PChar;
+  n: jsize;
+  u: UTF8String;
+begin
+  if JS = nil then
+    Exit('');
+  e := TJVMManager.GetJNIEnv;
+  p := e^^.GetStringUTFChars(e, JS, nil);
+  CheckJ('getutf');
+  if p = nil then
+    Exit('');
+  try
+    n := e^^.GetStringUTFLength(e, JS);
+    SetLength(u, n);
+    if n > 0 then
+      Move(p^, u[1], n);
+    Result := u;
+  finally
+    e^^.ReleaseStringUTFChars(e, JS, p);
+  end;
+end;
+
+function TBridge.SafeErrorChain: UTF8String;
 var
   e: PJNIEnv;
   js: jstring;
@@ -134,47 +244,7 @@ begin
   end;
 end;
 
-function TBridgeClient.JStr(const S: UTF8String): jstring;
-var
-  e: PJNIEnv;
-begin
-  e := TJVMManager.GetJNIEnv;
-  if S = '' then
-    Result := e^^.NewStringUTF(e, '')
-  else
-    Result := e^^.NewStringUTF(e, PChar(S));
-  CheckJ('newstring');
-  if Result = nil then
-    raise EJDBCError.CreateChain('bridge.newstring failed',
-      'HY000', 99, 'null jstring');
-end;
-
-function TBridgeClient.FromJStr(JS: jstring): UTF8String;
-var
-  e: PJNIEnv;
-  p: PChar;
-  n: jsize;
-  u: UTF8String;
-begin
-  if JS = nil then
-    Exit('');
-  e := TJVMManager.GetJNIEnv;
-  p := e^^.GetStringUTFChars(e, JS, nil);
-  CheckJ('getutf');
-  if p = nil then
-    Exit('');
-  try
-    n := e^^.GetStringUTFLength(e, JS);
-    SetLength(u, n);
-    if n > 0 then
-      Move(p^, u[1], n);
-    Result := u;
-  finally
-    e^^.ReleaseStringUTFChars(e, JS, p);
-  end;
-end;
-
-function TBridgeClient.Mid(const Name, Sig: string): jmethodID;
+function TBridge.Mid(const Name, Sig: string): jmethodID;
 var
   e: PJNIEnv;
 begin
@@ -182,10 +252,10 @@ begin
   Result := e^^.GetMethodID(e, FClass, PChar(Name), PChar(Sig));
   CheckJ('method ' + Name);
   if Result = nil then
-    raise EJDBCError.CreateChain('bridge.method missing', 'HY000', 99, Name);
+    raise EJDBCError.CreateChain('bridgev2.method missing', 'HY000', 99, Name);
 end;
 
-function TBridgeClient.CallJString0(M: jmethodID): UTF8String;
+function TBridge.CallJString0(M: jmethodID): UTF8String;
 var
   e: PJNIEnv;
   js: jstring;
@@ -202,7 +272,7 @@ begin
   end;
 end;
 
-function TBridgeClient.CallLong1(M: jmethodID; A: jlong): jlong;
+function TBridge.CallLong1(M: jmethodID; A: jlong): jlong;
 var
   e: PJNIEnv;
   args: array[0..0] of jvalue;
@@ -214,7 +284,54 @@ begin
   CheckJ('calllong');
 end;
 
-procedure TBridgeClient.CallVoid1J(M: jmethodID; A: jlong);
+function TBridge.CallLongStr(M: jmethodID; A: jlong; const S: UTF8String): jlong;
+var
+  e: PJNIEnv;
+  args: array[0..1] of jvalue;
+  js: jstring;
+begin
+  CheckHandle('arg', A);
+  e := TJVMManager.GetJNIEnv;
+  FillChar(args, SizeOf(args), 0);
+  js := JStr(S);
+  try
+    args[0].j := A;
+    args[1].l := js;
+    Result := e^^.CallLongMethodA(e, FObj, M, @args[0]);
+    CheckJ('calllongstr');
+  finally
+    e^^.DeleteLocalRef(e, js);
+  end;
+end;
+
+function TBridge.CallInt1(M: jmethodID; A: jlong): Integer;
+var
+  e: PJNIEnv;
+  args: array[0..0] of jvalue;
+begin
+  CheckHandle('arg', A);
+  e := TJVMManager.GetJNIEnv;
+  FillChar(args, SizeOf(args), 0);
+  args[0].j := A;
+  Result := e^^.CallIntMethodA(e, FObj, M, @args[0]);
+  CheckJ('callint');
+end;
+
+function TBridge.CallBool2(M: jmethodID; A: jlong; B: Boolean): Boolean;
+var
+  e: PJNIEnv;
+  args: array[0..1] of jvalue;
+begin
+  CheckHandle('arg', A);
+  e := TJVMManager.GetJNIEnv;
+  FillChar(args, SizeOf(args), 0);
+  args[0].j := A;
+  args[1].i := Ord(B);
+  Result := e^^.CallBooleanMethodA(e, FObj, M, @args[0]) <> 0;
+  CheckJ('callbool');
+end;
+
+procedure TBridge.CallVoid1J(M: jmethodID; A: jlong);
 var
   e: PJNIEnv;
   args: array[0..0] of jvalue;
@@ -226,10 +343,261 @@ begin
   CheckJ('callvoid');
 end;
 
-constructor TBridgeClient.Create;
+procedure TBridge.CallVoidJZ(M: jmethodID; A: jlong; B: Boolean);
 var
   e: PJNIEnv;
-  cls, scls, arrCls: jclass;
+  args: array[0..1] of jvalue;
+begin
+  CheckHandle('arg', A);
+  e := TJVMManager.GetJNIEnv;
+  FillChar(args, SizeOf(args), 0);
+  args[0].j := A;
+  args[1].z := Byte(Ord(B));
+  e^^.CallVoidMethodA(e, FObj, M, @args[0]);
+  CheckJ('callvoidz');
+end;
+
+procedure TBridge.CallVoidJS(M: jmethodID; A: jlong; const S: UTF8String);
+var
+  e: PJNIEnv;
+  args: array[0..1] of jvalue;
+  js: jstring;
+begin
+  CheckHandle('arg', A);
+  e := TJVMManager.GetJNIEnv;
+  FillChar(args, SizeOf(args), 0);
+  js := JStr(S);
+  try
+    args[0].j := A;
+    args[1].l := js;
+    e^^.CallVoidMethodA(e, FObj, M, @args[0]);
+    CheckJ('callvoids');
+  finally
+    e^^.DeleteLocalRef(e, js);
+  end;
+end;
+
+function TBridge.CallIntStr(M: jmethodID; A: jlong; const S: UTF8String): Integer;
+var
+  e: PJNIEnv;
+  args: array[0..1] of jvalue;
+  js: jstring;
+begin
+  CheckHandle('arg', A);
+  e := TJVMManager.GetJNIEnv;
+  FillChar(args, SizeOf(args), 0);
+  js := JStr(S);
+  try
+    args[0].j := A;
+    args[1].l := js;
+    Result := e^^.CallIntMethodA(e, FObj, M, @args[0]);
+    CheckJ('callints');
+  finally
+    e^^.DeleteLocalRef(e, js);
+  end;
+end;
+
+function TBridge.CallStrArray1(M: jmethodID; A: jlong): TStringList;
+var
+  e: PJNIEnv;
+  args: array[0..0] of jvalue;
+  arr: jobjectArray;
+  n, i: Integer;
+  cell: jobject;
+begin
+  Result := TStringList.Create;
+  CheckHandle('arg', A);
+  e := TJVMManager.GetJNIEnv;
+  FillChar(args, SizeOf(args), 0);
+  args[0].j := A;
+  arr := jobjectArray(e^^.CallObjectMethodA(e, FObj, M, @args[0]));
+  CheckJ('callstrarr');
+  if arr = nil then
+    Exit;
+  try
+    n := e^^.GetArrayLength(e, arr);
+    CheckJ('arrlen');
+    for i := 0 to n - 1 do
+    begin
+      cell := e^^.GetObjectArrayElement(e, arr, i);
+      CheckJ('arrcell');
+      try
+        if cell = nil then
+          Result.Add('')
+        else
+          Result.Add(string(FromJStr(jstring(cell))));
+      finally
+        if cell <> nil then
+          e^^.DeleteLocalRef(e, cell);
+      end;
+    end;
+  finally
+    e^^.DeleteLocalRef(e, arr);
+  end;
+end;
+
+function TBridge.CallStrMatrix(M: jmethodID; A: jlong; const S: UTF8String): TJdbcRows;
+var
+  e: PJNIEnv;
+  args: array[0..1] of jvalue;
+  js: jstring;
+  outer, inner: jobjectArray;
+  nr, nc, i, j: Integer;
+  cell: jobject;
+begin
+  SetLength(Result, 0);
+  CheckHandle('arg', A);
+  e := TJVMManager.GetJNIEnv;
+  FillChar(args, SizeOf(args), 0);
+  js := JStr(S);
+  try
+    args[0].j := A;
+    args[1].l := js;
+    outer := jobjectArray(e^^.CallObjectMethodA(e, FObj, M, @args[0]));
+    CheckJ('callmatrix');
+    if outer = nil then
+      Exit;
+    try
+      nr := e^^.GetArrayLength(e, outer);
+      CheckJ('matrixlen');
+      SetLength(Result, nr);
+      for i := 0 to nr - 1 do
+      begin
+        inner := jobjectArray(e^^.GetObjectArrayElement(e, outer, i));
+        CheckJ('matrixrow');
+        try
+          if inner = nil then
+          begin
+            SetLength(Result[i], 0);
+            Continue;
+          end;
+          nc := e^^.GetArrayLength(e, inner);
+          SetLength(Result[i], nc);
+          for j := 0 to nc - 1 do
+          begin
+            cell := e^^.GetObjectArrayElement(e, inner, j);
+            CheckJ('matrixcell');
+            try
+              Result[i][j] := FromJStr(jstring(cell));
+            finally
+              if cell <> nil then
+                e^^.DeleteLocalRef(e, cell);
+            end;
+          end;
+        finally
+          e^^.DeleteLocalRef(e, inner);
+        end;
+      end;
+    finally
+      e^^.DeleteLocalRef(e, outer);
+    end;
+  finally
+    e^^.DeleteLocalRef(e, js);
+  end;
+end;
+
+function TBridge.CallWindow(M: jmethodID; A: jlong; Size: Integer): TJdbcRows;
+var
+  e: PJNIEnv;
+  args: array[0..1] of jvalue;
+  outer, inner: jobjectArray;
+  nr, nc, i, j: Integer;
+  cell: jobject;
+begin
+  SetLength(Result, 0);
+  CheckHandle('cursor', A);
+  e := TJVMManager.GetJNIEnv;
+  FillChar(args, SizeOf(args), 0);
+  args[0].j := A;
+  args[1].i := Size;
+  outer := jobjectArray(e^^.CallObjectMethodA(e, FObj, M, @args[0]));
+  CheckJ('fetchwindow');
+  if outer = nil then
+    Exit;
+  try
+    nr := e^^.GetArrayLength(e, outer);
+    CheckJ('winlen');
+    SetLength(Result, nr);
+    for i := 0 to nr - 1 do
+    begin
+      inner := jobjectArray(e^^.GetObjectArrayElement(e, outer, i));
+      CheckJ('winrow');
+      try
+        if inner = nil then
+        begin
+          SetLength(Result[i], 0);
+          Continue;
+        end;
+        nc := e^^.GetArrayLength(e, inner);
+        SetLength(Result[i], nc);
+        for j := 0 to nc - 1 do
+        begin
+          cell := e^^.GetObjectArrayElement(e, inner, j);
+          CheckJ('wincell');
+          try
+            Result[i][j] := FromJStr(jstring(cell));
+          finally
+            if cell <> nil then
+              e^^.DeleteLocalRef(e, cell);
+          end;
+        end;
+      finally
+        e^^.DeleteLocalRef(e, inner);
+      end;
+    end;
+  finally
+    e^^.DeleteLocalRef(e, outer);
+  end;
+end;
+
+function TBridge.CallBytes(M: jmethodID; A: jlong; const S: UTF8String): TBytes;
+var
+  e: PJNIEnv;
+  args: array[0..1] of jvalue;
+  js: jstring;
+  arr: jbyteArray;
+  n: jsize;
+  elems: PJByte;
+  isCopy: jboolean;
+begin
+  SetLength(Result, 0);
+  CheckHandle('arg', A);
+  e := TJVMManager.GetJNIEnv;
+  FillChar(args, SizeOf(args), 0);
+  js := JStr(S);
+  try
+    args[0].j := A;
+    args[1].l := js;
+    arr := jbyteArray(e^^.CallObjectMethodA(e, FObj, M, @args[0]));
+    CheckJ('callbytes');
+    if arr = nil then
+      Exit;
+    try
+      n := e^^.GetArrayLength(e, arr);
+      SetLength(Result, n);
+      if n > 0 then
+      begin
+        isCopy := 0;
+        elems := e^^.GetByteArrayElements(e, arr, isCopy);
+        CheckJ('byteselems');
+        try
+          Move(elems^, Result[0], n);
+        finally
+          e^^.ReleaseByteArrayElements(e, arr, elems, JNI_ABORT);
+        end;
+      end;
+    finally
+      e^^.DeleteLocalRef(e, arr);
+    end;
+  finally
+    e^^.DeleteLocalRef(e, js);
+  end;
+end;
+
+constructor TBridge.Create;
+var
+  e: PJNIEnv;
+  cls: jclass;
   ctor: jmethodID;
   obj, g, gc: jobject;
 begin
@@ -260,53 +628,85 @@ begin
     g := e^^.NewGlobalRef(e, obj);
     e^^.DeleteLocalRef(e, obj);
     if g = nil then
-      raise EJDBCError.CreateChain('bridge ref failed', 'HY000', 99,
-        'NewGlobalRef');
+      raise EJDBCError.CreateChain('bridge ref failed', 'HY000', 99, 'NewGlobalRef');
     FObj := g;
     gc := jclass(e^^.NewGlobalRef(e, cls));
     if gc = nil then
     begin
       e^^.DeleteGlobalRef(e, FObj);
       FObj := nil;
-      raise EJDBCError.CreateChain('bridge class ref failed', 'HY000', 99,
-        'NewGlobalRef class');
+      raise EJDBCError.CreateChain('bridge class ref failed', 'HY000', 99, 'NewGlobalRef class');
     end;
     FClass := gc;
   finally
     e^^.DeleteLocalRef(e, cls);
   end;
   FMGetVersion := Mid('getVersion', '()Ljava/lang/String;');
-  FMCreatePool := Mid('createPool',
-    '(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;II)J');
+  FMCreatePoolFlat := Mid('createPoolFlat',
+    '(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIJJJJLjava/lang/String;JZZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;)J');
   FMDestroyPool := Mid('destroyPool', '(J)V');
-  FMBorrow := Mid('borrowConnection', '(J)J');
-  FMRelease := Mid('releaseConnection', '(J)V');
-  FMExecUpdate := Mid('execUpdate', '(JLjava/lang/String;)I');
-  FMExecUpdateTimeout := Mid('execUpdateTimeout', '(JLjava/lang/String;I)I');
-  FMExecBatch := Mid('execBatch', '(JLjava/lang/String;[[Ljava/lang/String;)I');
-  FMFetchBatch := Mid('fetchBatch', '(JLjava/lang/String;III)[[Ljava/lang/String;');
-  FMCancel := Mid('cancel', '(J)V');
-  FMPoolStats := Mid('poolStats', '(J)Ljava/lang/String;');
-  FMErrorChain := Mid('getErrorChain', '()Ljava/lang/String;');
+  FMBorrow := Mid('borrowConn', '(J)J');
+  FMCloseConn := Mid('closeConn', '(J)V');
   FMSetAutoCommit := Mid('setAutoCommit', '(JZ)V');
   FMCommit := Mid('commit', '(J)V');
   FMRollback := Mid('rollback', '(J)V');
   FMSavepoint := Mid('savepoint', '(JLjava/lang/String;)V');
-  FMRollbackTo := Mid('rollbackToSavepoint', '(JLjava/lang/String;)V');
+  FMRollbackTo := Mid('rollbackTo', '(JLjava/lang/String;)V');
   FMReleaseSp := Mid('releaseSavepoint', '(JLjava/lang/String;)V');
+  FMSetReadOnly := Mid('setReadOnly', '(JZ)V');
+  FMSetCatalog := Mid('setCatalog', '(JLjava/lang/String;)V');
+  FMSetSchema := Mid('setSchema', '(JLjava/lang/String;)V');
+  FMSetIsolation := Mid('setIsolation', '(JLjava/lang/String;)V');
+  FMIsValid := Mid('isValid', '(JI)Z');
+  FMDbMeta := Mid('getDatabaseMeta', '(J)Ljava/lang/String;');
+  FMPrepare := Mid('prepare', '(JLjava/lang/String;)J');
+  FMPrepareCall := Mid('prepareCall', '(JLjava/lang/String;)J');
+  FMSetTimeout := Mid('setTimeout', '(JI)V');
+  FMBindLong := Mid('bindLong', '(JIJ)V');
+  FMBindDouble := Mid('bindDouble', '(JID)V');
+  FMBindBD := Mid('bindBigDecimal', '(JILjava/lang/String;)V');
+  FMBindStr := Mid('bindString', '(JILjava/lang/String;)V');
+  FMBindDate := Mid('bindDate', '(JILjava/lang/String;)V');
+  FMBindTime := Mid('bindTime', '(JILjava/lang/String;)V');
+  FMBindTS := Mid('bindTimestamp', '(JILjava/lang/String;)V');
+  FMBindBytes := Mid('bindBytes', '(JI[B)V');
+  FMBindNull := Mid('bindNull', '(JII)V');
+  FMAddBatch := Mid('addBatch', '(J)V');
+  FMExecUpdate := Mid('execUpdate', '(J)I');
+  FMExecBatch := Mid('execBatch', '(J)I');
+  FMGenKeys := Mid('getGeneratedKeys', '(J)[Ljava/lang/String;');
+  FMExecDirect := Mid('execDirect', '(JLjava/lang/String;)I');
+  FMExecDirectTimeout := Mid('execDirectTimeout', '(JLjava/lang/String;I)I');
+  FMRegisterOut := Mid('registerOut', '(JII)V');
+  FMExecProc := Mid('execProc', '(J)Z');
+  FMGetOut := Mid('getOutValue', '(JI)Ljava/lang/String;');
+  FMCancel := Mid('cancel', '(J)V');
+  FMCloseStmt := Mid('closeStmt', '(J)V');
+  FMQueryOpen := Mid('queryOpen', '(JI)J');
+  FMCursorCols := Mid('cursorCols', '(J)I');
+  FMCursorNames := Mid('cursorNames', '(J)[Ljava/lang/String;');
+  FMCursorTypeNames := Mid('cursorTypeNames', '(J)[Ljava/lang/String;');
+  FMCursorTypeCodes := Mid('cursorTypeCodes', '(J)[I');
+  FMFetchWindow := Mid('fetchWindow', '(JI)[[Ljava/lang/String;');
+  FMCloseCursor := Mid('closeCursor', '(J)V');
+  FMGetTables := Mid('getTables', '(JLjava/lang/String;)[[Ljava/lang/String;');
+  FMGetColumns := Mid('getColumns', '(JLjava/lang/String;)[[Ljava/lang/String;');
+  FMGetPKs := Mid('getPrimaryKeys', '(JLjava/lang/String;)[Ljava/lang/String;');
   FMWriteBlob := Mid('writeBlob', '(JLjava/lang/String;[B)I');
   FMFetchBlob := Mid('fetchBlob', '(JLjava/lang/String;)[B');
+  FMPoolActive := Mid('poolActive', '(J)I');
+  FMPoolIdle := Mid('poolIdle', '(J)I');
+  FMPoolWaiting := Mid('poolWaiting', '(J)I');
+  FMPoolLeak := Mid('poolLeak', '(J)I');
   FMHeapUsed := Mid('heapUsedBytes', '()J');
   FMHeapMax := Mid('heapMaxBytes', '()J');
-  scls := e^^.FindClass(e, 'java/lang/String');
-  CheckJ('string class');
-  e^^.DeleteLocalRef(e, scls);
-  arrCls := e^^.FindClass(e, '[Ljava/lang/String;');
-  CheckJ('array class');
-  e^^.DeleteLocalRef(e, arrCls);
+  FMErrorChain := Mid('getErrorChain', '()Ljava/lang/String;');
+  if GetVersion <> '2.0.0' then
+    raise EJDBCError.CreateChain('bridgev2 version mismatch', 'HY000', 99,
+      'expected 2.0.0 got ' + string(GetVersion));
 end;
 
-destructor TBridgeClient.Destroy;
+destructor TBridge.Destroy;
 var
   e: PJNIEnv;
 begin
@@ -321,234 +721,136 @@ begin
   inherited;
 end;
 
-function TBridgeClient.GetVersion: UTF8String;
+function TBridge.GetVersion: UTF8String;
 begin
   Result := CallJString0(FMGetVersion);
 end;
 
-function TBridgeClient.CreatePool(const Url, User, Pw: UTF8String;
-  MaxPool, MinIdle: Integer): Int64;
+function TBridge.CreatePool(const Cfg: TPoolCfgRec): Int64;
 var
   e: PJNIEnv;
-  args: array[0..4] of jvalue;
-  ju, js, jp: jstring;
+  args: array[0..16] of jvalue;
+  su, ss, sp, sd, stq, sis, sc, ssch: jstring;
 begin
   e := TJVMManager.GetJNIEnv;
   FillChar(args, SizeOf(args), 0);
-  ju := JStr(Url);
-  js := JStr(User);
-  jp := JStr(Pw);
+  su := JStr(Cfg.Url); ss := JStr(Cfg.User); sp := JStr(Cfg.Password);
+  sd := JStr(Cfg.DriverClass); stq := JStr(Cfg.ConnectionTestQuery);
+  sis := JStr(Cfg.IsolationName); sc := JStr(Cfg.Catalog); ssch := JStr(Cfg.Schema);
   try
-    args[0].l := ju;
-    args[1].l := js;
-    args[2].l := jp;
-    args[3].i := MaxPool;
-    args[4].i := MinIdle;
-    Result := e^^.CallLongMethodA(e, FObj, FMCreatePool, @args[0]);
-    CheckJ('createPool');
+    args[0].l := su; args[1].l := ss; args[2].l := sp; args[3].l := sd;
+    args[4].i := Cfg.MaximumPoolSize; args[5].i := Cfg.MinimumIdle;
+    args[6].j := Cfg.ConnectionTimeoutMs; args[7].j := Cfg.MaxLifetimeMs;
+    args[8].j := Cfg.KeepaliveTimeMs; args[9].j := Cfg.LeakDetectionThresholdMs;
+    args[10].l := stq; args[11].j := Cfg.ValidationTimeoutMs;
+    args[12].z := Byte(Ord(Cfg.ReadOnly)); args[13].z := Byte(Ord(Cfg.AutoCommit));
+    args[14].l := sis; args[15].l := sc; args[16].l := ssch;
+    Result := e^^.CallLongMethodA(e, FObj, FMCreatePoolFlat, @args[0]);
+    CheckJ('createPoolFlat');
   finally
-    e^^.DeleteLocalRef(e, ju);
-    e^^.DeleteLocalRef(e, js);
-    e^^.DeleteLocalRef(e, jp);
+    e^^.DeleteLocalRef(e, su); e^^.DeleteLocalRef(e, ss);
+    e^^.DeleteLocalRef(e, sp); e^^.DeleteLocalRef(e, sd);
+    e^^.DeleteLocalRef(e, stq); e^^.DeleteLocalRef(e, sis);
+    e^^.DeleteLocalRef(e, sc); e^^.DeleteLocalRef(e, ssch);
   end;
 end;
 
-procedure TBridgeClient.DestroyPool(PoolId: Int64);
+procedure TBridge.DestroyPool(PoolId: Int64);
 begin
   CallVoid1J(FMDestroyPool, PoolId);
 end;
 
-function TBridgeClient.BorrowConnection(PoolId: Int64): Int64;
+function TBridge.BorrowConn(PoolId: Int64): Int64;
 begin
+  CheckHandle('pool', PoolId);
   Result := CallLong1(FMBorrow, PoolId);
+  CheckHandle('conn', Result);
 end;
 
-procedure TBridgeClient.ReleaseConnection(ConnId: Int64);
+procedure TBridge.CloseConn(ConnId: Int64);
 begin
-  CallVoid1J(FMRelease, ConnId);
+  CheckHandle('conn', ConnId);
+  CallVoid1J(FMCloseConn, ConnId);
 end;
 
-function TBridgeClient.ExecUpdate(ConnId: Int64; const SQL: UTF8String): Integer;
+procedure TBridge.SetAutoCommit(ConnId: Int64; Auto: Boolean);
+begin
+  CallVoidJZ(FMSetAutoCommit, ConnId, Auto);
+end;
+
+procedure TBridge.Commit(ConnId: Int64);
+begin
+  CheckHandle('conn', ConnId);
+  CallVoid1J(FMCommit, ConnId);
+end;
+
+procedure TBridge.Rollback(ConnId: Int64);
+begin
+  CheckHandle('conn', ConnId);
+  CallVoid1J(FMRollback, ConnId);
+end;
+
+procedure TBridge.Savepoint(ConnId: Int64; const Name: UTF8String);
+begin
+  CallVoidJS(FMSavepoint, ConnId, Name);
+end;
+
+procedure TBridge.RollbackTo(ConnId: Int64; const Name: UTF8String);
+begin
+  CallVoidJS(FMRollbackTo, ConnId, Name);
+end;
+
+procedure TBridge.ReleaseSavepoint(ConnId: Int64; const Name: UTF8String);
+begin
+  CallVoidJS(FMReleaseSp, ConnId, Name);
+end;
+
+procedure TBridge.SetReadOnly(ConnId: Int64; Ro: Boolean);
+begin
+  CallVoidJZ(FMSetReadOnly, ConnId, Ro);
+end;
+
+procedure TBridge.SetCatalog(ConnId: Int64; const V: UTF8String);
+begin
+  CallVoidJS(FMSetCatalog, ConnId, V);
+end;
+
+procedure TBridge.SetSchema(ConnId: Int64; const V: UTF8String);
+begin
+  CallVoidJS(FMSetSchema, ConnId, V);
+end;
+
+procedure TBridge.SetIsolation(ConnId: Int64; const Name: UTF8String);
+begin
+  CallVoidJS(FMSetIsolation, ConnId, Name);
+end;
+
+function TBridge.IsValid(ConnId: Int64; TimeoutSecs: Integer): Boolean;
 var
   e: PJNIEnv;
   args: array[0..1] of jvalue;
-  js: jstring;
 begin
+  CheckHandle('conn', ConnId);
   e := TJVMManager.GetJNIEnv;
   FillChar(args, SizeOf(args), 0);
-  js := JStr(SQL);
-  try
-    args[0].j := ConnId;
-    args[1].l := js;
-    Result := e^^.CallIntMethodA(e, FObj, FMExecUpdate, @args[0]);
-    CheckJ('execUpdate');
-  finally
-    e^^.DeleteLocalRef(e, js);
-  end;
+  args[0].j := ConnId;
+  args[1].i := TimeoutSecs;
+  Result := e^^.CallBooleanMethodA(e, FObj, FMIsValid, @args[0]) <> 0;
+  CheckJ('isValid');
 end;
 
-function TBridgeClient.ExecUpdateTimeout(ConnId: Int64; const SQL: UTF8String;
-  TimeoutSecs: Integer): Integer;
-var
-  e: PJNIEnv;
-  args: array[0..2] of jvalue;
-  js: jstring;
-begin
-  e := TJVMManager.GetJNIEnv;
-  FillChar(args, SizeOf(args), 0);
-  js := JStr(SQL);
-  try
-    args[0].j := ConnId;
-    args[1].l := js;
-    args[2].i := TimeoutSecs;
-    Result := e^^.CallIntMethodA(e, FObj, FMExecUpdateTimeout, @args[0]);
-    CheckJ('execUpdateTimeout');
-  finally
-    e^^.DeleteLocalRef(e, js);
-  end;
-end;
-
-function TBridgeClient.ExecBatch(ConnId: Int64; const SQL: UTF8String;
-  const Rows: TJavaRows; const Nulls: TJavaNulls): Integer;
-var
-  e: PJNIEnv;
-  args: array[0..2] of jvalue;
-  js: jstring;
-  scls, arrCls: jclass;
-  outer, inner: jobjectArray;
-  i, j: Integer;
-  cell: jstring;
-begin
-  e := TJVMManager.GetJNIEnv;
-  FillChar(args, SizeOf(args), 0);
-  js := JStr(SQL);
-  scls := e^^.FindClass(e, 'java/lang/String');
-  CheckJ('string class');
-  arrCls := e^^.FindClass(e, '[Ljava/lang/String;');
-  CheckJ('array class');
-  try
-    outer := e^^.NewObjectArray(e, Length(Rows), arrCls, nil);
-    CheckJ('new batch outer');
-    if outer = nil then
-      raise EJDBCError.CreateChain('bridge.execBatch failed', 'HY000', 99,
-        'null outer array');
-    try
-      for i := 0 to High(Rows) do
-      begin
-        inner := e^^.NewObjectArray(e, Length(Rows[i]), scls, nil);
-        CheckJ('new batch row');
-        for j := 0 to High(Rows[i]) do
-        begin
-          if (i <= High(Nulls)) and (j <= High(Nulls[i])) and Nulls[i][j] then
-            e^^.SetObjectArrayElement(e, inner, j, nil)
-          else
-          begin
-            cell := JStr(Rows[i][j]);
-            try
-              e^^.SetObjectArrayElement(e, inner, j, cell);
-            finally
-              e^^.DeleteLocalRef(e, cell);
-            end;
-          end;
-        end;
-        e^^.SetObjectArrayElement(e, outer, i, inner);
-        e^^.DeleteLocalRef(e, inner);
-        CheckJ('fill batch row');
-      end;
-      args[0].j := ConnId;
-      args[1].l := js;
-      args[2].l := outer;
-      Result := e^^.CallIntMethodA(e, FObj, FMExecBatch, @args[0]);
-      CheckJ('execBatch');
-    finally
-      e^^.DeleteLocalRef(e, outer);
-    end;
-  finally
-    e^^.DeleteLocalRef(e, js);
-    e^^.DeleteLocalRef(e, scls);
-    e^^.DeleteLocalRef(e, arrCls);
-  end;
-end;
-
-function TBridgeClient.FetchBatch(ConnId: Int64; const SQL: UTF8String;
-  Offset, Limit, FetchSize: Integer): TJavaRows;
-var
-  e: PJNIEnv;
-  args: array[0..4] of jvalue;
-  js: jstring;
-  outer, inner: jobjectArray;
-  nr, nc, i, j: Integer;
-  cell: jobject;
-begin
-  SetLength(Result, 0);
-  e := TJVMManager.GetJNIEnv;
-  FillChar(args, SizeOf(args), 0);
-  js := JStr(SQL);
-  try
-    args[0].j := ConnId;
-    args[1].l := js;
-    args[2].i := Offset;
-    args[3].i := Limit;
-    args[4].i := FetchSize;
-    outer := jobjectArray(e^^.CallObjectMethodA(e, FObj, FMFetchBatch, @args[0]));
-    CheckJ('fetchBatch');
-    if outer = nil then
-      Exit;
-    try
-      nr := e^^.GetArrayLength(e, outer);
-      CheckJ('batch len');
-      SetLength(Result, nr);
-      for i := 0 to nr - 1 do
-      begin
-        inner := jobjectArray(e^^.GetObjectArrayElement(e, outer, i));
-        CheckJ('batch row');
-        try
-          if inner = nil then
-          begin
-            SetLength(Result[i], 0);
-            Continue;
-          end;
-          nc := e^^.GetArrayLength(e, inner);
-          SetLength(Result[i], nc);
-          for j := 0 to nc - 1 do
-          begin
-            cell := e^^.GetObjectArrayElement(e, inner, j);
-            CheckJ('batch cell');
-            try
-              Result[i][j] := FromJStr(jstring(cell));
-            finally
-              if cell <> nil then
-                e^^.DeleteLocalRef(e, cell);
-            end;
-          end;
-        finally
-          e^^.DeleteLocalRef(e, inner);
-        end;
-      end;
-    finally
-      e^^.DeleteLocalRef(e, outer);
-    end;
-  finally
-    e^^.DeleteLocalRef(e, js);
-  end;
-end;
-
-procedure TBridgeClient.Cancel(ConnId: Int64);
-begin
-  CallVoid1J(FMCancel, ConnId);
-end;
-
-function TBridgeClient.PoolStats(PoolId: Int64): UTF8String;
+function TBridge.DatabaseMeta(ConnId: Int64): UTF8String;
 var
   e: PJNIEnv;
   args: array[0..0] of jvalue;
   js: jstring;
 begin
+  CheckHandle('conn', ConnId);
   e := TJVMManager.GetJNIEnv;
   FillChar(args, SizeOf(args), 0);
-  args[0].j := PoolId;
-  js := jstring(e^^.CallObjectMethodA(e, FObj, FMPoolStats, @args[0]));
-  CheckJ('poolStats');
+  args[0].j := ConnId;
+  js := jstring(e^^.CallObjectMethodA(e, FObj, FMDbMeta, @args[0]));
+  CheckJ('dbmeta');
   if js = nil then
     Exit('');
   try
@@ -558,152 +860,449 @@ begin
   end;
 end;
 
-function TBridgeClient.GetErrorChain: UTF8String;
+function TBridge.Prepare(ConnId: Int64; const SQL: UTF8String): Int64;
 begin
-  Result := CallJString0(FMErrorChain);
+  Result := CallLongStr(FMPrepare, ConnId, SQL);
+  CheckHandle('stmt', Result);
 end;
 
-procedure TBridgeClient.SetAutoCommit(ConnId: Int64; Auto: Boolean);
+function TBridge.PrepareCall(ConnId: Int64; const SQL: UTF8String): Int64;
+begin
+  Result := CallLongStr(FMPrepareCall, ConnId, SQL);
+  CheckHandle('stmt', Result);
+end;
+
+procedure TBridge.SetTimeout(StmtId: Int64; Secs: Integer);
 var
   e: PJNIEnv;
   args: array[0..1] of jvalue;
 begin
+  CheckHandle('stmt', StmtId);
+  if Secs < 0 then
+    raise EJDBCError.CreateChain('bad timeout', 'HY092', 20, 'timeout<0');
   e := TJVMManager.GetJNIEnv;
   FillChar(args, SizeOf(args), 0);
-  args[0].j := ConnId;
-  args[1].z := Byte(Ord(Auto));
-  e^^.CallVoidMethodA(e, FObj, FMSetAutoCommit, @args[0]);
-  CheckJ('setAutoCommit');
+  args[0].j := StmtId;
+  args[1].i := Secs;
+  e^^.CallVoidMethodA(e, FObj, FMSetTimeout, @args[0]);
+  CheckJ('setTimeout');
 end;
 
-procedure TBridgeClient.Commit(ConnId: Int64);
-begin
-  CallVoid1J(FMCommit, ConnId);
-end;
-
-procedure TBridgeClient.Rollback(ConnId: Int64);
-begin
-  CallVoid1J(FMRollback, ConnId);
-end;
-
-procedure TBridgeClient.Savepoint(ConnId: Int64; const Name: UTF8String);
+procedure TBridge.BindLong(StmtId: Int64; Idx: Integer; V: Int64);
 var
   e: PJNIEnv;
-  args: array[0..1] of jvalue;
-  js: jstring;
+  args: array[0..2] of jvalue;
 begin
+  CheckHandle('stmt', StmtId);
   e := TJVMManager.GetJNIEnv;
   FillChar(args, SizeOf(args), 0);
-  js := JStr(Name);
-  try
-    args[0].j := ConnId;
-    args[1].l := js;
-    e^^.CallVoidMethodA(e, FObj, FMSavepoint, @args[0]);
-    CheckJ('savepoint');
-  finally
-    e^^.DeleteLocalRef(e, js);
-  end;
+  args[0].j := StmtId; args[1].i := Idx; args[2].j := V;
+  e^^.CallVoidMethodA(e, FObj, FMBindLong, @args[0]);
+  CheckJ('bindLong');
 end;
 
-procedure TBridgeClient.RollbackToSavepoint(ConnId: Int64; const Name: UTF8String);
+procedure TBridge.BindDouble(StmtId: Int64; Idx: Integer; V: Double);
 var
   e: PJNIEnv;
-  args: array[0..1] of jvalue;
-  js: jstring;
+  args: array[0..2] of jvalue;
 begin
+  CheckHandle('stmt', StmtId);
   e := TJVMManager.GetJNIEnv;
   FillChar(args, SizeOf(args), 0);
-  js := JStr(Name);
-  try
-    args[0].j := ConnId;
-    args[1].l := js;
-    e^^.CallVoidMethodA(e, FObj, FMRollbackTo, @args[0]);
-    CheckJ('rollbackToSavepoint');
-  finally
-    e^^.DeleteLocalRef(e, js);
-  end;
+  args[0].j := StmtId; args[1].i := Idx; args[2].d := V;
+  e^^.CallVoidMethodA(e, FObj, FMBindDouble, @args[0]);
+  CheckJ('bindDouble');
 end;
 
-procedure TBridgeClient.ReleaseSavepoint(ConnId: Int64; const Name: UTF8String);
-var
-  e: PJNIEnv;
-  args: array[0..1] of jvalue;
-  js: jstring;
-begin
-  e := TJVMManager.GetJNIEnv;
-  FillChar(args, SizeOf(args), 0);
-  js := JStr(Name);
-  try
-    args[0].j := ConnId;
-    args[1].l := js;
-    e^^.CallVoidMethodA(e, FObj, FMReleaseSp, @args[0]);
-    CheckJ('releaseSavepoint');
-  finally
-    e^^.DeleteLocalRef(e, js);
-  end;
-end;
-
-function TBridgeClient.WriteBlob(ConnId: Int64; const SQL: UTF8String;
-  const Data: TBytes): Integer;
+procedure TBridge.BindBigDecimal(StmtId: Int64; Idx: Integer; const V: UTF8String);
 var
   e: PJNIEnv;
   args: array[0..2] of jvalue;
   js: jstring;
-  arr: jbyteArray;
 begin
+  CheckHandle('stmt', StmtId);
   e := TJVMManager.GetJNIEnv;
   FillChar(args, SizeOf(args), 0);
-  js := JStr(SQL);
-  arr := e^^.NewByteArray(e, Length(Data));
-  CheckJ('new bytes');
+  js := JStr(V);
   try
-    if Length(Data) > 0 then
-      e^^.SetByteArrayRegion(e, arr, 0, Length(Data), PJByte(@Data[0]));
-    CheckJ('fill bytes');
-    args[0].j := ConnId;
-    args[1].l := js;
-    args[2].l := arr;
-    Result := e^^.CallIntMethodA(e, FObj, FMWriteBlob, @args[0]);
-    CheckJ('writeBlob');
+    args[0].j := StmtId; args[1].i := Idx; args[2].l := js;
+    e^^.CallVoidMethodA(e, FObj, FMBindBD, @args[0]);
+    CheckJ('bindBigDecimal');
   finally
-    e^^.DeleteLocalRef(e, arr);
     e^^.DeleteLocalRef(e, js);
   end;
 end;
 
-function TBridgeClient.FetchBlob(ConnId: Int64; const SQL: UTF8String): TBytes;
+procedure TBridge.BindString(StmtId: Int64; Idx: Integer; const V: UTF8String);
 var
   e: PJNIEnv;
-  args: array[0..1] of jvalue;
+  args: array[0..2] of jvalue;
   js: jstring;
+begin
+  CheckHandle('stmt', StmtId);
+  e := TJVMManager.GetJNIEnv;
+  FillChar(args, SizeOf(args), 0);
+  js := JStr(V);
+  try
+    args[0].j := StmtId; args[1].i := Idx; args[2].l := js;
+    e^^.CallVoidMethodA(e, FObj, FMBindStr, @args[0]);
+    CheckJ('bindString');
+  finally
+    e^^.DeleteLocalRef(e, js);
+  end;
+end;
+
+procedure TBridge.BindDate(StmtId: Int64; Idx: Integer; const Iso: UTF8String);
+var
+  e: PJNIEnv;
+  args: array[0..2] of jvalue;
+  js: jstring;
+begin
+  CheckHandle('stmt', StmtId);
+  e := TJVMManager.GetJNIEnv;
+  FillChar(args, SizeOf(args), 0);
+  js := JStr(Iso);
+  try
+    args[0].j := StmtId; args[1].i := Idx; args[2].l := js;
+    e^^.CallVoidMethodA(e, FObj, FMBindDate, @args[0]);
+    CheckJ('bindDate');
+  finally
+    e^^.DeleteLocalRef(e, js);
+  end;
+end;
+
+procedure TBridge.BindTime(StmtId: Int64; Idx: Integer; const Iso: UTF8String);
+var
+  e: PJNIEnv;
+  args: array[0..2] of jvalue;
+  js: jstring;
+begin
+  CheckHandle('stmt', StmtId);
+  e := TJVMManager.GetJNIEnv;
+  FillChar(args, SizeOf(args), 0);
+  js := JStr(Iso);
+  try
+    args[0].j := StmtId; args[1].i := Idx; args[2].l := js;
+    e^^.CallVoidMethodA(e, FObj, FMBindTime, @args[0]);
+    CheckJ('bindTime');
+  finally
+    e^^.DeleteLocalRef(e, js);
+  end;
+end;
+
+procedure TBridge.BindTimestamp(StmtId: Int64; Idx: Integer; const Iso: UTF8String);
+var
+  e: PJNIEnv;
+  args: array[0..2] of jvalue;
+  js: jstring;
+begin
+  CheckHandle('stmt', StmtId);
+  e := TJVMManager.GetJNIEnv;
+  FillChar(args, SizeOf(args), 0);
+  js := JStr(Iso);
+  try
+    args[0].j := StmtId; args[1].i := Idx; args[2].l := js;
+    e^^.CallVoidMethodA(e, FObj, FMBindTS, @args[0]);
+    CheckJ('bindTimestamp');
+  finally
+    e^^.DeleteLocalRef(e, js);
+  end;
+end;
+
+procedure TBridge.BindBytes(StmtId: Int64; Idx: Integer; const V: TBytes);
+var
+  e: PJNIEnv;
+  args: array[0..2] of jvalue;
   arr: jbyteArray;
-  n: jsize;
-  elems: PJByte;
-  isCopy: jboolean;
+begin
+  CheckHandle('stmt', StmtId);
+  e := TJVMManager.GetJNIEnv;
+  FillChar(args, SizeOf(args), 0);
+  arr := e^^.NewByteArray(e, Length(V));
+  CheckJ('newbytes');
+  try
+    if Length(V) > 0 then
+      e^^.SetByteArrayRegion(e, arr, 0, Length(V), PJByte(@V[0]));
+    CheckJ('fillbytes');
+    args[0].j := StmtId; args[1].i := Idx; args[2].l := arr;
+    e^^.CallVoidMethodA(e, FObj, FMBindBytes, @args[0]);
+    CheckJ('bindBytes');
+  finally
+    e^^.DeleteLocalRef(e, arr);
+  end;
+end;
+
+procedure TBridge.BindNull(StmtId: Int64; Idx: Integer; SqlType: Integer);
+var
+  e: PJNIEnv;
+  args: array[0..2] of jvalue;
+begin
+  CheckHandle('stmt', StmtId);
+  e := TJVMManager.GetJNIEnv;
+  FillChar(args, SizeOf(args), 0);
+  args[0].j := StmtId; args[1].i := Idx; args[2].i := SqlType;
+  e^^.CallVoidMethodA(e, FObj, FMBindNull, @args[0]);
+  CheckJ('bindNull');
+end;
+
+procedure TBridge.AddBatch(StmtId: Int64);
+begin
+  CheckHandle('stmt', StmtId);
+  CallVoid1J(FMAddBatch, StmtId);
+end;
+
+function TBridge.ExecUpdate(StmtId: Int64): Integer;
+begin
+  Result := CallInt1(FMExecUpdate, StmtId);
+end;
+
+function TBridge.ExecBatch(StmtId: Int64): Integer;
+begin
+  Result := CallInt1(FMExecBatch, StmtId);
+end;
+
+function TBridge.GeneratedKeys(StmtId: Int64): TJdbcRow;
+var
+  e: PJNIEnv;
+  args: array[0..0] of jvalue;
+  arr: jobjectArray;
+  n, i: Integer;
+  cell: jobject;
 begin
   SetLength(Result, 0);
+  CheckHandle('stmt', StmtId);
+  e := TJVMManager.GetJNIEnv;
+  FillChar(args, SizeOf(args), 0);
+  args[0].j := StmtId;
+  arr := jobjectArray(e^^.CallObjectMethodA(e, FObj, FMGenKeys, @args[0]));
+  CheckJ('genkeys');
+  if arr = nil then
+    Exit;
+  try
+    n := e^^.GetArrayLength(e, arr);
+    SetLength(Result, n);
+    for i := 0 to n - 1 do
+    begin
+      cell := e^^.GetObjectArrayElement(e, arr, i);
+      CheckJ('genkeycell');
+      try
+        Result[i] := FromJStr(jstring(cell));
+      finally
+        if cell <> nil then
+          e^^.DeleteLocalRef(e, cell);
+      end;
+    end;
+  finally
+    e^^.DeleteLocalRef(e, arr);
+  end;
+end;
+
+function TBridge.ExecDirect(ConnId: Int64; const SQL: UTF8String): Integer;
+begin
+  Result := CallIntStr(FMExecDirect, ConnId, SQL);
+end;
+
+function TBridge.ExecDirectTimeout(ConnId: Int64; const SQL: UTF8String; Secs: Integer): Integer;
+var
+  e: PJNIEnv;
+  args: array[0..2] of jvalue;
+  js: jstring;
+begin
+  CheckHandle('conn', ConnId);
   e := TJVMManager.GetJNIEnv;
   FillChar(args, SizeOf(args), 0);
   js := JStr(SQL);
   try
-    args[0].j := ConnId;
-    args[1].l := js;
-    arr := jbyteArray(e^^.CallObjectMethodA(e, FObj, FMFetchBlob, @args[0]));
-    CheckJ('fetchBlob');
+    args[0].j := ConnId; args[1].l := js; args[2].i := Secs;
+    Result := e^^.CallIntMethodA(e, FObj, FMExecDirectTimeout, @args[0]);
+    CheckJ('execDirectTimeout');
+  finally
+    e^^.DeleteLocalRef(e, js);
+  end;
+end;
+
+procedure TBridge.RegisterOut(StmtId: Int64; Idx, SqlType: Integer);
+var
+  e: PJNIEnv;
+  args: array[0..2] of jvalue;
+begin
+  CheckHandle('stmt', StmtId);
+  e := TJVMManager.GetJNIEnv;
+  FillChar(args, SizeOf(args), 0);
+  args[0].j := StmtId; args[1].i := Idx; args[2].i := SqlType;
+  e^^.CallVoidMethodA(e, FObj, FMRegisterOut, @args[0]);
+  CheckJ('registerOut');
+end;
+
+function TBridge.ExecProc(StmtId: Int64): Boolean;
+var
+  e: PJNIEnv;
+  args: array[0..0] of jvalue;
+begin
+  CheckHandle('stmt', StmtId);
+  e := TJVMManager.GetJNIEnv;
+  FillChar(args, SizeOf(args), 0);
+  args[0].j := StmtId;
+  Result := e^^.CallBooleanMethodA(e, FObj, FMExecProc, @args[0]) <> 0;
+  CheckJ('execProc');
+end;
+
+function TBridge.OutValue(StmtId: Int64; Idx: Integer): UTF8String;
+var
+  e: PJNIEnv;
+  args: array[0..1] of jvalue;
+  js: jstring;
+begin
+  CheckHandle('stmt', StmtId);
+  e := TJVMManager.GetJNIEnv;
+  FillChar(args, SizeOf(args), 0);
+  args[0].j := StmtId; args[1].i := Idx;
+  js := jstring(e^^.CallObjectMethodA(e, FObj, FMGetOut, @args[0]));
+  CheckJ('getOut');
+  if js = nil then
+    Exit('');
+  try
+    Result := FromJStr(js);
+  finally
+    e^^.DeleteLocalRef(e, js);
+  end;
+end;
+
+procedure TBridge.Cancel(StmtId: Int64);
+begin
+  CheckHandle('stmt', StmtId);
+  CallVoid1J(FMCancel, StmtId);
+end;
+
+procedure TBridge.CloseStmt(StmtId: Int64);
+begin
+  CheckHandle('stmt', StmtId);
+  CallVoid1J(FMCloseStmt, StmtId);
+end;
+
+function TBridge.QueryOpen(StmtId: Int64; FetchSize: Integer): Int64;
+var
+  e: PJNIEnv;
+  args: array[0..1] of jvalue;
+begin
+  CheckHandle('stmt', StmtId);
+  e := TJVMManager.GetJNIEnv;
+  FillChar(args, SizeOf(args), 0);
+  args[0].j := StmtId; args[1].i := FetchSize;
+  Result := e^^.CallLongMethodA(e, FObj, FMQueryOpen, @args[0]);
+  CheckJ('queryOpen');
+  CheckHandle('cursor', Result);
+end;
+
+function TBridge.CursorCols(CursorId: Int64): Integer;
+begin
+  Result := CallInt1(FMCursorCols, CursorId);
+end;
+
+function TBridge.CursorNames(CursorId: Int64): TStringList;
+begin
+  Result := CallStrArray1(FMCursorNames, CursorId);
+end;
+
+function TBridge.CursorTypeNames(CursorId: Int64): TStringList;
+begin
+  Result := CallStrArray1(FMCursorTypeNames, CursorId);
+end;
+
+function TBridge.CursorTypeCodes(CursorId: Int64): TIntArray;
+var
+  e: PJNIEnv;
+  args: array[0..0] of jvalue;
+  arr: jintArray;
+  n: jsize;
+  elems: PJInt;
+  isCopy: jboolean;
+  i: Integer;
+begin
+  SetLength(Result, 0);
+  CheckHandle('cursor', CursorId);
+  e := TJVMManager.GetJNIEnv;
+  FillChar(args, SizeOf(args), 0);
+  args[0].j := CursorId;
+  arr := jintArray(e^^.CallObjectMethodA(e, FObj, FMCursorTypeCodes, @args[0]));
+  CheckJ('typecodes');
+  if arr = nil then
+    Exit;
+  try
+    n := e^^.GetArrayLength(e, arr);
+    SetLength(Result, n);
+    if n > 0 then
+    begin
+      isCopy := 0;
+      elems := e^^.GetIntArrayElements(e, arr, isCopy);
+      CheckJ('typeelems');
+      try
+        for i := 0 to n - 1 do
+          Result[i] := elems[i];
+      finally
+        e^^.ReleaseIntArrayElements(e, arr, elems, JNI_ABORT);
+      end;
+    end;
+  finally
+    e^^.DeleteLocalRef(e, arr);
+  end;
+end;
+
+function TBridge.FetchWindow(CursorId: Int64; Size: Integer): TJdbcRows;
+begin
+  Result := CallWindow(FMFetchWindow, CursorId, Size);
+end;
+
+procedure TBridge.CloseCursor(CursorId: Int64);
+begin
+  CheckHandle('cursor', CursorId);
+  CallVoid1J(FMCloseCursor, CursorId);
+end;
+
+function TBridge.GetTables(ConnId: Int64; const Table: UTF8String): TJdbcRows;
+begin
+  Result := CallStrMatrix(FMGetTables, ConnId, Table);
+end;
+
+function TBridge.GetColumns(ConnId: Int64; const Table: UTF8String): TJdbcRows;
+begin
+  Result := CallStrMatrix(FMGetColumns, ConnId, Table);
+end;
+
+function TBridge.GetPrimaryKeys(ConnId: Int64; const Table: UTF8String): TStringList;
+var
+  e: PJNIEnv;
+  args: array[0..1] of jvalue;
+  js: jstring;
+  arr: jobjectArray;
+  n, i: Integer;
+  cell: jobject;
+begin
+  Result := TStringList.Create;
+  CheckHandle('conn', ConnId);
+  e := TJVMManager.GetJNIEnv;
+  FillChar(args, SizeOf(args), 0);
+  js := JStr(Table);
+  try
+    args[0].j := ConnId; args[1].l := js;
+    arr := jobjectArray(e^^.CallObjectMethodA(e, FObj, FMGetPKs, @args[0]));
+    CheckJ('getpks');
     if arr = nil then
       Exit;
     try
       n := e^^.GetArrayLength(e, arr);
-      SetLength(Result, n);
-      if n > 0 then
+      for i := 0 to n - 1 do
       begin
-        isCopy := 0;
-        elems := e^^.GetByteArrayElements(e, arr, isCopy);
-        CheckJ('blob elems');
+        cell := e^^.GetObjectArrayElement(e, arr, i);
+        CheckJ('pkcell');
         try
-          Move(elems^, Result[0], n);
+          if cell = nil then
+            Result.Add('')
+          else
+            Result.Add(string(FromJStr(jstring(cell))));
         finally
-          e^^.ReleaseByteArrayElements(e, arr, elems, JNI_ABORT);
+          if cell <> nil then
+            e^^.DeleteLocalRef(e, cell);
         end;
       end;
     finally
@@ -714,7 +1313,47 @@ begin
   end;
 end;
 
-function TBridgeClient.HeapUsedBytes: Int64;
+function TBridge.WriteBlob(ConnId: Int64; const SQL: UTF8String; const Data: TBytes): Integer;
+var
+  e: PJNIEnv;
+  args: array[0..2] of jvalue;
+  js: jstring;
+  arr: jbyteArray;
+begin
+  CheckHandle('conn', ConnId);
+  e := TJVMManager.GetJNIEnv;
+  FillChar(args, SizeOf(args), 0);
+  js := JStr(SQL);
+  arr := e^^.NewByteArray(e, Length(Data));
+  CheckJ('newbytes');
+  try
+    if Length(Data) > 0 then
+      e^^.SetByteArrayRegion(e, arr, 0, Length(Data), PJByte(@Data[0]));
+    CheckJ('fillbytes');
+    args[0].j := ConnId; args[1].l := js; args[2].l := arr;
+    Result := e^^.CallIntMethodA(e, FObj, FMWriteBlob, @args[0]);
+    CheckJ('writeBlob');
+  finally
+    e^^.DeleteLocalRef(e, arr);
+    e^^.DeleteLocalRef(e, js);
+  end;
+end;
+
+function TBridge.FetchBlob(ConnId: Int64; const SQL: UTF8String): TBytes;
+begin
+  Result := CallBytes(FMFetchBlob, ConnId, SQL);
+end;
+
+function TBridge.PoolStats(PoolId: Int64): TPoolStatRec;
+begin
+  CheckHandle('pool', PoolId);
+  Result.Active := CallInt1(FMPoolActive, PoolId);
+  Result.Idle := CallInt1(FMPoolIdle, PoolId);
+  Result.Waiting := CallInt1(FMPoolWaiting, PoolId);
+  Result.Leak := CallInt1(FMPoolLeak, PoolId);
+end;
+
+function TBridge.HeapUsed: Int64;
 var
   e: PJNIEnv;
 begin
@@ -723,13 +1362,18 @@ begin
   CheckJ('heapUsed');
 end;
 
-function TBridgeClient.HeapMaxBytes: Int64;
+function TBridge.HeapMax: Int64;
 var
   e: PJNIEnv;
 begin
   e := TJVMManager.GetJNIEnv;
   Result := e^^.CallLongMethod(e, FObj, FMHeapMax);
   CheckJ('heapMax');
+end;
+
+function TBridge.ErrorChain: UTF8String;
+begin
+  Result := CallJString0(FMErrorChain);
 end;
 
 end.

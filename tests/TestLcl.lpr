@@ -1,16 +1,16 @@
-program TestV2Lcl;
+program TestLcl;
 
 {$mode objfpc}{$H+}
 
-{ V2 LCL design-surface test (no IDE needed): the design components hold
-  config only; URL building goes through the V2 registry; the dialog gates
+{ LCL design-surface test (no IDE needed): the design components hold
+  config only; URL building goes through the registry; the dialog gates
   confirmation on Test; a live H2 loopback proves grid-bound rows read and
   write back. }
 
 uses
   SysUtils, Classes, TyFPJDBC.Handles, TyFPJDBC.JVM.Manager,
-  TyFPJDBC.JNI.BridgeV2, TyFPJDBC.Engine, TyFPJDBC.Driver.Registry,
-  TyFPJDBC.LCL.Conn, TyFPJDBC.LCL.Query, TyFPJDBC.V2.Query;
+  TyFPJDBC.JNI.Bridge, TyFPJDBC.Engine, TyFPJDBC.Driver.Registry,
+  TyFPJDBC.LCL.Conn, TyFPJDBC.LCL.Query, TyFPJDBC.Query;
 
 var
   Fails: Integer = 0;
@@ -41,13 +41,13 @@ end;
 
 var
   c: TJdbcConnection;
-  qd: TJdbcQuery;
+  qd: TJdbcConnQuery;
   classesDir: string;
-  bridge: TBridgeV2;
+  bridge: TBridge;
   eng: TJdbcEngine;
   cfg: TPoolCfgRec;
   pool, conn: Int64;
-  q: TJV2Query;
+  q: TJdbcQuery;
 begin
   c := TJdbcConnection.Create(nil);
   try
@@ -60,7 +60,7 @@ begin
   finally
     c.Free;
   end;
-  qd := TJdbcQuery.Create(nil);
+  qd := TJdbcConnQuery.Create(nil);
   try
     Ok('query-defaults', (qd.WindowSize = 1000) and (qd.KeyField = ''));
     qd.SQLText := 'SELECT 1';
@@ -82,16 +82,16 @@ begin
     ';' + LibJar('slf4j-api-2.0.9.jar') + ';' + LibJar('h2-2.2.224.jar') +
     ';' + LibJar('sqlite-jdbc-3.46.1.0.jar'));
   TJVMManager.EnsureStarted(FindJvmDll, TJVMManager.BuildDesktopArgs);
-  bridge := TBridgeV2.Create;
+  bridge := TBridge.Create;
   try
     eng := TJdbcEngine.Create(bridge);
     try
-      cfg := DefaultPoolCfg('jdbc:h2:mem:v2lcl;DB_CLOSE_DELAY=-1', 'org.h2.Driver');
+      cfg := DefaultPoolCfg('jdbc:h2:mem:lcl;DB_CLOSE_DELAY=-1', 'org.h2.Driver');
       pool := eng.OpenPool(cfg);
       conn := eng.Borrow(pool);
       bridge.ExecDirect(conn, 'CREATE TABLE grid(id BIGINT PRIMARY KEY, name VARCHAR(50))');
       bridge.ExecDirect(conn, 'INSERT INTO grid VALUES(1, ''a'')');
-      q := TJV2Query.Create(nil);
+      q := TJdbcQuery.Create(nil);
       try
         q.KeyField := 'id';
         q.OpenQuery(eng, conn, 'grid', 'SELECT id,name FROM grid ORDER BY id', 100);

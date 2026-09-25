@@ -1,8 +1,8 @@
-program TestV2Dialect;
+program TestDialect;
 
 {$mode objfpc}{$H+}
 
-{ V2 dialect + registry pure-logic tests: no JVM, no DB. }
+{ Dialect + registry pure-logic tests: no JVM, no DB. }
 
 uses
   SysUtils, Classes, TyFPJDBC.Handles, TyFPJDBC.Dialect.Api,

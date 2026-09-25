@@ -43,6 +43,7 @@ type
     class function BuildDesktopArgs: string; static;
     class function BuildServerArgs: string; static;
     class function FindLibJvm(const CustomPath: string): string; static;
+    class function FindLibJvmLegacy(const CustomPath: string): string; static;
     class procedure SetClassPath(const CP: string); static;
     class function GetClassPath: string; static;
     class procedure EnsureStarted(const LibJvm, ExtraArgs: string); static;
@@ -52,7 +53,6 @@ type
       const Args: array of string); static;
     class function JoinArgs(const Args: array of string): string; static;
     class function SplitArgs(const S: string): TStringArray; static;
-    class function FindLibJvmV2(const CustomPath: string): string; static;
     class procedure ShutdownJvm; static;
     class function JniVersionUsed: LongInt; static;
     class function LastStartArgs: string; static;
@@ -212,6 +212,49 @@ begin
 end;
 
 class function TJVMManager.FindLibJvm(const CustomPath: string): string;
+var
+  h, cand: string;
+
+  function TryPath(const P: string): Boolean;
+  begin
+    Result := (P <> '') and FileExists(P);
+    if Result then
+      FindLibJvm := P;
+  end;
+
+begin
+  { Merged lookup (was FindLibJvm + FindLibJvmV2): explicit path first,
+    then bundled runtime, JAVA_HOME, registry/PATH probe, macOS dylib. }
+  if TryPath(CustomPath) then
+    Exit;
+  cand := IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) + 'jre' +
+    PathDelim + 'bin' + PathDelim + 'server' + PathDelim + 'jvm.dll';
+  if TryPath(cand) then
+    Exit;
+  cand := IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) + 'jre' +
+    PathDelim + 'lib' + PathDelim + 'server' + PathDelim + 'libjvm.so';
+  if TryPath(cand) then
+    Exit;
+  h := GetEnvironmentVariable('JAVA_HOME');
+  if h <> '' then
+  begin
+    if TryPath(IncludeTrailingPathDelimiter(h) + 'bin' + PathDelim + 'server' +
+      PathDelim + 'jvm.dll') then
+      Exit;
+    if TryPath(IncludeTrailingPathDelimiter(h) + 'lib' + PathDelim + 'server' +
+      PathDelim + 'libjvm.so') then
+      Exit;
+    if TryPath(IncludeTrailingPathDelimiter(h) + 'Contents' + PathDelim + 'Home' +
+      PathDelim + 'lib' + PathDelim + 'server' + PathDelim + 'libjvm.dylib') then
+      Exit;
+  end;
+  { Well-known macOS location (harmless to probe on other platforms). }
+  if TryPath('/Library/Java/JavaVirtualMachines/temurin-25.jdk/Contents/Home/lib/server/libjvm.dylib') then
+    Exit;
+  Result := FindLibJvmLegacy(CustomPath);
+end;
+
+class function TJVMManager.FindLibJvmLegacy(const CustomPath: string): string;
 var
   h: string;
 begin
@@ -387,48 +430,6 @@ begin
   { JoinArgs quotes space-bearing args; the quote-aware SplitArgs below
     strips them back, so paths with spaces arrive as single options. }
   EnsureStarted(LibJvm, JoinArgs(Args));
-end;
-
-class function TJVMManager.FindLibJvmV2(const CustomPath: string): string;
-var
-  h, cand: string;
-
-  function TryPath(const P: string): Boolean;
-  begin
-    Result := (P <> '') and FileExists(P);
-    if Result then
-      FindLibJvmV2 := P;
-  end;
-
-begin
-  if TryPath(CustomPath) then
-    Exit;
-  { Bundled runtime next to the executable. }
-  cand := IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) + 'jre' +
-    PathDelim + 'bin' + PathDelim + 'server' + PathDelim + 'jvm.dll';
-  if TryPath(cand) then
-    Exit;
-  cand := IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) + 'jre' +
-    PathDelim + 'lib' + PathDelim + 'server' + PathDelim + 'libjvm.so';
-  if TryPath(cand) then
-    Exit;
-  h := GetEnvironmentVariable('JAVA_HOME');
-  if h <> '' then
-  begin
-    if TryPath(IncludeTrailingPathDelimiter(h) + 'bin' + PathDelim + 'server' +
-      PathDelim + 'jvm.dll') then
-      Exit;
-    if TryPath(IncludeTrailingPathDelimiter(h) + 'lib' + PathDelim + 'server' +
-      PathDelim + 'libjvm.so') then
-      Exit;
-    if TryPath(IncludeTrailingPathDelimiter(h) + 'Contents' + PathDelim + 'Home' +
-      PathDelim + 'lib' + PathDelim + 'server' + PathDelim + 'libjvm.dylib') then
-      Exit;
-  end;
-  { Well-known macOS location (harmless to probe on other platforms). }
-  if TryPath('/Library/Java/JavaVirtualMachines/temurin-25.jdk/Contents/Home/lib/server/libjvm.dylib') then
-    Exit;
-  Result := FindLibJvm(CustomPath);
 end;
 
 class procedure TJVMManager.ShutdownJvm;

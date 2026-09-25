@@ -1,4 +1,4 @@
-program TestV2Jvm;
+program TestJvm;
 {$mode objfpc}{$H+}
 uses
   SysUtils, TyFPJDBC.JVM.Manager;
@@ -57,7 +57,7 @@ begin
   Ok('shutdown-ok', True);
   Ok('jni-version', TJVMManager.JniVersionUsed = $00010006);
   try
-    TJVMManager.FindLibJvmV2('');
+    TJVMManager.FindLibJvm('');
     Ok('findlib-probe', True);
   except
     on E: Exception do

@@ -8,7 +8,7 @@ type
   TLogLevel = (llDebug, llInfo, llWarn, llError);
   TLogProc = procedure(Level: TLogLevel; const Msg: string) of object;
 
-  { V2 observability: explicit log sink, slow-query timing at the call site,
+  { Observability: explicit log sink, slow-query timing at the call site,
     structured pool/exec snapshots. No globals: one instance per engine. }
   TJdbcLogger = class
   private

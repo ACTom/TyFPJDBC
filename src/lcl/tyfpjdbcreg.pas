@@ -9,6 +9,6 @@ uses
   TyFPJDBC.LCL.Conn, TyFPJDBC.LCL.Query;
 procedure Register;
 begin
-  RegisterComponents('TyFPJDBC', [TJdbcConnection, TJdbcQuery]);
+  RegisterComponents('TyFPJDBC', [TJdbcConnection, TJdbcConnQuery]);
 end;
 end.

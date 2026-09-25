@@ -1,17 +1,17 @@
-program TestV2Engine;
+program TestEngine;
 
 {$mode objfpc}{$H+}
 {$codepage UTF8}
 
-{ V2 engine live loopback: JVM (real JNI_CreateJavaVM) -> BridgeV2 (real JNI)
+{ Engine live loopback: JVM (real JNI_CreateJavaVM) -> Bridge (real JNI)
   -> HikariCP -> H2 mem DB. Covers: version, bad-handle local reject,
   pool/borrow, typed batch via direct prepare, windowed fetch, savepoint
   rollback with re-read, structured pool stats, handle count归零.
-  Usage: TestV2Engine <classesDir>. }
+  Usage: TestEngine <classesDir>. }
 
 uses
   SysUtils, Classes, TyFPJDBC.Handles, TyFPJDBC.JVM.Manager,
-  TyFPJDBC.JNI.BridgeV2, TyFPJDBC.Engine;
+  TyFPJDBC.JNI.Bridge, TyFPJDBC.Engine;
 
 var
   Fails: Integer = 0;
@@ -44,17 +44,17 @@ end;
 
 var
   classesDir: string;
-  bridge: TBridgeV2;
+  bridge: TBridge;
   eng: TJdbcEngine;
   cfg: TPoolCfgRec;
   pool, conn, stmt, cur: Int64;
-  rows: TV2Rows;
+  rows: TJdbcRows;
   raised: Boolean;
   st: string;
 begin
   if ParamCount < 1 then
   begin
-    WriteLn('usage: TestV2Engine <classesDir>');
+    WriteLn('usage: TestEngine <classesDir>');
     Halt(2);
   end;
   classesDir := ParamStr(1);
@@ -65,7 +65,7 @@ begin
   TJVMManager.EnsureStarted(FindJvmDll, TJVMManager.BuildDesktopArgs);
   Ok('jvm-started', TJVMManager.IsStarted);
 
-  bridge := TBridgeV2.Create;
+  bridge := TBridge.Create;
   try
     Ok('bridge-version-2', bridge.GetVersion = '2.0.0');
     try
@@ -80,7 +80,7 @@ begin
 
     eng := TJdbcEngine.Create(bridge);
     try
-      cfg := DefaultPoolCfg('jdbc:h2:mem:v2eng;DB_CLOSE_DELAY=-1', 'org.h2.Driver');
+      cfg := DefaultPoolCfg('jdbc:h2:mem:tjeng;DB_CLOSE_DELAY=-1', 'org.h2.Driver');
       pool := eng.OpenPool(cfg);
       Ok('pool-open', pool > 0);
       conn := eng.Borrow(pool);

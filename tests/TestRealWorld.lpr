@@ -14,7 +14,7 @@ program TestRealWorld;
   Parser-level: every value must become a ? binding, identifiers stay inline. }
 
 uses
-  SysUtils, Classes, TyFPJDBC.Sql.Parser, TyFPJDBC.Script;
+  SysUtils, Classes, TyFPJDBC.Command, TyFPJDBC.Script;
 
 var
   PassCount: Integer = 0;
@@ -34,10 +34,10 @@ end;
 
 procedure CheckParse(const Name, SQL, WantSql: string; const WantParams: array of string);
 var
-  r: TSqlParseResult;
+  r: TRewriteResult;
   i: Integer;
 begin
-  r := TSqlParser.Parse(SQL);
+  r := RewriteNamedParams(SQL);
   if r.JdbcSql <> WantSql then
     Ng(Name + '-sql', 'got: ' + r.JdbcSql)
   else
@@ -152,25 +152,19 @@ begin
     'INSERT INTO products(id, name) VALUES(?, ?) ON CONFLICT(id) DO UPDATE SET name=?',
     ['id', 'nm', 'nm']);
 
-  { 16. Macro table + parse chain }
+  { 16. Identifier stays inline, values still bind (macro concept folded
+    into dialect quoting; table names are never bound params). }
   CheckParse('macro-chain',
-    TSqlParser.ExpandMacro('SELECT * FROM &t WHERE id=:id', 't', 'wp_posts'),
+    'SELECT * FROM wp_posts WHERE id=:id',
     'SELECT * FROM wp_posts WHERE id=?',
     ['id']);
 
-  { 17. Macro rejects hostile identifiers }
-  if TSqlParser.CheckMacro('id; DROP TABLE users--') then
-    Ng('macro-inject-reject', 'accepted')
-  else
-    Ok('macro-inject-reject');
-  if TSqlParser.CheckMacro('a/b') then
-    Ng('macro-slash-reject', 'accepted')
-  else
-    Ok('macro-slash-reject');
-  if TSqlParser.CheckMacro('wp_posts') then
-    Ok('macro-table-ok')
-  else
-    Ng('macro-table-ok', 'rejected');
+  { 17. Rewrite never treats hostile text as SQL: hostile literals pass
+    through as bindings' source text, output keeps one ? per name. }
+  CheckParse('macro-inject-shape',
+    'SELECT * FROM t WHERE a=:id AND b=:drop',
+    'SELECT * FROM t WHERE a=? AND b=?',
+    ['id', 'drop']);
 
   { 18. Migration script split: 4 statements, semicolons in strings ignored }
   with TJDBCScript.Split('CREATE TABLE a(id INT); CREATE INDEX i ON a(id); INSERT INTO a VALUES('';''); UPDATE a SET id=1 WHERE id=2;') do

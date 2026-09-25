@@ -2,10 +2,10 @@ unit TyFPJDBC.Script;
 {$mode objfpc}{$H+}
 interface
 uses
-  SysUtils, Classes, TyFPJDBC.Handles, TyFPJDBC.JNI.BridgeV2, TyFPJDBC.Engine;
+  SysUtils, Classes, TyFPJDBC.Handles, TyFPJDBC.JNI.Bridge, TyFPJDBC.Engine;
 
 type
-  { V2 script runner: splits on top-level semicolons (strings, line/block
+  { Script runner: splits on top-level semicolons (strings, line/block
     comments and $$ bodies untouched), executes each via ExecDirect in one
     transaction, reports the failing statement number. }
   TJDBCScript = class
