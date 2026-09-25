@@ -4,6 +4,8 @@ interface
 uses
   SysUtils, Classes, TyFPJDBC.Handles;
 type
+  TDriverIdArray = array of string;
+
   { Driver entry: arbitrary JDBC drivers register here. Unknown ids
     raise 08000; no silent fallback. }
   TDriverEntry = record
@@ -15,6 +17,8 @@ type
   TDriverRegistry = class
     class procedure Register(const E: TDriverEntry); static;
     class function Find(const DriverId: string): TDriverEntry; static;
+    class function IsEmbedded(const DriverId: string): Boolean; static;
+    class function BuiltinIds: TDriverIdArray; static;
     class function DefaultPort(const DriverId: string): Integer; static;
     class function BuildUrl(const DriverId, Host: string; Port: Integer;
       const Database: string; Extra: TStrings): string; static;
@@ -72,6 +76,96 @@ begin
   e.DefaultPort := 0; e.TestQuery := 'SELECT 1';
   e.License := 'MPL-2.0'; e.Maven := 'com.h2database:h2:2.2.224'; e.Sha := '';
   TDriverRegistry.Register(e);
+  e.Id := 'duckdb'; e.DriverClass := 'org.duckdb.DuckDBDriver';
+  e.UrlTemplate := 'jdbc:duckdb:{database}';
+  e.DefaultPort := 0; e.TestQuery := 'SELECT 1';
+  e.License := 'MIT'; e.Maven := 'org.duckdb:duckdb_jdbc:1.0.0'; e.Sha := '';
+  TDriverRegistry.Register(e);
+  e.Id := 'derby'; e.DriverClass := 'org.apache.derby.jdbc.EmbeddedDriver';
+  e.UrlTemplate := 'jdbc:derby:{database};create=true';
+  e.DefaultPort := 0; e.TestQuery := 'SELECT 1';
+  e.License := 'Apache-2.0'; e.Maven := 'org.apache.derby:derby:10.17.1.0'; e.Sha := '';
+  TDriverRegistry.Register(e);
+  e.Id := 'hsqldb'; e.DriverClass := 'org.hsqldb.jdbc.JDBCDriver';
+  e.UrlTemplate := 'jdbc:hsqldb:file:{database}';
+  e.DefaultPort := 0; e.TestQuery := 'SELECT 1';
+  e.License := 'BSD-3-Clause'; e.Maven := 'org.hsqldb:hsqldb:2.7.2'; e.Sha := '';
+  TDriverRegistry.Register(e);
+  e.Id := 'firebird'; e.DriverClass := 'org.firebirdsql.jdbc.FBDriver';
+  e.UrlTemplate := 'jdbc:firebirdsql://{host}:{port}/{database}';
+  e.DefaultPort := 3050; e.TestQuery := 'SELECT 1 FROM RDB$DATABASE';
+  e.License := 'IPL-1.0'; e.Maven := 'org.firebirdsql.jdbc:jaybird:4.0.9.java11'; e.Sha := '';
+  TDriverRegistry.Register(e);
+  e.Id := 'db2'; e.DriverClass := 'com.ibm.db2.jcc.DB2Driver';
+  e.UrlTemplate := 'jdbc:db2://{host}:{port}/{database}';
+  e.DefaultPort := 50000; e.TestQuery := 'SELECT 1 FROM SYSIBM.SYSDUMMY1';
+  e.License := 'Proprietary'; e.Maven := 'com.ibm.db2:jcc:11.5.9.0'; e.Sha := '';
+  TDriverRegistry.Register(e);
+  e.Id := 'informix'; e.DriverClass := 'com.informix.jdbc.IfxDriver';
+  e.UrlTemplate := 'jdbc:informix-sqli://{host}:{port}/{database}';
+  e.DefaultPort := 9088; e.TestQuery := 'SELECT 1 FROM SYSTABLES';
+  e.License := 'Proprietary'; e.Maven := 'com.ibm.informix:jdbc:4.50.10'; e.Sha := '';
+  TDriverRegistry.Register(e);
+  e.Id := 'sybase'; e.DriverClass := 'net.sourceforge.jtds.jdbc.Driver';
+  e.UrlTemplate := 'jdbc:jtds:sybase://{host}:{port}/{database}';
+  e.DefaultPort := 5000; e.TestQuery := 'SELECT 1';
+  e.License := 'LGPL-2.1'; e.Maven := 'net.sourceforge.jtds:jtds:1.3.1'; e.Sha := '';
+  TDriverRegistry.Register(e);
+  e.Id := 'teradata'; e.DriverClass := 'com.teradata.jdbc.TeraDriver';
+  e.UrlTemplate := 'jdbc:teradata://{host}/{database}';
+  e.DefaultPort := 1025; e.TestQuery := 'SELECT 1';
+  e.License := 'Proprietary'; e.Maven := 'com.teradata.jdbc:terajdbc4:17.20.00.12'; e.Sha := '';
+  TDriverRegistry.Register(e);
+  e.Id := 'vertica'; e.DriverClass := 'com.vertica.jdbc.Driver';
+  e.UrlTemplate := 'jdbc:vertica://{host}:{port}/{database}';
+  e.DefaultPort := 5433; e.TestQuery := 'SELECT 1';
+  e.License := 'Proprietary'; e.Maven := 'com.vertica.jdbc:vertica-jdbc:23.4.0-0'; e.Sha := '';
+  TDriverRegistry.Register(e);
+  e.Id := 'clickhouse'; e.DriverClass := 'com.clickhouse.jdbc.ClickHouseDriver';
+  e.UrlTemplate := 'jdbc:clickhouse://{host}:{port}/{database}';
+  e.DefaultPort := 8123; e.TestQuery := 'SELECT 1';
+  e.License := 'Apache-2.0'; e.Maven := 'com.clickhouse:clickhouse-jdbc:0.6.0'; e.Sha := '';
+  TDriverRegistry.Register(e);
+  e.Id := 'trino'; e.DriverClass := 'io.trino.jdbc.TrinoDriver';
+  e.UrlTemplate := 'jdbc:trino://{host}:{port}/{database}';
+  e.DefaultPort := 8080; e.TestQuery := 'SELECT 1';
+  e.License := 'Apache-2.0'; e.Maven := 'io.trino:trino-jdbc:435'; e.Sha := '';
+  TDriverRegistry.Register(e);
+  e.Id := 'presto'; e.DriverClass := 'com.facebook.presto.jdbc.PrestoDriver';
+  e.UrlTemplate := 'jdbc:presto://{host}:{port}/{database}';
+  e.DefaultPort := 8080; e.TestQuery := 'SELECT 1';
+  e.License := 'Apache-2.0'; e.Maven := 'com.facebook.presto:presto-jdbc:0.288'; e.Sha := '';
+  TDriverRegistry.Register(e);
+  e.Id := 'hive'; e.DriverClass := 'org.apache.hive.jdbc.HiveDriver';
+  e.UrlTemplate := 'jdbc:hive2://{host}:{port}/{database}';
+  e.DefaultPort := 10000; e.TestQuery := 'SELECT 1';
+  e.License := 'Apache-2.0'; e.Maven := 'org.apache.hive:hive-jdbc:3.1.3'; e.Sha := '';
+  TDriverRegistry.Register(e);
+  e.Id := 'snowflake'; e.DriverClass := 'net.snowflake.client.jdbc.SnowflakeDriver';
+  e.UrlTemplate := 'jdbc:snowflake://{host}.snowflakecomputing.com/{database}';
+  e.DefaultPort := 443; e.TestQuery := 'SELECT 1';
+  e.License := 'Apache-2.0'; e.Maven := 'net.snowflake:snowflake-jdbc:3.16.1'; e.Sha := '';
+  TDriverRegistry.Register(e);
+  e.Id := 'redshift'; e.DriverClass := 'com.amazon.redshift.jdbc42.Driver';
+  e.UrlTemplate := 'jdbc:redshift://{host}:{port}/{database}';
+  e.DefaultPort := 5439; e.TestQuery := 'SELECT 1';
+  e.License := 'Apache-2.0'; e.Maven := 'software.amazon.redshift:redshift-jdbc42:2.1.0.9'; e.Sha := '';
+  TDriverRegistry.Register(e);
+  e.Id := 'exasol'; e.DriverClass := 'com.exasol.jdbc.EXADriver';
+  e.UrlTemplate := 'jdbc:exa:{host}:{port};schema={database}';
+  e.DefaultPort := 8563; e.TestQuery := 'SELECT 1';
+  e.License := 'MIT'; e.Maven := 'com.exasol:exasol-jdbc:24.1.0'; e.Sha := '';
+  TDriverRegistry.Register(e);
+  e.Id := 'monetdb'; e.DriverClass := 'nl.cwi.monetdb.jdbc.MonetDriver';
+  e.UrlTemplate := 'jdbc:monetdb://{host}:{port}/{database}';
+  e.DefaultPort := 50000; e.TestQuery := 'SELECT 1';
+  e.License := 'MPL-2.0'; e.Maven := 'org.monetdb:monetdb-jdbc:3.2'; e.Sha := '';
+  TDriverRegistry.Register(e);
+  e.Id := 'hana'; e.DriverClass := 'com.sap.db.jdbc.Driver';
+  e.UrlTemplate := 'jdbc:sap://{host}:{port}/?databaseName={database}';
+  e.DefaultPort := 30015; e.TestQuery := 'SELECT 1 FROM DUMMY';
+  e.License := 'Proprietary'; e.Maven := 'com.sap.cloud.db.jdbc:ngdbc:2.18.16'; e.Sha := '';
+  TDriverRegistry.Register(e);
 end;
 
 class procedure TDriverRegistry.Register(const E: TDriverEntry);
@@ -104,6 +198,25 @@ begin
   Result := Find(DriverId).DefaultPort;
 end;
 
+class function TDriverRegistry.IsEmbedded(const DriverId: string): Boolean;
+var
+  id: string;
+begin
+  id := LowerCase(Trim(DriverId));
+  Result := (id = 'sqlite') or (id = 'h2') or (id = 'duckdb') or
+    (id = 'derby') or (id = 'hsqldb');
+end;
+
+class function TDriverRegistry.BuiltinIds: TDriverIdArray;
+var
+  i: Integer;
+begin
+  RegisterBuiltinDrivers;
+  SetLength(Result, Length(GDrivers));
+  for i := 0 to High(GDrivers) do
+    Result[i] := GDrivers[i].Id;
+end;
+
 class function TDriverRegistry.BuildUrl(const DriverId, Host: string;
   Port: Integer; const Database: string; Extra: TStrings): string;
 var
@@ -116,7 +229,7 @@ begin
   p := Port;
   if p <= 0 then
     p := e.DefaultPort;
-  if (LowerCase(e.Id) = 'sqlite') or (LowerCase(e.Id) = 'h2') then
+  if IsEmbedded(e.Id) then
   begin
     Result := StringReplace(Result, '{database}', Database, [rfReplaceAll]);
     Exit(Result);

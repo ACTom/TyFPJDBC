@@ -18,6 +18,15 @@ begin
   if C then WriteLn('PASS ', N) else begin Inc(Fails); WriteLn('FAIL ', N); end;
 end;
 
+procedure CheckUrl(const Id, Host: string; Port: Integer; const Db, Want: string);
+begin
+  try
+    Ok('url-' + Id, TDriverRegistry.BuildUrl(Id, Host, Port, Db, nil) = Want);
+  except
+    Ok('url-' + Id, False);
+  end;
+end;
+
 var
   raised: Boolean;
   props: TStringList;
@@ -88,6 +97,29 @@ begin
   TDriverRegistry.Register(e);
   Ok('custom-driver', TDriverRegistry.BuildUrl('mydb', 'h', 0, 'd', nil) =
     'jdbc:mydb://h:1234/d');
+  CheckUrl('duckdb', '', 0, 'mem.db', 'jdbc:duckdb:mem.db');
+  CheckUrl('derby', '', 0, 'appdb', 'jdbc:derby:appdb;create=true');
+  CheckUrl('hsqldb', '', 0, 'appdb', 'jdbc:hsqldb:file:appdb');
+  CheckUrl('firebird', 'db', 0, 'app', 'jdbc:firebirdsql://db:3050/app');
+  CheckUrl('db2', 'db', 0, 'app', 'jdbc:db2://db:50000/app');
+  CheckUrl('informix', 'db', 0, 'app', 'jdbc:informix-sqli://db:9088/app');
+  CheckUrl('sybase', 'db', 0, 'app', 'jdbc:jtds:sybase://db:5000/app');
+  CheckUrl('teradata', 'db', 0, 'app', 'jdbc:teradata://db/app');
+  CheckUrl('vertica', 'db', 0, 'app', 'jdbc:vertica://db:5433/app');
+  CheckUrl('clickhouse', 'db', 0, 'app', 'jdbc:clickhouse://db:8123/app');
+  CheckUrl('trino', 'db', 0, 'app', 'jdbc:trino://db:8080/app');
+  CheckUrl('presto', 'db', 0, 'app', 'jdbc:presto://db:8080/app');
+  CheckUrl('hive', 'db', 0, 'app', 'jdbc:hive2://db:10000/app');
+  CheckUrl('snowflake', 'myacct', 0, 'app', 'jdbc:snowflake://myacct.snowflakecomputing.com/app');
+  CheckUrl('redshift', 'db', 0, 'app', 'jdbc:redshift://db:5439/app');
+  CheckUrl('exasol', 'db', 0, 'app', 'jdbc:exa:db:8563;schema=app');
+  CheckUrl('monetdb', 'db', 0, 'app', 'jdbc:monetdb://db:50000/app');
+  CheckUrl('hana', 'db', 0, 'app', 'jdbc:sap://db:30015/?databaseName=app');
+  CheckUrl('mysql', 'db', 0, 'app', 'jdbc:mysql://db:3306/app');
+  CheckUrl('mariadb', 'db', 0, 'app', 'jdbc:mariadb://db:3306/app');
+  CheckUrl('mssql', 'db', 0, 'app', 'jdbc:sqlserver://db:1433;databaseName=app');
+  CheckUrl('oracle', 'db', 0, 'app', 'jdbc:oracle:thin:@db:1521:app');
+  Ok('builtin-count', Length(TDriverRegistry.BuiltinIds) >= 25);
 
   WriteLn('TOTAL fails=', Fails);
   if Fails > 0 then Halt(1);

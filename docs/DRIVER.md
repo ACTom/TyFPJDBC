@@ -7,7 +7,8 @@
 
 ## 内置驱动
 
-`src/core/TyFPJDBC.Driver.Registry.pas`（`RegisterBuiltinDrivers`）：
+`src/core/TyFPJDBC.Driver.Registry.pas`（`RegisterBuiltinDrivers`）与
+`configs/drivers.json` 同增同减（25 条），`mautool --list` 应输出 25 行：
 
 | id | driverClass | urlTemplate | 默认端口 | 许可 |
 |---|---|---|---|---|
@@ -18,9 +19,41 @@
 | oracle | oracle.jdbc.OracleDriver | jdbc:oracle:thin:@{host}:{port}:{database} | 1521 | OTN |
 | sqlite | org.sqlite.JDBC | jdbc:sqlite:{database} | 0 | Apache-2.0 |
 | h2 | org.h2.Driver | jdbc:h2:mem:{database} | 0 | MPL-2.0 |
+| duckdb | org.duckdb.DuckDBDriver | jdbc:duckdb:{database} | 0 | MIT |
+| derby | org.apache.derby.jdbc.EmbeddedDriver | jdbc:derby:{database};create=true | 0 | Apache-2.0 |
+| hsqldb | org.hsqldb.jdbc.JDBCDriver | jdbc:hsqldb:file:{database} | 0 | BSD-3-Clause |
+| firebird | org.firebirdsql.jdbc.FBDriver | jdbc:firebirdsql://{host}:{port}/{database} | 3050 | IPL-1.0 |
+| db2 | com.ibm.db2.jcc.DB2Driver | jdbc:db2://{host}:{port}/{database} | 50000 | Proprietary |
+| informix | com.informix.jdbc.IfxDriver | jdbc:informix-sqli://{host}:{port}/{database} | 9088 | Proprietary |
+| sybase | net.sourceforge.jtds.jdbc.Driver | jdbc:jtds:sybase://{host}:{port}/{database} | 5000 | LGPL-2.1 |
+| teradata | com.teradata.jdbc.TeraDriver | jdbc:teradata://{host}/{database} | 1025 | Proprietary |
+| vertica | com.vertica.jdbc.Driver | jdbc:vertica://{host}:{port}/{database} | 5433 | Proprietary |
+| clickhouse | com.clickhouse.jdbc.ClickHouseDriver | jdbc:clickhouse://{host}:{port}/{database} | 8123 | Apache-2.0 |
+| trino | io.trino.jdbc.TrinoDriver | jdbc:trino://{host}:{port}/{database} | 8080 | Apache-2.0 |
+| presto | com.facebook.presto.jdbc.PrestoDriver | jdbc:presto://{host}:{port}/{database} | 8080 | Apache-2.0 |
+| hive | org.apache.hive.jdbc.HiveDriver | jdbc:hive2://{host}:{port}/{database} | 10000 | Apache-2.0 |
+| snowflake | net.snowflake.client.jdbc.SnowflakeDriver | jdbc:snowflake://{host}.snowflakecomputing.com/{database} | 443 | Apache-2.0 |
+| redshift | com.amazon.redshift.jdbc42.Driver | jdbc:redshift://{host}:{port}/{database} | 5439 | Apache-2.0 |
+| exasol | com.exasol.jdbc.EXADriver | jdbc:exa:{host}:{port};schema={database} | 8563 | MIT |
+| monetdb | nl.cwi.monetdb.jdbc.MonetDriver | jdbc:monetdb://{host}:{port}/{database} | 50000 | Apache-2.0 |
+| hana | com.sap.db.jdbc.Driver | jdbc:sap://{host}:{port}/?databaseName={database} | 30015 | Proprietary |
 
-`TestDialect` 断言：未知驱动抛 `08000`；`sqlite`/`h2` 只替换 `{database}`；
-`mssql` 的 `Extra` 用 `;` 连接，其余用 `?k=v&...`。
+maven 版本为尽力值（以中央仓库为准；改 `drivers.json` 即生效，无需改代码；
+无 `sha1` 的条目下载时走上游 `.sha1` 实时取）。
+
+wire 协议兼容别名（不用新条目，走已有条目即可）：
+CockroachDB/Yugabyte/Timescale/QuestDB/CrateDB → `postgresql` 条目；
+StarRocks/OceanBase/TiDB → `mysql` 条目；Spark SQL → `hive` 条目。
+25 条 + 8 别名 = 33 个可连名。
+
+不收录：BigQuery/Athena（REST 式 URL 不合 `host/port/database` 模板）、
+Cassandra/Couchbase（非 SQL wire 语义不同）、Netezza/Greenplum/Phoenix
+（无公开 maven 构件或已停更）。要加走 `TDriverRegistry.Register` 自定义，
+`TestDialect` 的 `custom-driver` 即该路径断言。
+
+`TestDialect` 断言：未知驱动抛 `08000`；嵌入式（sqlite/h2/duckdb/derby/hsqldb）
+只替换 `{database}`；`mssql` 的 `Extra` 用 `;` 连接，其余用 `?k=v&...`；
+`BuiltinIds` 数量 `>= 25`。
 
 ## 配置（TJDBCConfig，唯一入口）
 
