@@ -84,6 +84,43 @@ foreach ($pg in @("pg","mysql","mssql","oracle")) {
   Write-Output ("SKIP-MATRIX: " + $pg + " no local server (env-missing, dialect asserts cover SQL shape)")
 }
 
+Section "live-pg-mysql"
+# Per-database semantic baseline (H2 + SQLite always; PG/MySQL only with a
+# container runtime). No docker here = honest SKIP, never faked.
+$semExe = Join-Path $bin "testsemantic.exe"
+fpc "-FU$units" "-Fu$ws\src\core" "-Fu$ws\src\db" "-o$semExe" "$ws\tests\TestSemantic.lpr" 2>&1
+Check "semantic-compile" ($LASTEXITCODE -eq 0)
+$sout = & $semExe $jm (Join-Path $work "semantic") 2>&1 | Out-String
+Write-Output $sout
+Check "semantic-fails-0" ($sout -match "TOTAL fails=0")
+if ($sout -cmatch "(?m)^FAIL ") { Check "semantic-no-fail-lines" $false } else { Check "semantic-no-fail-lines" $true }
+Check "semantic-h2-baseline" (Test-Path (Join-Path $work "semantic/baseline-h2.txt"))
+Check "semantic-sqlite-baseline" (Test-Path (Join-Path $work "semantic/baseline-sqlite.txt"))
+$hasDocker = (Get-Command docker -ErrorAction SilentlyContinue) -ne $null
+if (-not $hasDocker) {
+  Write-Output "SKIP-MATRIX: pg no container runtime (env-missing)"
+  Write-Output "SKIP-MATRIX: mysql no driver manifest, no container runtime (env-missing)"
+  Check "pg-mysql-skip-documented" $true
+} else {
+  $pgJarOut = & $mautool --driver postgresql --out $libs 2>&1 | Out-String
+  Write-Output $pgJarOut
+  Check "pg-jar-fetched" ($pgJarOut -match "checksum: VERIFIED")
+  docker compose -f "$ws\scripts\compose-db.yml" up -d 2>&1
+  Start-Sleep -Seconds 15
+  try {
+    $env:TJDBC_PG_URL = "jdbc:postgresql://localhost:5433/tyfpjdbc"
+    $env:TJDBC_PG_JAR = Join-Path $libs "postgresql-42.7.4.jar"
+    $pout = & $semExe $jm (Join-Path $work "semantic-pg") 2>&1 | Out-String
+    Write-Output $pout
+    Check "semantic-pg" (($pout -match "TOTAL fails=0") -and (Test-Path (Join-Path $work "semantic-pg/baseline-pg.txt")))
+  } finally {
+    Remove-Item Env:TJDBC_PG_URL -ErrorAction SilentlyContinue
+    Remove-Item Env:TJDBC_PG_JAR -ErrorAction SilentlyContinue
+    docker compose -f "$ws\scripts\compose-db.yml" down 2>&1
+  }
+  Write-Output "SKIP-MATRIX: mysql no driver manifest (env-missing, pg covers server semantics)"
+}
+
 Section "tiers-shipped-live-path"
 # Tiers on the SHIPPED live path (Pascal -> JNI -> Bridge -> sqlite file DB).
 # 10k/100k run in-matrix; the 1M tier is covered by the 3x scratch perf.log
