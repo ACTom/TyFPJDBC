@@ -19,6 +19,7 @@ type
     procedure BuildFields(AQuery: TBufDataset; Names, TypeNames: TStrings);
     procedure FillField(F: TField; const U: UTF8String);
     procedure FillWindow(AQuery: TBufDataset; const Rows: TJdbcRows);
+    procedure FillPage(AQuery: TBufDataset; const Page: TFetchPage);
     function CollectRow(AQuery: TBufDataset): TBoundRow;
   end;
 
@@ -148,6 +149,7 @@ procedure TDatasetAdapter.FillWindow(AQuery: TBufDataset; const Rows: TJdbcRows)
 var
   r, c: Integer;
 begin
+  { Legacy: conflates empty with NULL; new code uses FillPage. }
   for r := 0 to High(Rows) do
   begin
     AQuery.Append;
@@ -163,6 +165,28 @@ begin
         end
         else
           FillField(AQuery.Fields[c], Rows[r][c]);
+      end;
+    AQuery.Post;
+  end;
+end;
+
+procedure TDatasetAdapter.FillPage(AQuery: TBufDataset; const Page: TFetchPage);
+var
+  r, c: Integer;
+  isNull: Boolean;
+begin
+  for r := 0 to High(Page.Rows) do
+  begin
+    AQuery.Append;
+    for c := 0 to AQuery.FieldCount - 1 do
+      if c <= High(Page.Rows[r]) then
+      begin
+        isNull := (r <= High(Page.Nulls)) and (c <= High(Page.Nulls[r])) and
+          Page.Nulls[r][c];
+        if isNull then
+          AQuery.Fields[c].Clear
+        else
+          FillField(AQuery.Fields[c], Page.Rows[r][c]);
       end;
     AQuery.Post;
   end;

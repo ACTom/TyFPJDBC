@@ -42,6 +42,7 @@ public class Bridge {
     ResultSet rs;
     ResultSetMetaData meta;
     int pos;
+    boolean[][] lastNulls;
   }
 
   public String getVersion() { return VERSION; }
@@ -519,51 +520,63 @@ public class Bridge {
       int[] codes = new int[cols];
       for (int i = 1; i <= cols; i++) codes[i - 1] = c.meta.getColumnType(i);
       List<String[]> rows = new ArrayList<>();
+      List<boolean[]> nulls = new ArrayList<>();
       int n = 0;
       while (n < size && c.rs.next()) {
         String[] r = new String[cols];
+        boolean[] nb = new boolean[cols];
         for (int i = 1; i <= cols; i++) {
           String v;
+          boolean wasNull;
           switch (codes[i - 1]) {
             case Types.BIGINT: {
-              long lv = c.rs.getLong(i); v = c.rs.wasNull() ? null : Long.toString(lv); break;
+              long lv = c.rs.getLong(i); wasNull = c.rs.wasNull(); v = wasNull ? null : Long.toString(lv); break;
             }
             case Types.INTEGER: case Types.SMALLINT: case Types.TINYINT: {
-              int iv = c.rs.getInt(i); v = c.rs.wasNull() ? null : Integer.toString(iv); break;
+              int iv = c.rs.getInt(i); wasNull = c.rs.wasNull(); v = wasNull ? null : Integer.toString(iv); break;
             }
             case Types.NUMERIC: case Types.DECIMAL: {
-              BigDecimal bd = c.rs.getBigDecimal(i); v = (bd == null) ? null : bd.toPlainString(); break;
+              BigDecimal bd = c.rs.getBigDecimal(i); wasNull = (bd == null); v = wasNull ? null : bd.toPlainString(); break;
             }
             case Types.FLOAT: case Types.REAL: case Types.DOUBLE: {
-              double dv = c.rs.getDouble(i); v = c.rs.wasNull() ? null : Double.toString(dv); break;
+              double dv = c.rs.getDouble(i); wasNull = c.rs.wasNull(); v = wasNull ? null : Double.toString(dv); break;
             }
             case Types.BOOLEAN: case Types.BIT: {
-              boolean bv = c.rs.getBoolean(i); v = c.rs.wasNull() ? null : (bv ? "1" : "0"); break;
+              boolean bv = c.rs.getBoolean(i); wasNull = c.rs.wasNull(); v = wasNull ? null : (bv ? "1" : "0"); break;
             }
             case Types.DATE: {
-              java.sql.Date d = c.rs.getDate(i); v = (d == null) ? null : d.toString(); break;
+              java.sql.Date d = c.rs.getDate(i); wasNull = (d == null); v = wasNull ? null : d.toString(); break;
             }
             case Types.TIME: {
-              Time t = c.rs.getTime(i); v = (t == null) ? null : t.toString(); break;
+              Time t = c.rs.getTime(i); wasNull = (t == null); v = wasNull ? null : t.toString(); break;
             }
             case Types.TIMESTAMP: {
-              Timestamp ts = c.rs.getTimestamp(i); v = (ts == null) ? null : ts.toString(); break;
+              Timestamp ts = c.rs.getTimestamp(i); wasNull = (ts == null); v = wasNull ? null : ts.toString(); break;
             }
             case Types.BINARY: case Types.VARBINARY: case Types.LONGVARBINARY: case Types.BLOB: {
-              byte[] by = c.rs.getBytes(i); v = (by == null) ? null : ("<blob:" + by.length + ">"); break;
+              byte[] by = c.rs.getBytes(i); wasNull = (by == null); v = wasNull ? null : ("<blob:" + by.length + ">"); break;
             }
             default: {
-              String sv = c.rs.getString(i); v = c.rs.wasNull() ? null : sv; break;
+              String sv = c.rs.getString(i); wasNull = c.rs.wasNull(); v = wasNull ? null : sv; break;
             }
           }
           r[i - 1] = v;
+          nb[i - 1] = wasNull;
         }
         rows.add(r);
+        nulls.add(nb);
         n++;
         c.pos++;
       }
+      c.lastNulls = nulls.toArray(new boolean[0][]);
       return rows.toArray(new String[0][]);
     } catch (SQLException e) { recordChain(e); throw e; }
+  }
+
+  public boolean[][] fetchLastNulls(long cursorId) throws SQLException {
+    CursorBox c = needCursor(cursorId);
+    if (c.lastNulls == null) return new boolean[0][];
+    return c.lastNulls;
   }
 
   public void closeCursor(long cursorId) {

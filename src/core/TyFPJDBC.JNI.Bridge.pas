@@ -8,6 +8,15 @@ type
   TJdbcRow = array of UTF8String;
   TJdbcRows = array of TJdbcRow;
   TIntArray = array of LongInt;
+  TNullMatrix = array of array of Boolean;
+
+  { Window page: strings plus the NULL bitmap from fetchLastNulls.
+    Rows[i][j] = '' with Nulls[i][j] = False means a real empty string;
+    Nulls[i][j] = True means SQL NULL regardless of the string cell. }
+  TFetchPage = record
+    Rows: TJdbcRows;
+    Nulls: TNullMatrix;
+  end;
 
   { Config mirror of tyfpjdbc.PoolCfg: shipped to Java via createPoolFlat so
     Pascal never builds Java objects field-by-field over JNI. }
@@ -46,7 +55,7 @@ type
     FMRegisterOut, FMExecProc, FMGetOut: jmethodID;
     FMCancel, FMCloseStmt: jmethodID;
     FMQueryOpen, FMCursorCols, FMCursorNames, FMCursorTypeNames, FMCursorTypeCodes: jmethodID;
-    FMFetchWindow, FMCloseCursor: jmethodID;
+    FMFetchWindow, FMFetchNulls, FMCloseCursor: jmethodID;
     FMGetTables, FMGetColumns, FMGetPKs: jmethodID;
     FMWriteBlob, FMFetchBlob: jmethodID;
     FMPoolActive, FMPoolIdle, FMPoolWaiting, FMPoolLeak: jmethodID;
@@ -69,6 +78,7 @@ type
     function CallStrArray1(M: jmethodID; A: jlong): TStringList;
     function CallStrMatrix(M: jmethodID; A: jlong; const S: UTF8String): TJdbcRows;
     function CallWindow(M: jmethodID; A: jlong; Size: Integer): TJdbcRows;
+    function CallBoolMatrix(M: jmethodID; A: jlong): TNullMatrix;
     function CallBytes(M: jmethodID; A: jlong; const S: UTF8String): TBytes;
   public
     constructor Create;
@@ -119,6 +129,8 @@ type
     function CursorTypeNames(CursorId: Int64): TStringList;
     function CursorTypeCodes(CursorId: Int64): TIntArray;
     function FetchWindow(CursorId: Int64; Size: Integer): TJdbcRows;
+    function FetchLastNulls(CursorId: Int64): TNullMatrix;
+    function FetchPage(CursorId: Int64; Size: Integer): TFetchPage;
     procedure CloseCursor(CursorId: Int64);
     function GetTables(ConnId: Int64; const Table: UTF8String): TJdbcRows;
     function GetColumns(ConnId: Int64; const Table: UTF8String): TJdbcRows;
@@ -698,6 +710,7 @@ begin
   FMCursorTypeNames := Mid('cursorTypeNames', '(J)[Ljava/lang/String;');
   FMCursorTypeCodes := Mid('cursorTypeCodes', '(J)[I');
   FMFetchWindow := Mid('fetchWindow', '(JI)[[Ljava/lang/String;');
+  FMFetchNulls := Mid('fetchLastNulls', '(J)[[Z');
   FMCloseCursor := Mid('closeCursor', '(J)V');
   FMGetTables := Mid('getTables', '(JLjava/lang/String;)[[Ljava/lang/String;');
   FMGetColumns := Mid('getColumns', '(JLjava/lang/String;)[[Ljava/lang/String;');
@@ -1258,9 +1271,72 @@ begin
   end;
 end;
 
+function TBridge.CallBoolMatrix(M: jmethodID; A: jlong): TNullMatrix;
+var
+  e: PJNIEnv;
+  args: array[0..0] of jvalue;
+  outer, inner: jobjectArray;
+  nr, nc, i, j: Integer;
+  elems: PByte;
+  isCopy: jboolean;
+begin
+  SetLength(Result, 0);
+  CheckHandle('cursor', A);
+  e := TJVMManager.GetJNIEnv;
+  FillChar(args, SizeOf(args), 0);
+  args[0].j := A;
+  outer := jobjectArray(e^^.CallObjectMethodA(e, FObj, M, @args[0]));
+  CheckJ('fetchnulls');
+  if outer = nil then
+    Exit;
+  try
+    nr := e^^.GetArrayLength(e, outer);
+    CheckJ('nulllen');
+    SetLength(Result, nr);
+    for i := 0 to nr - 1 do
+    begin
+      inner := jobjectArray(e^^.GetObjectArrayElement(e, outer, i));
+      CheckJ('nullrow');
+      try
+        if inner = nil then
+        begin
+          SetLength(Result[i], 0);
+          Continue;
+        end;
+        nc := e^^.GetArrayLength(e, inner);
+        SetLength(Result[i], nc);
+        isCopy := 0;
+        elems := PByte(e^^.GetBooleanArrayElements(e, jbooleanArray(inner), isCopy));
+        CheckJ('nullelems');
+        try
+          for j := 0 to nc - 1 do
+            Result[i][j] := elems[j] <> 0;
+        finally
+          e^^.ReleaseBooleanArrayElements(e, jbooleanArray(inner), elems, JNI_ABORT);
+        end;
+      finally
+        e^^.DeleteLocalRef(e, inner);
+      end;
+    end;
+  finally
+    e^^.DeleteLocalRef(e, outer);
+  end;
+end;
+
 function TBridge.FetchWindow(CursorId: Int64; Size: Integer): TJdbcRows;
 begin
   Result := CallWindow(FMFetchWindow, CursorId, Size);
+end;
+
+function TBridge.FetchLastNulls(CursorId: Int64): TNullMatrix;
+begin
+  Result := CallBoolMatrix(FMFetchNulls, CursorId);
+end;
+
+function TBridge.FetchPage(CursorId: Int64; Size: Integer): TFetchPage;
+begin
+  Result.Rows := CallWindow(FMFetchWindow, CursorId, Size);
+  Result.Nulls := CallBoolMatrix(FMFetchNulls, CursorId);
 end;
 
 procedure TBridge.CloseCursor(CursorId: Int64);
