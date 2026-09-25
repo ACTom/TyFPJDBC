@@ -1,6 +1,7 @@
 # Examples
 
-每个用法至少一个可运行示例。FPC 示例用 `fpc -Fu src/core -Fu src/db` 编译；
+每个用法至少一个可运行示例。FPC 示例用 `fpc -Fu src/core -Fu src/db -FUtest-results/work/units` 编译
+（`.o`/`.ppu` 单元产物进 `test-results/work/units`，不落源码旁；`exe` 进 `test-results/bin`）；
 `ex01` 需要 `sqlite3.dll` 在 exe 旁边（`C:\Tools\sqlite3.dll` 有一份）。
 Java 示例用 `javac -cp <bridge jars>` 编译。
 
@@ -22,15 +23,15 @@ Java 示例用 `javac -cp <bridge jars>` 编译。
 
 ```powershell
 # 单个示例
-fpc -Fusrc/core -Fusrc/db -oex01.exe examples/ex01_connect_select.lpr
-Copy-Item C:\Tools\sqlite3.dll . -Force  # 仅 ex01 需要
-.\ex01.exe
+fpc -Fusrc/core -Fusrc/db -FUtest-results/work/units -otest-results/bin/ex01.exe examples/ex01_connect_select.lpr
+Copy-Item C:\Tools\sqlite3.dll test-results/bin -Force  # 仅 ex01 需要
+.\test-results\bin\ex01.exe
 # 图形化示例（LCL 工程）
 lazbuild examples/ex09_dbgrid/ex09_dbgrid.lpi
 .\test-results\bin\ex09\ex09_dbgrid.exe
 # V2 示例（需 H2/JVM，classesDir 指向已编译 BridgeV2）
-fpc -Fusrc/core -Fusrc/db -oex11.exe examples/ex11_code_first.lpr
-fpc -Fusrc/core -Fusrc/db -oex12.exe examples/ex12_dbgrid.lpr
+fpc -Fusrc/core -Fusrc/db -FUtest-results/work/units -otest-results/bin/ex11.exe examples/ex11_code_first.lpr
+fpc -Fusrc/core -Fusrc/db -FUtest-results/work/units -otest-results/bin/ex12.exe examples/ex12_dbgrid.lpr
 # Java
 $cp="C:\Tools\tyfpjdbc-libs\HikariCP-5.1.0.jar;C:\Tools\tyfpjdbc-libs\slf4j-api-2.0.9.jar;C:\Tools\tyfpjdbc-libs\h2-2.2.224.jar"
 & "$jh\bin\javac.exe" -cp $cp -d out examples/BridgeDemo.java java/bridge/src/main/java/tyfpjdbc/Bridge.java

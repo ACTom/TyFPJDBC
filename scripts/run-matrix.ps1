@@ -13,7 +13,11 @@ $libs = "C:\Tools\tyfpjdbc-libs"
 $rtZips = "D:\Projects\TyFPJDBC-Runtimes\zips"
 $bin = Join-Path $ws ($OutDir + "/bin")
 $work = Join-Path $ws ($OutDir + "/work")
-New-Item -ItemType Directory -Force -Path $bin,$work | Out-Null
+# Unit output (.o/.ppu) goes here, never next to sources: every fpc call
+# below passes -FU$units, and the dir is wiped for hermetic rebuilds.
+$units = Join-Path $work "units"
+Remove-Item $units -Recurse -Force -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force -Path $bin,$work,$units | Out-Null
 Set-Location $ws
 Copy-Item C:\Tools\sqlite3.dll (Join-Path $bin "sqlite3.dll") -Force
 
@@ -22,7 +26,7 @@ Section "guard"
 Check "guard-exit-0" ($?)
 
 Section "mautool-build"
-fpc "-o$bin\mautool.exe" "$ws\src\tools\mautool.lpr" 2>&1
+fpc "-FU$units" "-o$bin\mautool.exe" "$ws\src\tools\mautool.lpr" 2>&1
 Check "mautool-compile" ($LASTEXITCODE -eq 0)
 $mautool = Join-Path $bin "mautool.exe"
 
@@ -42,7 +46,7 @@ foreach ($t in @("TestParser","TestTypeMap","TestQuery","TestBridge","TestPoolDa
   $lpr = Join-Path $ws ("tests\" + $t + ".lpr")
   $extraFu = @()
   if ($t -eq "TestLiveGrid") { $extraFu = @("-Fu$ws\examples\ex09_dbgrid") }
-  fpc "-Fu$ws\src\core" "-Fu$ws\src\db" @extraFu "-o$exe" $lpr 2>&1
+  fpc "-FU$units" "-Fu$ws\src\core" "-Fu$ws\src\db" @extraFu "-o$exe" $lpr 2>&1
   Check "$t-compile" ($LASTEXITCODE -eq 0)
   if (($t -eq "TestLiveBridge") -or ($t -eq "TestLiveGrid")) {
     $liveOut = Join-Path $work ($t.ToLower() + ".dbdir")
@@ -100,7 +104,7 @@ Section "perf-tiers-shipped-live-path"
 # 10k/100k run in-matrix; the 1M tier is covered by the 3x scratch perf.log
 # runs (acceptance evidence) because a single 1M scan already takes ~2min.
 $tiersExe = Join-Path $bin "testperftiers.exe"
-fpc "-Fu$ws\src\core" "-Fu$ws\src\db" "-o$tiersExe" "$ws\tests\TestPerfTiers.lpr" 2>&1
+fpc "-FU$units" "-Fu$ws\src\core" "-Fu$ws\src\db" "-o$tiersExe" "$ws\tests\TestPerfTiers.lpr" 2>&1
 Check "perf-tiers-compile" ($LASTEXITCODE -eq 0)
 $tout = & $tiersExe $jm (Join-Path $work "tiers") 1 skip1M 2>&1 | Out-String
 Write-Output $tout
@@ -114,7 +118,7 @@ Section "perf-compare-sqlite-vs-bridge-20k"
 # Same workload, same 20k rows, separate file DBs. Pool/connect + warmup run
 # BEFORE the timers on both sides, so JVM/Hikari startup is never counted.
 $perfExe = Join-Path $bin "testperfcompare.exe"
-fpc "-Fu$ws\src\core" "-Fu$ws\src\db" "-o$perfExe" "$ws\tests\TestPerfCompare.lpr" 2>&1
+fpc "-FU$units" "-Fu$ws\src\core" "-Fu$ws\src\db" "-o$perfExe" "$ws\tests\TestPerfCompare.lpr" 2>&1
 Check "perf-fpc-compile" ($LASTEXITCODE -eq 0)
 $fout = & $perfExe (Join-Path $work "perf-fpc.db") 20000 2>&1 | Out-String
 Write-Output $fout
@@ -137,9 +141,9 @@ Section "examples-compile-run"
 foreach ($e in @("ex01_connect_select","ex02_named_params","ex03_batch_fetch","ex04_edit_apply","ex05_transaction","ex06_blob_stream","ex07_script_migrate","ex08_pool_stats","ex10_json_config")) {
   $exe = Join-Path $bin ($e + ".exe")
   if ($e -eq "ex10_json_config") {
-    fpc "-o$exe" (Join-Path $ws ("examples\" + $e + ".lpr")) 2>&1
+    fpc "-FU$units" "-o$exe" (Join-Path $ws ("examples\" + $e + ".lpr")) 2>&1
   } else {
-    fpc "-Fu$ws\src\core" "-Fu$ws\src\db" "-o$exe" (Join-Path $ws ("examples\" + $e + ".lpr")) 2>&1
+    fpc "-FU$units" "-Fu$ws\src\core" "-Fu$ws\src\db" "-o$exe" (Join-Path $ws ("examples\" + $e + ".lpr")) 2>&1
   }
   Check "$e-compile" ($LASTEXITCODE -eq 0)
   if ($e -eq "ex10_json_config") {
@@ -248,9 +252,9 @@ foreach ($t in @("TestV2Handles","TestV2Jvm","TestV2Engine","TestV2Data","TestV2
   $exe = Join-Path $bin ($t.ToLower() + ".exe")
   $lpr = Join-Path $ws ("tests\" + $t + ".lpr")
   if ($t -eq "TestV2Lcl") {
-    fpc "-Fu$ws\src\core" "-Fu$ws\src\db" "-Fu$ws\src\lcl" "-o$exe" $lpr 2>&1
+    fpc "-FU$units" "-Fu$ws\src\core" "-Fu$ws\src\db" "-Fu$ws\src\lcl" "-o$exe" $lpr 2>&1
   } else {
-    fpc "-Fu$ws\src\core" "-Fu$ws\src\db" "-o$exe" $lpr 2>&1
+    fpc "-FU$units" "-Fu$ws\src\core" "-Fu$ws\src\db" "-o$exe" $lpr 2>&1
   }
   Check "$t-compile" ($LASTEXITCODE -eq 0)
   if ($t -eq "TestV2Handles") { $o = & $exe 2>&1 | Out-String }
@@ -269,7 +273,7 @@ foreach ($pg in @("pg","mysql","mssql","oracle")) {
 Section "v2-examples-lpk"
 foreach ($e in @("ex11_code_first","ex12_dbgrid")) {
   $exe = Join-Path $bin ($e + ".exe")
-  fpc "-Fu$ws\src\core" "-Fu$ws\src\db" "-o$exe" (Join-Path $ws ("examples\" + $e + ".lpr")) 2>&1
+  fpc "-FU$units" "-Fu$ws\src\core" "-Fu$ws\src\db" "-o$exe" (Join-Path $ws ("examples\" + $e + ".lpr")) 2>&1
   Check "$e-compile" ($LASTEXITCODE -eq 0)
   $o = & $exe $jv2 2>&1 | Out-String
   Write-Output $o
