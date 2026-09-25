@@ -54,7 +54,7 @@ foreach ($t in @("TestRewrite","TestTypes","TestRealWorld")) {
   $out = & $exe 2>&1 | Out-String
   Write-Output $out
   if ($t -eq "TestRewrite") { Check "$t-61-0" ($out -match "TOTAL pass=61 fail=0") }
-  if ($t -eq "TestTypes") { Check "$t-50-0" ($out -match "TOTAL pass=50 fail=0") }
+  if ($t -eq "TestTypes") { Check "$t-62-0" ($out -match "TOTAL pass=62 fail=0") }
   if ($t -eq "TestRealWorld") { Check "$t-88-0" ($out -match "TOTAL pass=88 fail=0") }
   if ($out -cmatch "FAIL") { Check "$t-no-fail-lines" $false } else { Check "$t-no-fail-lines" $true }
 }
@@ -120,6 +120,18 @@ if (-not $hasDocker) {
   }
   Write-Output "SKIP-MATRIX: mysql no driver manifest (env-missing, pg covers server semantics)"
 }
+
+Section "binding-matrix"
+# Field-binding matrix: H2/SQLite always, PG/MySQL when reachable (test SKIPs per-DB).
+$bindExe = Join-Path $bin "testbinding.exe"
+fpc "-FU$units" "-Fu$ws\src\core" "-Fu$ws\src\db" "-o$bindExe" "$ws\tests\TestBinding.lpr" 2>&1
+Check "binding-compile" ($LASTEXITCODE -eq 0)
+$bout = & $bindExe $jm (Join-Path $work "binding") 2>&1 | Out-String
+Write-Output $bout
+Check "binding-fails-0" ($bout -match "TOTAL fails=0")
+if ($bout -cmatch "(?m)^FAIL ") { Check "binding-no-fail-lines" $false } else { Check "binding-no-fail-lines" $true }
+Check "binding-null-split" (($bout -match "empty-not-null") -and ($bout -match "null-is-null"))
+Check "binding-blob" ($bout -match "blob-twice")
 
 Section "tiers-shipped-live-path"
 # Tiers on the SHIPPED live path (Pascal -> JNI -> Bridge -> sqlite file DB).

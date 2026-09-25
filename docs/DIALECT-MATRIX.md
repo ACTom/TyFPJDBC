@@ -39,6 +39,19 @@ H2 建 `SemFold` 读回 `SEMFOLD`；SQLite 读回 `SemFold`。创表与查询大
 语义基线（`genkeys` 行）：H2 `1,2`；SQLite `1,2`；插入后回填键逐一重查一致，
 PG/MySQL 待容器补行。
 
+## 绑定契约（TestBinding 锁死）
+
+| 类型 | canonical form | NULL | 非法值 |
+|---|---|---|---|
+| 整数/长整数 | 十进制串，极值原样 | 独立位，空串不混 | 溢出按驱动错链分类 |
+| Double/BigDec | `Double.toString`/`toPlainString` | 独立位 | 坏 BigDecimal `HY092/43` |
+| 串/CJK | UTF-8 原样 | 空串≠NULL | — |
+| 日期/时间戳 | `yyyy-mm-dd[ hh:nn:ss]` | 独立位 | 坏日期 `HY092/43` 带原文 |
+| 布尔 | 写 `0/1`，读 `1/0` 归一 | 独立位 | — |
+| BLOB | 窗口长度占位 + `fetchBlob` 内容两次一致 | 0 字节与 NULL 分开 | — |
+
+大小写折叠：H2 全大写、SQLite 原样、PG/MySQL 全小写（`TestBinding` 建表全小写）。
+
 ## 错误与超时采样
 
 `TestSemantic` 的 `error-state` 行记录坏语句的 `SQLState`（H2/SQLite 当前为

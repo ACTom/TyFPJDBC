@@ -49,7 +49,7 @@ type
     FMSetAutoCommit, FMCommit, FMRollback, FMSavepoint, FMRollbackTo, FMReleaseSp: jmethodID;
     FMSetReadOnly, FMSetCatalog, FMSetSchema, FMSetIsolation, FMIsValid, FMDbMeta: jmethodID;
     FMPrepare, FMPrepareCall, FMSetTimeout: jmethodID;
-    FMBindLong, FMBindDouble, FMBindBD, FMBindStr, FMBindDate, FMBindTime: jmethodID;
+    FMBindLong, FMBindDouble, FMBindBool, FMBindBD, FMBindStr, FMBindDate, FMBindTime: jmethodID;
     FMBindTS, FMBindBytes, FMBindNull, FMAddBatch, FMExecUpdate, FMExecBatch: jmethodID;
     FMGenKeys, FMExecDirect, FMExecDirectTimeout: jmethodID;
     FMRegisterOut, FMExecProc, FMGetOut: jmethodID;
@@ -105,6 +105,7 @@ type
     procedure SetTimeout(StmtId: Int64; Secs: Integer);
     procedure BindLong(StmtId: Int64; Idx: Integer; V: Int64);
     procedure BindDouble(StmtId: Int64; Idx: Integer; V: Double);
+    procedure BindBoolean(StmtId: Int64; Idx: Integer; V: Boolean);
     procedure BindBigDecimal(StmtId: Int64; Idx: Integer; const V: UTF8String);
     procedure BindString(StmtId: Int64; Idx: Integer; const V: UTF8String);
     procedure BindDate(StmtId: Int64; Idx: Integer; const Iso: UTF8String);
@@ -207,7 +208,7 @@ begin
     if p > 0 then
     begin
       st := Copy(string(chain), p + 9, 5);
-      if Length(st) <> 5 then
+      if (Length(st) <> 5) or (st = 'null;') or (st = 'null') then
         st := 'HY000';
     end;
     q := Pos(';code=', string(chain));
@@ -716,6 +717,7 @@ begin
   FMSetTimeout := Mid('setTimeout', '(JI)V');
   FMBindLong := Mid('bindLong', '(JIJ)V');
   FMBindDouble := Mid('bindDouble', '(JID)V');
+  FMBindBool := Mid('bindBoolean', '(JIZ)V');
   FMBindBD := Mid('bindBigDecimal', '(JILjava/lang/String;)V');
   FMBindStr := Mid('bindString', '(JILjava/lang/String;)V');
   FMBindDate := Mid('bindDate', '(JILjava/lang/String;)V');
@@ -965,6 +967,19 @@ begin
   args[0].j := StmtId; args[1].i := Idx; args[2].d := V;
   e^^.CallVoidMethodA(e, FObj, FMBindDouble, @args[0]);
   CheckJ('bindDouble');
+end;
+
+procedure TBridge.BindBoolean(StmtId: Int64; Idx: Integer; V: Boolean);
+var
+  e: PJNIEnv;
+  args: array[0..2] of jvalue;
+begin
+  CheckHandle('stmt', StmtId);
+  e := TJVMManager.GetJNIEnv;
+  FillChar(args, SizeOf(args), 0);
+  args[0].j := StmtId; args[1].i := Idx; args[2].z := Byte(Ord(V));
+  e^^.CallVoidMethodA(e, FObj, FMBindBool, @args[0]);
+  CheckJ('bindBoolean');
 end;
 
 procedure TBridge.BindBigDecimal(StmtId: Int64; Idx: Integer; const V: UTF8String);

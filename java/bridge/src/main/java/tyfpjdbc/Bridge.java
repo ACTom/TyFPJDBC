@@ -300,6 +300,11 @@ public class Bridge {
     try { s.ps.setDouble(idx, v); } catch (SQLException e) { recordChain(e); throw e; }
   }
 
+  public void bindBoolean(long stmtId, int idx, boolean v) throws SQLException {
+    StmtBox s = needStmt(stmtId);
+    try { s.ps.setBoolean(idx, v); } catch (SQLException e) { recordChain(e); throw e; }
+  }
+
   public void bindBigDecimal(long stmtId, int idx, String v) throws SQLException {
     StmtBox s = needStmt(stmtId);
     try { s.ps.setBigDecimal(idx, new BigDecimal(v)); } catch (SQLException e) { recordChain(e); throw e; }

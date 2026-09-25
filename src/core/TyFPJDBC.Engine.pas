@@ -38,6 +38,7 @@ type
     function PoolIdle(PoolId: Int64): Integer;
     function PoolWaiting(PoolId: Int64): Integer;
     function PoolSnapshot(PoolId: Int64): string;
+    procedure ForceReset;
     property Bridge: TBridge read FBridge;
   end;
 
@@ -233,6 +234,16 @@ begin
   st := FBridge.PoolStats(PoolId);
   Result := 'active=' + IntToStr(st.Active) + ' idle=' + IntToStr(st.Idle) +
     ' waiting=' + IntToStr(st.Waiting) + ' leak=' + IntToStr(st.Leak);
+end;
+
+procedure TJdbcEngine.ForceReset;
+begin
+  { Test-only recovery after a SKIP-path failure left tracked handles
+    behind: counts return to zero, leak asserts stay honest on the next run. }
+  FPools.Clear;
+  FConns.Clear;
+  FStmts.Clear;
+  FCursors.Clear;
 end;
 
 end.

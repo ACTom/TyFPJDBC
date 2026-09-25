@@ -301,7 +301,7 @@ begin
           Result[i] := BBigDec(string(s));
         end;
       ftBoolean:
-        Result[i] := BInt(Ord(F.AsBoolean));
+        Result[i] := BBool(F.AsBoolean);
       ftDate:
         Result[i] := BDate(FormatDateTime('yyyy-mm-dd', F.AsDateTime));
       ftTime:

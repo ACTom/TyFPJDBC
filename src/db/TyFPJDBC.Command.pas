@@ -8,7 +8,7 @@ type
   { Bound value kinds mirror the typed Bridge setters. Values stay in
     canonical string form on the Pascal side; JDBC uses the typed setter. }
   TBVKind = (bvInt, bvInt64, bvDouble, bvBigDec, bvStr, bvDate, bvTime,
-    bvStamp, bvBytes, bvNull);
+    bvStamp, bvBytes, bvNull, bvBool);
 
   TBoundValue = record
     Kind: TBVKind;
@@ -17,6 +17,7 @@ type
     F64: Double;
     Bytes: TBytes;
     SqlType: Integer;
+    B: Boolean;
   end;
 
   TBoundRow = array of TBoundValue;
@@ -31,6 +32,7 @@ function BTime(const Iso: string): TBoundValue;
 function BStamp(const Iso: string): TBoundValue;
 function BBytes(const V: TBytes): TBoundValue;
 function BNull(SqlType: Integer): TBoundValue;
+function BBool(V: Boolean): TBoundValue;
 
 type
   TRewriteResult = record
@@ -244,48 +246,56 @@ function BInt(V: Integer): TBoundValue;
 begin
   Result.Kind := bvInt; Result.I64 := V; Result.F64 := 0;
   Result.S := ''; SetLength(Result.Bytes, 0); Result.SqlType := 0;
+  Result.B := False;
 end;
 
 function BInt64(V: Int64): TBoundValue;
 begin
   Result.Kind := bvInt64; Result.I64 := V; Result.F64 := 0;
   Result.S := ''; SetLength(Result.Bytes, 0); Result.SqlType := 0;
+  Result.B := False;
 end;
 
 function BDouble(V: Double): TBoundValue;
 begin
   Result.Kind := bvDouble; Result.F64 := V; Result.I64 := 0;
   Result.S := ''; SetLength(Result.Bytes, 0); Result.SqlType := 0;
+  Result.B := False;
 end;
 
 function BBigDec(const V: string): TBoundValue;
 begin
   Result.Kind := bvBigDec; Result.S := UTF8String(V);
   Result.I64 := 0; Result.F64 := 0; SetLength(Result.Bytes, 0); Result.SqlType := 0;
+  Result.B := False;
 end;
 
 function BStr(const V: string): TBoundValue;
 begin
   Result.Kind := bvStr; Result.S := UTF8String(V);
   Result.I64 := 0; Result.F64 := 0; SetLength(Result.Bytes, 0); Result.SqlType := 0;
+  Result.B := False;
 end;
 
 function BDate(const Iso: string): TBoundValue;
 begin
   Result.Kind := bvDate; Result.S := UTF8String(Iso);
   Result.I64 := 0; Result.F64 := 0; SetLength(Result.Bytes, 0); Result.SqlType := 0;
+  Result.B := False;
 end;
 
 function BTime(const Iso: string): TBoundValue;
 begin
   Result.Kind := bvTime; Result.S := UTF8String(Iso);
   Result.I64 := 0; Result.F64 := 0; SetLength(Result.Bytes, 0); Result.SqlType := 0;
+  Result.B := False;
 end;
 
 function BStamp(const Iso: string): TBoundValue;
 begin
   Result.Kind := bvStamp; Result.S := UTF8String(Iso);
   Result.I64 := 0; Result.F64 := 0; SetLength(Result.Bytes, 0); Result.SqlType := 0;
+  Result.B := False;
 end;
 
 function BBytes(const V: TBytes): TBoundValue;
@@ -294,6 +304,7 @@ var
 begin
   Result.Kind := bvBytes; Result.S := '';
   Result.I64 := 0; Result.F64 := 0; Result.SqlType := 0;
+  Result.B := False;
   SetLength(Result.Bytes, Length(V));
   for i := 0 to High(V) do
     Result.Bytes[i] := V[i];
@@ -303,6 +314,14 @@ function BNull(SqlType: Integer): TBoundValue;
 begin
   Result.Kind := bvNull; Result.SqlType := SqlType;
   Result.S := ''; Result.I64 := 0; Result.F64 := 0; SetLength(Result.Bytes, 0);
+  Result.B := False;
+end;
+
+function BBool(V: Boolean): TBoundValue;
+begin
+  Result.Kind := bvBool; Result.B := V;
+  Result.S := ''; Result.I64 := 0; Result.F64 := 0; SetLength(Result.Bytes, 0);
+  Result.SqlType := 0;
 end;
 
 constructor TJdbcCommand.Create(AEngine: TJdbcEngine; AConn: Int64);
@@ -374,7 +393,8 @@ begin
   b := FEngine.Bridge;
   for i := 0 to High(Row) do
     case Row[i].Kind of
-      bvInt: b.BindLong(FStmt, i + 1, Row[i].I64); // ftBoolean arrives as BInt(0/1) by CollectRow contract
+      bvInt: b.BindLong(FStmt, i + 1, Row[i].I64);
+      bvBool: b.BindBoolean(FStmt, i + 1, Row[i].B);
       bvInt64: b.BindLong(FStmt, i + 1, Row[i].I64);
       bvDouble: b.BindDouble(FStmt, i + 1, Row[i].F64);
       bvBigDec: b.BindBigDecimal(FStmt, i + 1, Row[i].S);
