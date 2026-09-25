@@ -11,7 +11,13 @@
       "extraParams": {},
       "license": "MPL-2.0",
       "sha1": "7bdade27d8cd197d9b5ce9dc251f41d2edc5f7ad",
-      "upstreamSyncVersion": "2026-09-25"
+      "upstreamSyncVersion": "2026-09-25",
+      "embedded": true,
+      "paging": "limit-offset",
+      "quote": "double",
+      "keyReturn": "none",
+      "paramSep": "&",
+      "typeAliases": {}
     },
     {
       "id": "sqlite",
@@ -24,7 +30,13 @@
       "extraParams": {},
       "license": "Apache-2.0",
       "sha1": "97ca06712e2afa8c0e551245da72280fca5474cf",
-      "upstreamSyncVersion": "2026-09-25"
+      "upstreamSyncVersion": "2026-09-25",
+      "embedded": true,
+      "paging": "limit-offset",
+      "quote": "double",
+      "keyReturn": "none",
+      "paramSep": "&",
+      "typeAliases": {}
     },
     {
       "id": "duckdb",
@@ -36,7 +48,13 @@
       "testQuery": "SELECT 1",
       "extraParams": {},
       "license": "MIT",
-      "upstreamSyncVersion": "2026-09-25"
+      "upstreamSyncVersion": "2026-09-25",
+      "embedded": true,
+      "paging": "limit-offset",
+      "quote": "double",
+      "keyReturn": "none",
+      "paramSep": "&",
+      "typeAliases": {}
     },
     {
       "id": "derby",
@@ -48,7 +66,13 @@
       "testQuery": "SELECT 1",
       "extraParams": {},
       "license": "Apache-2.0",
-      "upstreamSyncVersion": "2026-09-25"
+      "upstreamSyncVersion": "2026-09-25",
+      "embedded": true,
+      "paging": "limit-offset",
+      "quote": "double",
+      "keyReturn": "none",
+      "paramSep": "&",
+      "typeAliases": {}
     },
     {
       "id": "hsqldb",
@@ -60,7 +84,13 @@
       "testQuery": "SELECT 1",
       "extraParams": {},
       "license": "BSD-3-Clause",
-      "upstreamSyncVersion": "2026-09-25"
+      "upstreamSyncVersion": "2026-09-25",
+      "embedded": true,
+      "paging": "limit-offset",
+      "quote": "double",
+      "keyReturn": "none",
+      "paramSep": "&",
+      "typeAliases": {}
     },
     {
       "id": "firebird",
@@ -72,7 +102,13 @@
       "testQuery": "SELECT 1 FROM RDB$DATABASE",
       "extraParams": {},
       "license": "IPL-1.0",
-      "upstreamSyncVersion": "2026-09-25"
+      "upstreamSyncVersion": "2026-09-25",
+      "embedded": false,
+      "paging": "limit-offset",
+      "quote": "double",
+      "keyReturn": "none",
+      "paramSep": "&",
+      "typeAliases": {}
     },
     {
       "id": "db2",
@@ -84,7 +120,13 @@
       "testQuery": "SELECT 1 FROM SYSIBM.SYSDUMMY1",
       "extraParams": {},
       "license": "Proprietary",
-      "upstreamSyncVersion": "2026-09-25"
+      "upstreamSyncVersion": "2026-09-25",
+      "embedded": false,
+      "paging": "limit-offset",
+      "quote": "double",
+      "keyReturn": "none",
+      "paramSep": "&",
+      "typeAliases": {}
     },
     {
       "id": "informix",
@@ -96,7 +138,13 @@
       "testQuery": "SELECT 1 FROM SYSTABLES",
       "extraParams": {},
       "license": "Proprietary",
-      "upstreamSyncVersion": "2026-09-25"
+      "upstreamSyncVersion": "2026-09-25",
+      "embedded": false,
+      "paging": "limit-offset",
+      "quote": "double",
+      "keyReturn": "none",
+      "paramSep": "&",
+      "typeAliases": {}
     },
     {
       "id": "sybase",
@@ -108,7 +156,13 @@
       "testQuery": "SELECT 1",
       "extraParams": {},
       "license": "LGPL-2.1",
-      "upstreamSyncVersion": "2026-09-25"
+      "upstreamSyncVersion": "2026-09-25",
+      "embedded": false,
+      "paging": "limit-offset",
+      "quote": "double",
+      "keyReturn": "none",
+      "paramSep": "&",
+      "typeAliases": {}
     },
     {
       "id": "teradata",
@@ -120,7 +174,13 @@
       "testQuery": "SELECT 1",
       "extraParams": {},
       "license": "Proprietary",
-      "upstreamSyncVersion": "2026-09-25"
+      "upstreamSyncVersion": "2026-09-25",
+      "embedded": false,
+      "paging": "limit-offset",
+      "quote": "double",
+      "keyReturn": "none",
+      "paramSep": "&",
+      "typeAliases": {}
     },
     {
       "id": "vertica",
@@ -132,7 +192,13 @@
       "testQuery": "SELECT 1",
       "extraParams": {},
       "license": "Proprietary",
-      "upstreamSyncVersion": "2026-09-25"
+      "upstreamSyncVersion": "2026-09-25",
+      "embedded": false,
+      "paging": "limit-offset",
+      "quote": "double",
+      "keyReturn": "none",
+      "paramSep": "&",
+      "typeAliases": {}
     },
     {
       "id": "clickhouse",
@@ -144,7 +210,13 @@
       "testQuery": "SELECT 1",
       "extraParams": {},
       "license": "Apache-2.0",
-      "upstreamSyncVersion": "2026-09-25"
+      "upstreamSyncVersion": "2026-09-25",
+      "embedded": false,
+      "paging": "limit-offset",
+      "quote": "double",
+      "keyReturn": "none",
+      "paramSep": "&",
+      "typeAliases": {}
     },
     {
       "id": "trino",
@@ -156,7 +228,13 @@
       "testQuery": "SELECT 1",
       "extraParams": {},
       "license": "Apache-2.0",
-      "upstreamSyncVersion": "2026-09-25"
+      "upstreamSyncVersion": "2026-09-25",
+      "embedded": false,
+      "paging": "limit-offset",
+      "quote": "double",
+      "keyReturn": "none",
+      "paramSep": "&",
+      "typeAliases": {}
     },
     {
       "id": "presto",
@@ -168,7 +246,13 @@
       "testQuery": "SELECT 1",
       "extraParams": {},
       "license": "Apache-2.0",
-      "upstreamSyncVersion": "2026-09-25"
+      "upstreamSyncVersion": "2026-09-25",
+      "embedded": false,
+      "paging": "limit-offset",
+      "quote": "double",
+      "keyReturn": "none",
+      "paramSep": "&",
+      "typeAliases": {}
     },
     {
       "id": "hive",
@@ -180,7 +264,13 @@
       "testQuery": "SELECT 1",
       "extraParams": {},
       "license": "Apache-2.0",
-      "upstreamSyncVersion": "2026-09-25"
+      "upstreamSyncVersion": "2026-09-25",
+      "embedded": false,
+      "paging": "limit-offset",
+      "quote": "double",
+      "keyReturn": "none",
+      "paramSep": "&",
+      "typeAliases": {}
     },
     {
       "id": "snowflake",
@@ -192,7 +282,13 @@
       "testQuery": "SELECT 1",
       "extraParams": {},
       "license": "Apache-2.0",
-      "upstreamSyncVersion": "2026-09-25"
+      "upstreamSyncVersion": "2026-09-25",
+      "embedded": false,
+      "paging": "limit-offset",
+      "quote": "double",
+      "keyReturn": "none",
+      "paramSep": "&",
+      "typeAliases": {}
     },
     {
       "id": "redshift",
@@ -204,7 +300,13 @@
       "testQuery": "SELECT 1",
       "extraParams": {},
       "license": "Apache-2.0",
-      "upstreamSyncVersion": "2026-09-25"
+      "upstreamSyncVersion": "2026-09-25",
+      "embedded": false,
+      "paging": "limit-offset",
+      "quote": "double",
+      "keyReturn": "none",
+      "paramSep": "&",
+      "typeAliases": {}
     },
     {
       "id": "exasol",
@@ -216,7 +318,13 @@
       "testQuery": "SELECT 1",
       "extraParams": {},
       "license": "MIT",
-      "upstreamSyncVersion": "2026-09-25"
+      "upstreamSyncVersion": "2026-09-25",
+      "embedded": false,
+      "paging": "limit-offset",
+      "quote": "double",
+      "keyReturn": "none",
+      "paramSep": "&",
+      "typeAliases": {}
     },
     {
       "id": "monetdb",
@@ -228,7 +336,13 @@
       "testQuery": "SELECT 1",
       "extraParams": {},
       "license": "Apache-2.0",
-      "upstreamSyncVersion": "2026-09-25"
+      "upstreamSyncVersion": "2026-09-25",
+      "embedded": false,
+      "paging": "limit-offset",
+      "quote": "double",
+      "keyReturn": "none",
+      "paramSep": "&",
+      "typeAliases": {}
     },
     {
       "id": "hana",
@@ -240,7 +354,13 @@
       "testQuery": "SELECT 1 FROM DUMMY",
       "extraParams": {},
       "license": "Proprietary",
-      "upstreamSyncVersion": "2026-09-25"
+      "upstreamSyncVersion": "2026-09-25",
+      "embedded": false,
+      "paging": "limit-offset",
+      "quote": "double",
+      "keyReturn": "none",
+      "paramSep": "&",
+      "typeAliases": {}
     },
     {
       "id": "postgresql",
@@ -253,7 +373,13 @@
       "extraParams": {},
       "license": "BSD-2-Clause",
       "sha1": "264310fd7b2cd76738787dc0b9f7ea2e3b11adc1",
-      "upstreamSyncVersion": "2026-09-25"
+      "upstreamSyncVersion": "2026-09-25",
+      "embedded": false,
+      "paging": "limit-offset",
+      "quote": "double",
+      "keyReturn": "returning",
+      "paramSep": "&",
+      "typeAliases": {}
     },
     {
       "id": "mysql",
@@ -265,7 +391,13 @@
       "testQuery": "SELECT 1",
       "extraParams": {},
       "license": "GPL-2",
-      "upstreamSyncVersion": "2026-09-25"
+      "upstreamSyncVersion": "2026-09-25",
+      "embedded": false,
+      "paging": "limit-offset",
+      "quote": "backtick",
+      "keyReturn": "none",
+      "paramSep": "&",
+      "typeAliases": {}
     },
     {
       "id": "mariadb",
@@ -277,7 +409,13 @@
       "testQuery": "SELECT 1",
       "extraParams": {},
       "license": "LGPL-2.1",
-      "upstreamSyncVersion": "2026-09-25"
+      "upstreamSyncVersion": "2026-09-25",
+      "embedded": false,
+      "paging": "limit-offset",
+      "quote": "backtick",
+      "keyReturn": "none",
+      "paramSep": "&",
+      "typeAliases": {}
     },
     {
       "id": "mssql",
@@ -289,7 +427,13 @@
       "testQuery": "SELECT 1",
       "extraParams": {},
       "license": "MIT",
-      "upstreamSyncVersion": "2026-09-25"
+      "upstreamSyncVersion": "2026-09-25",
+      "embedded": false,
+      "paging": "offset-fetch-next",
+      "quote": "bracket",
+      "keyReturn": "none",
+      "paramSep": ";",
+      "typeAliases": {}
     },
     {
       "id": "oracle",
@@ -301,7 +445,13 @@
       "testQuery": "SELECT 1 FROM DUAL",
       "extraParams": {},
       "license": "OTN",
-      "upstreamSyncVersion": "2026-09-25"
+      "upstreamSyncVersion": "2026-09-25",
+      "embedded": false,
+      "paging": "offset-fetch-first",
+      "quote": "double",
+      "keyReturn": "none",
+      "paramSep": "&",
+      "typeAliases": {}
     }
   ]
 }

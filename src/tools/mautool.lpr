@@ -215,8 +215,9 @@ var
   arr: TJSONArray;
   i: Integer;
   o: TJSONObject;
-  need: array[0..7] of string = ('id', 'displayName', 'maven', 'driverClass',
-    'urlTemplate', 'testQuery', 'license', 'upstreamSyncVersion');
+  need: array[0..13] of string = ('id', 'displayName', 'maven', 'driverClass',
+    'urlTemplate', 'testQuery', 'license', 'upstreamSyncVersion',
+    'embedded', 'paging', 'quote', 'keyReturn', 'paramSep', 'typeAliases');
   k: Integer;
 begin
   j := LoadJSON(Cfg);
@@ -229,6 +230,20 @@ begin
       for k := 0 to High(need) do
         if o.Find(need[k]) = nil then
           Fail('driver[' + IntToStr(i) + '] missing ' + need[k]);
+      if (o.Strings['paging'] <> 'limit-offset') and
+        (o.Strings['paging'] <> 'offset-fetch-next') and
+        (o.Strings['paging'] <> 'offset-fetch-first') then
+        Fail('driver[' + IntToStr(i) + '] bad paging');
+      if (o.Strings['quote'] <> 'double') and
+        (o.Strings['quote'] <> 'backtick') and
+        (o.Strings['quote'] <> 'bracket') then
+        Fail('driver[' + IntToStr(i) + '] bad quote');
+      if (o.Strings['keyReturn'] <> 'none') and
+        (o.Strings['keyReturn'] <> 'returning') then
+        Fail('driver[' + IntToStr(i) + '] bad keyReturn');
+      if (o.Strings['paramSep'] <> '&') and
+        (o.Strings['paramSep'] <> ';') then
+        Fail('driver[' + IntToStr(i) + '] bad paramSep');
     end;
     WriteLn('drivers ok: ', arr.Count);
   finally

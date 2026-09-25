@@ -36,11 +36,15 @@ type
       const Database: string): string; static;
     class procedure BuildProperties(const DriverId: string; LoginTimeoutSecs,
       SocketTimeoutSecs: Integer; ReadOnly: Boolean; Dest: TStrings); static;
+    class procedure LoadStylesFromJson(const Path: string); static;
   end;
 
 procedure RegisterBuiltinDrivers;
 
 implementation
+
+uses
+  fpjson, jsonparser;
 
 var
   GDrivers: array of TDriverEntry;
@@ -329,6 +333,143 @@ class function TDriverRegistry.BuildUrlNil(const DriverId, Host: string;
   Port: Integer; const Database: string): string;
 begin
   Result := BuildUrl(DriverId, Host, Port, Database, nil);
+end;
+
+function StyleFileStr(O: TJSONObject; const K, Def: string): string;
+var
+  d: TJSONData;
+begin
+  d := O.Find(K);
+  if (d = nil) or (d.JSONType <> jtString) then
+    Exit(Def);
+  Result := d.AsString;
+end;
+
+function StyleFileBool(O: TJSONObject; const K: string; Def: Boolean): Boolean;
+var
+  d: TJSONData;
+begin
+  d := O.Find(K);
+  if (d = nil) or ((d.JSONType <> jtBoolean) and (d.JSONType <> jtNumber)) then
+    Exit(Def);
+  Result := d.AsBoolean;
+end;
+
+function PagingStyleOfFile(const S, Ctx: string): TPagingStyle;
+begin
+  if S = 'limit-offset' then Exit(psLimitOffset);
+  if S = 'offset-fetch-next' then Exit(psOffsetFetchNext);
+  if S = 'offset-fetch-first' then Exit(psOffsetFetchFirst);
+  raise EJDBCError.CreateChain('bad driver style file', 'HY000', 45, Ctx + '.paging=' + S);
+end;
+
+function QuoteStyleOfFile(const S, Ctx: string): TQuoteStyle;
+begin
+  if S = 'double' then Exit(qsDouble);
+  if S = 'backtick' then Exit(qsBacktick);
+  if S = 'bracket' then Exit(qsBracket);
+  raise EJDBCError.CreateChain('bad driver style file', 'HY000', 45, Ctx + '.quote=' + S);
+end;
+
+function KeyReturnStyleOfFile(const S, Ctx: string): TKeyReturnStyle;
+begin
+  if S = 'none' then Exit(krNone);
+  if S = 'returning' then Exit(krReturning);
+  raise EJDBCError.CreateChain('bad driver style file', 'HY000', 45, Ctx + '.keyReturn=' + S);
+end;
+
+procedure CheckAliasClass(const Cls, Ctx: string);
+begin
+  case LowerCase(Trim(Cls)) of
+    'widestring', 'widememo', 'integer', 'largeint', 'fmtbcd', 'float',
+    'boolean', 'date', 'time', 'datetime', 'blob': Exit;
+  else
+    raise EJDBCError.CreateChain('bad driver style file', 'HY000', 45, Ctx + '.typeAliases=' + Cls);
+  end;
+end;
+
+class procedure TDriverRegistry.LoadStylesFromJson(const Path: string);
+var
+  sl: TStringList;
+  j: TJSONData;
+  arr: TJSONArray;
+  i, k: Integer;
+  o, al: TJSONObject;
+  id, ctx: string;
+  e: TDriverEntry;
+  known: Boolean;
+  sep: string;
+begin
+  if not FileExists(Path) then
+    Exit;
+  sl := TStringList.Create;
+  try
+    sl.LoadFromFile(Path);
+    j := GetJSON(sl.Text);
+  finally
+    sl.Free;
+  end;
+  try
+    arr := TJSONArray(TJSONObject(j).FindPath('drivers'));
+    if arr = nil then
+      raise EJDBCError.CreateChain('bad driver style file', 'HY000', 45, Path + ': missing drivers[]');
+    for i := 0 to arr.Count - 1 do
+    begin
+      o := arr.Objects[i];
+      id := StyleFileStr(o, 'id', '');
+      ctx := Path + ': drivers[' + IntToStr(i) + ']=' + id;
+      if Trim(id) = '' then
+        raise EJDBCError.CreateChain('bad driver style file', 'HY000', 45, Path + ': drivers[' + IntToStr(i) + '] missing id');
+      known := True;
+      try
+        e := Find(id);
+      except
+        known := False;
+      end;
+      if not known then
+      begin
+        InitStyle(e);
+        e.Id := id;
+        e.DriverClass := StyleFileStr(o, 'driverClass', '');
+        e.UrlTemplate := StyleFileStr(o, 'urlTemplate', '');
+        e.DefaultPort := StrToIntDef(StyleFileStr(o, 'defaultPort', '0'), 0);
+        e.TestQuery := StyleFileStr(o, 'testQuery', 'SELECT 1');
+        e.License := StyleFileStr(o, 'license', '');
+        e.Maven := StyleFileStr(o, 'maven', '');
+        e.Sha := StyleFileStr(o, 'sha1', '');
+        if Trim(e.DriverClass) = '' then
+          raise EJDBCError.CreateChain('bad driver style file', 'HY000', 45, ctx + ' missing driverClass');
+        if Trim(e.UrlTemplate) = '' then
+          raise EJDBCError.CreateChain('bad driver style file', 'HY000', 45, ctx + ' missing urlTemplate');
+      end;
+      e.Embedded := StyleFileBool(o, 'embedded', e.Embedded);
+      if o.Find('paging') <> nil then
+        e.Paging := PagingStyleOfFile(StyleFileStr(o, 'paging', ''), ctx);
+      if o.Find('quote') <> nil then
+        e.Quote := QuoteStyleOfFile(StyleFileStr(o, 'quote', ''), ctx);
+      if o.Find('keyReturn') <> nil then
+        e.KeyReturn := KeyReturnStyleOfFile(StyleFileStr(o, 'keyReturn', ''), ctx);
+      sep := StyleFileStr(o, 'paramSep', e.ParamSep);
+      if sep = '' then
+        sep := '&';
+      if (sep <> '&') and (sep <> ';') then
+        raise EJDBCError.CreateChain('bad driver style file', 'HY000', 45, ctx + '.paramSep=' + sep);
+      e.ParamSep := sep;
+      al := TJSONObject(o.Find('typeAliases'));
+      if al <> nil then
+      begin
+        SetLength(e.TypeAliases, al.Count);
+        for k := 0 to al.Count - 1 do
+        begin
+          CheckAliasClass(al.Items[k].AsString, ctx);
+          e.TypeAliases[k] := UpperCase(Trim(al.Names[k])) + '=' + LowerCase(Trim(al.Items[k].AsString));
+        end;
+      end;
+      Register(e);
+    end;
+  finally
+    j.Free;
+  end;
 end;
 
 initialization

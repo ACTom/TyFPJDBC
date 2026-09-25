@@ -33,6 +33,8 @@ var
   e: TDriverEntry;
   ad: TDatasetAdapter;
   memo: Boolean;
+  tmp: string;
+  sl: TStringList;
 begin
   Ok('pg-page', DialectFor('postgresql').PagedSQL('SELECT * FROM t ORDER BY id', 10, 20) =
     'SELECT * FROM t ORDER BY id LIMIT 10 OFFSET 20');
@@ -149,6 +151,34 @@ begin
     Ok('alias-memo', (ad.MapTypeFor('mydb', 'mYtExT', memo) = ftWideMemo) and memo);
     Ok('alias-global-fallback', ad.MapTypeFor('mydb', 'VARCHAR', memo) = ftWideString);
     Ok('alias-unknown-driver', ad.MapTypeFor('nosuchdb', 'VARCHAR', memo) = ftWideString);
+    tmp := GetTempFileName(GetTempDir, 'tyfstyle');
+    sl := TStringList.Create;
+    try
+      sl.Text := '{"drivers": [{"id": "mydb2", "driverClass": "com.x.Driver", ' +
+        '"urlTemplate": "jdbc:x://{host}:{port}/{database}", "defaultPort": 9999, ' +
+        '"paging": "offset-fetch-first", "quote": "backtick", "keyReturn": "none", ' +
+        '"paramSep": "&", "typeAliases": {"XBIN": "blob"}}]}';
+      sl.SaveToFile(tmp);
+      TDriverRegistry.LoadStylesFromJson(tmp);
+      Ok('json-overlay-page', DialectFor('mydb2').PagedSQL('SELECT * FROM t', 10, 20) =
+        'SELECT * FROM t OFFSET 20 ROWS FETCH FIRST 10 ROWS ONLY');
+      Ok('json-overlay-quote', DialectFor('mydb2').QuoteIdent('a`b') = '`a``b`');
+      Ok('json-overlay-alias', ad.MapTypeFor('mydb2', 'XBIN', memo) = ftBlob);
+      sl.Text := '{"drivers": [{"id": "bad1", "driverClass": "com.x.D", ' +
+        '"urlTemplate": "jdbc:x:d", "paging": "sideways"}]}';
+      sl.SaveToFile(tmp);
+      raised := False;
+      try
+        TDriverRegistry.LoadStylesFromJson(tmp);
+      except
+        on E: EJDBCError do
+          raised := (E.SQLState = 'HY000') and (E.VendorCode = 45);
+      end;
+      Ok('json-bad-enum', raised);
+    finally
+      sl.Free;
+      DeleteFile(tmp);
+    end;
   finally
     ad.Free;
   end;

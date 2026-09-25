@@ -1,29 +1,29 @@
 # TyFPJDBC 方言矩阵（DIALECT-MATRIX）
 
 接口 `src/core/TyFPJDBC.Dialect.Api.pas`：`IJdbcDialect`（`PagedSQL` /
-`QuoteIdent` / `KeyReturn` / `DialectId`），`DialectFor(DriverId)` 未知抛
-`08000`。形状断言在 `tests/TestDialect.lpr`（19 项）；语义基线在
+`QuoteIdent` / `KeyReturn` / `DialectId`），实现是唯一的 `TGenericDialect`
+（`src/core/TyFPJDBC.Dialect.Base.pas`），由驱动描述的风格枚举配出；
+`DialectFor(DriverId)` 未知抛 `08000`。风格枚举与类型别名见
+`docs/superpowers/specs/2026-09-25-tyfpjdbc-generic-dialect-design.md` §2。形状断言在
+`tests/TestDialect.lpr`（含 `mydb/mydb2` 假想库零源码新增证明）；语义基线在
 `tests/TestSemantic.lpr`（H2/SQLite 常跑，PG/MySQL 有容器才跑，
 基线落 `test-results/work/semantic/baseline-<dbid>.txt`，不入库）。
 
 ## 分页
 
-| 方言 | PagedSQL('SELECT * FROM t ORDER BY id', 10, 20) | 真库执行 |
-|---|---|---|
-| postgresql（base） | `... ORDER BY id LIMIT 10 OFFSET 20` | PG 容器：`LIMIT 2 OFFSET 1` 取回 `2,3` |
-| mysql / mariadb（base） | `... ORDER BY id LIMIT 10 OFFSET 20` | 待容器（MySQL 无 manifest，当前 SKIP，PG 覆盖服务端语义） |
-| sqlite（base） | `... ORDER BY id LIMIT 10 OFFSET 20` | SQLite：`LIMIT 2 OFFSET 1` 取回 `2,3` |
-| h2（base） | `... ORDER BY id LIMIT 10 OFFSET 20` | H2：`LIMIT 2 OFFSET 1` 取回 `2,3` |
-| mssql | `... ORDER BY id OFFSET 20 ROWS FETCH NEXT 10 ROWS ONLY`（需 ORDER BY） | 形状断言，无真库 |
-| oracle（12c+） | `... ORDER BY id OFFSET 20 ROWS FETCH FIRST 10 ROWS ONLY` | 形状断言，无真库 |
+| 风格 | PagedSQL('SELECT * FROM t ORDER BY id', 10, 20) | 覆盖库 | 真库执行 |
+|---|---|---|---|
+| limit-offset | `... ORDER BY id LIMIT 10 OFFSET 20` | postgresql / mysql / mariadb / sqlite / h2 | PG 容器：`LIMIT 2 OFFSET 1` 取回 `2,3`；SQLite：`LIMIT 2 OFFSET 1` 取回 `2,3`；H2：`LIMIT 2 OFFSET 1` 取回 `2,3` |
+| offset-fetch-next | `... ORDER BY id OFFSET 20 ROWS FETCH NEXT 10 ROWS ONLY`（需 ORDER BY） | mssql | 形状断言，无真库 |
+| offset-fetch-first | `... ORDER BY id OFFSET 20 ROWS FETCH FIRST 10 ROWS ONLY` | oracle（12c+） | 形状断言，无真库 |
 
 ## 标识符引用
 
-| 方言 | 规则 | 例 |
+| 风格 | 规则 | 例 |
 |---|---|---|
-| postgresql / oracle / sqlite / h2（base） | `"` 包裹，内嵌 `"` 双写 | `weird"name` → `"weird""name"` |
-| mysql / mariadb | 反引号包裹，内嵌反引号双写 | ``weird`name`` → `` `weird``name` `` |
-| mssql | `[`...`]`，内嵌 `]` 双写 | `a]b` → `[a]]b]` |
+| double | `"` 包裹，内嵌 `"` 双写 | `weird"name` → `"weird""name"` |
+| backtick | 反引号包裹，内嵌反引号双写 | ``weird`name`` → `` `weird``name` `` |
+| bracket | `[`...`]`，内嵌 `]` 双写 | `a]b` → `[a]]b]` |
 
 大小写折叠观测（`TestSemantic` 的 `fold-observed`，JDBC 不统一、各库自有语义）：
 H2 建 `SemFold` 读回 `SEMFOLD`；SQLite 读回 `SemFold`。创表与查询大小写必须一致，
@@ -31,8 +31,8 @@ H2 建 `SemFold` 读回 `SEMFOLD`；SQLite 读回 `SemFold`。创表与查询大
 
 ## 主键回填
 
-只有 `postgresql` 实现 `KeyReturn(Table, Key) = ' RETURNING "key"'`；
-其余方言返回空串，走 `getGeneratedKeys` 路径。
+只有 `keyReturn=returning`（postgresql）配出 `KeyReturn(Table, Key) = ' RETURNING "key"'`；
+其余配出空串，走 `getGeneratedKeys` 路径。
 `TJdbcQuery.ApplyUpdates2` 当前对无 `KeyField` 表直接抛 `HY092/47`，
 拒绝无键写（`TestData` 的 `unkeyed-refused` 断言）。
 

@@ -51,8 +51,7 @@ Cassandra/Couchbase（非 SQL wire 语义不同）、Netezza/Greenplum/Phoenix
 （无公开 maven 构件或已停更）。要加走 `TDriverRegistry.Register` 自定义，
 `TestDialect` 的 `custom-driver` 即该路径断言。
 
-`TestDialect` 断言：未知驱动抛 `08000`；嵌入式（sqlite/h2/duckdb/derby/hsqldb）
-只替换 `{database}`；`mssql` 的 `Extra` 用 `;` 连接，其余用 `?k=v&...`；
+`TestDialect` 断言：未知驱动抛 `08000`；嵌入式判定走驱动描述的 `embedded` 字段（sqlite/h2/duckdb/derby/hsqldb 为真），只替换 `{database}`；`Extra` 连接符走 `paramSep`（mssql 为 `;`，其余为 `?k=v&...`）；
 `BuiltinIds` 数量 `>= 25`。
 
 ## 配置（TJDBCConfig，唯一入口）
