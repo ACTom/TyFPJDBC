@@ -2,24 +2,28 @@ program TestSoak;
 
 {$mode objfpc}{$H+}
 
-{ Soak: 4 threads x 50 borrow/exec/query/release iterations against one
-  shared pool. Each iteration writes a thread-keyed row and reads it back;
-  any cross-talk (wrong tag on own id) counts as misroute. Leak assert:
-  every per-thread engine ends at HandleCount=0 and the main engine is zero
-  after ClosePool. Usage: TestSoak <classesDir>. }
+{ Parameterized soak: <classesDir> [threads] [iters] [faultPct].
+  Each iteration writes a thread-keyed row and reads it back; any
+  cross-talk (wrong tag on own id) counts as misroute. Every iteration may
+  also run a timeout+cancel probe (faultPct chance). Leak assert: every
+  per-thread engine ends at HandleCount=0 with a zero audit, the main
+  engine audits zero after ClosePool, and faults stay classified. }
 
 uses
   SysUtils, Classes, syncobjs, TyFPJDBC.Handles, TyFPJDBC.JVM.Manager,
-  TyFPJDBC.JNI.Bridge, TyFPJDBC.Engine;
+  TyFPJDBC.JNI.Bridge, TyFPJDBC.Engine, TyFPJDBC.Errors;
 
-const
-  THREADS = 4;
-  ITERS = 50;
+var
+  GThreads: Integer = 4;
+  GIters: Integer = 50;
+  GFaultPct: Integer = 10;
 
 var
   Fails: Integer = 0;
   Misroute: Integer = 0;
   ThreadFails: Integer = 0;
+  FaultProbed: Integer = 0;
+  FaultBad: Integer = 0;
   Lock: TCriticalSection;
   SharedBridge: TBridge;
   SharedPool: Int64;
@@ -70,16 +74,86 @@ end;
 procedure TSoakThread.Execute;
 var
   eng: TJdbcEngine;
-  conn, stmt, cur: Int64;
+  conn, stmt, cur, fstmt, fcur: Int64;
   rows: TJdbcRows;
   i, id: Integer;
   tag: string;
   localBad: Integer;
+
+  procedure FaultProbe;
+  { Timeout + cancel cross-pressure: must never crash or misroute; any
+    EJDBCError is classified, anything else is a fault. }
+  var
+    cl: TJdbcErrClass;
+  begin
+    fstmt := 0;
+    fcur := 0;
+    try
+      fstmt := SharedBridge.Prepare(conn, 'SELECT tag FROM soak WHERE id=?');
+      SharedBridge.SetTimeout(fstmt, 1);
+      SharedBridge.BindLong(fstmt, 1, id);
+      fcur := SharedBridge.QueryOpen(fstmt, 10);
+      SharedBridge.Cancel(fstmt);
+      rows := SharedBridge.FetchWindow(fcur, 10);
+      SharedBridge.CloseCursor(fcur);
+      fcur := 0;
+      SharedBridge.CloseStmt(fstmt);
+      fstmt := 0;
+    except
+      on E: EJDBCError do
+      begin
+        cl := JdbcErrClassOf(E);
+        if not (cl in [ecRetryable, ecConfig, ecDriver]) then
+        begin
+          Lock.Enter;
+          try
+            Inc(FaultBad);
+          finally
+            Lock.Leave;
+          end;
+          Exit;
+        end;
+        try
+          if fcur > 0 then SharedBridge.CloseCursor(fcur);
+        except
+        end;
+        try
+          if fstmt > 0 then SharedBridge.CloseStmt(fstmt);
+        except
+        end;
+      end;
+      on E: Exception do
+      begin
+        Lock.Enter;
+        try
+          Inc(FaultBad);
+        finally
+          Lock.Leave;
+        end;
+        try
+          if fcur > 0 then SharedBridge.CloseCursor(fcur);
+        except
+        end;
+        try
+          if fstmt > 0 then SharedBridge.CloseStmt(fstmt);
+        except
+        end;
+        Exit;
+      end;
+    end;
+    Lock.Enter;
+    try
+      Inc(FaultProbed);
+    finally
+      Lock.Leave;
+    end;
+  end;
+
 begin
   localBad := 0;
   eng := TJdbcEngine.Create(SharedBridge);
   try
-    for i := 1 to ITERS do
+    for i := 1 to GIters do
     begin
       id := FSlot * 100000 + i;
       tag := 't' + IntToStr(FSlot) + 'r' + IntToStr(i);
@@ -114,6 +188,8 @@ begin
         cur := 0;
         SharedBridge.CloseStmt(stmt);
         stmt := 0;
+        if ((i * FSlot) mod 100 < GFaultPct) then
+          FaultProbe;
         eng.Release(conn);
         conn := 0;
       except
@@ -133,6 +209,8 @@ begin
       end;
     end;
     if eng.HandleCount <> 0 then
+      Inc(localBad);
+    if eng.AuditReport <> 'pools=0 conns=0 stmts=0 cursors=0' then
       Inc(localBad);
   finally
     eng.Free;
@@ -155,16 +233,30 @@ var
   cfg: TPoolCfgRec;
   conn, stmt, cur: Int64;
   rows: TJdbcRows;
-  workers: array[0..THREADS - 1] of TSoakThread;
+  workers: array of TSoakThread;
   t: Integer;
   attachBase: Integer;
 begin
   if ParamCount < 1 then
   begin
-    WriteLn('usage: TestSoak <classesDir>');
+    WriteLn('usage: TestSoak <classesDir> [threads] [iters] [faultPct]');
     Halt(2);
   end;
   classesDir := ParamStr(1);
+  if ParamStr(2) <> '' then
+    GThreads := StrToIntDef(ParamStr(2), 4);
+  if ParamStr(3) <> '' then
+    GIters := StrToIntDef(ParamStr(3), 50);
+  if ParamStr(4) <> '' then
+    GFaultPct := StrToIntDef(ParamStr(4), 10);
+  if GThreads < 1 then
+    GThreads := 1;
+  if GIters < 1 then
+    GIters := 1;
+  if (GFaultPct < 0) or (GFaultPct > 100) then
+    GFaultPct := 10;
+  WriteLn('soak-config threads=', GThreads, ' iters=', GIters,
+    ' faultPct=', GFaultPct);
   Lock := TCriticalSection.Create;
   try
     TJVMManager.ResetForTests;
@@ -187,18 +279,20 @@ begin
         Ok('ddl', SharedBridge.ExecDirect(conn,
           'CREATE TABLE soak(id BIGINT PRIMARY KEY, tag VARCHAR(50))') = 0);
         mainEng.Release(conn);
-        for t := 0 to THREADS - 1 do
+        SetLength(workers, GThreads);
+        for t := 0 to GThreads - 1 do
         begin
           workers[t] := TSoakThread.Create(t + 1);
           workers[t].Start;
         end;
-        for t := 0 to THREADS - 1 do
+        for t := 0 to GThreads - 1 do
         begin
           workers[t].WaitFor;
           workers[t].Free;
         end;
         Ok('no-misroute', Misroute = 0);
         Ok('no-thread-fails', ThreadFails = 0);
+        Ok('faults-classified', (FaultProbed > 0) and (FaultBad = 0));
         conn := mainEng.Borrow(SharedPool);
         stmt := SharedBridge.Prepare(conn, 'SELECT COUNT(*) FROM soak');
         try
@@ -206,7 +300,7 @@ begin
           try
             rows := SharedBridge.FetchWindow(cur, 10);
             Ok('soak-total', (Length(rows) = 1) and
-              (rows[0][0] = IntToStr(THREADS * ITERS)));
+              (rows[0][0] = IntToStr(GThreads * GIters)));
           finally
             SharedBridge.CloseCursor(cur);
           end;
@@ -216,6 +310,8 @@ begin
         mainEng.Release(conn);
         mainEng.ClosePool(SharedPool);
         Ok('handles-zero', mainEng.HandleCount = 0);
+        Ok('no-leak-audit', mainEng.AuditReport =
+          'pools=0 conns=0 stmts=0 cursors=0');
         Ok('threads-detached', TJVMManager.AttachedCount = attachBase);
       finally
         mainEng.Free;
