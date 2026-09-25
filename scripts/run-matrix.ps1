@@ -26,7 +26,7 @@ Section "guard"
 Check "guard-exit-0" ($?)
 
 Section "mautool-build"
-fpc "-FU$units" "-o$bin\mautool.exe" "$ws\src\tools\mautool.lpr" 2>&1
+fpc "-FU$units" "-Fu$ws\src\core" "-o$bin\mautool.exe" "$ws\src\tools\mautool.lpr" 2>&1
 Check "mautool-compile" ($LASTEXITCODE -eq 0)
 $mautool = Join-Path $bin "mautool.exe"
 

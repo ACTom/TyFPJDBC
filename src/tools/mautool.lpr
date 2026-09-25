@@ -1,7 +1,7 @@
 program mautool;
 {$mode objfpc}{$H+}
 uses
-  SysUtils, Classes, process, fpjson, jsonparser, sha1;
+  SysUtils, Classes, process, fpjson, jsonparser, TyFPJDBC.Driver.Fetch;
 
 procedure Fail(const M: string);
 begin
@@ -54,77 +54,22 @@ begin
   end;
 end;
 
-function MavenPath(const Maven: string; out Group, Artifact, Ver: string): string;
-var
-  p1, p2: Integer;
-begin
-  Result := '';
-  Group := '';
-  Artifact := '';
-  Ver := '';
-  p1 := Pos(':', Maven);
-  p2 := LastDelimiter(':', Maven);
-  if (p1 = 0) or (p2 <= p1) then
-    Fail('bad maven coordinate ' + Maven);
-  Group := Copy(Maven, 1, p1 - 1);
-  Artifact := Copy(Maven, p1 + 1, p2 - p1 - 1);
-  Ver := Copy(Maven, p2 + 1, MaxInt);
-  Result := StringReplace(Group, '.', '/', [rfReplaceAll]) + '/' + Artifact +
-    '/' + Ver + '/' + Artifact + '-' + Ver + '.jar';
-end;
-
-function MavenURL(const Rel: string): string;
-begin
-  Result := 'https://repo1.maven.org/maven2/' + Rel;
-end;
-
-function CacheDir: string;
-begin
-  Result := GetEnvironmentVariable('TYFPJDBC_CACHE');
-  if Trim(Result) = '' then
-    Result := IncludeTrailingPathDelimiter(GetEnvironmentVariable('USERPROFILE')) +
-      '.tyfpjdbc' + PathDelim + 'cache';
-  if not DirectoryExists(Result) then
-    ForceDirectories(Result);
-end;
-
-function IsGplLicense(const L: string): Boolean;
-begin
-  Result := (Pos('GPL', UpperCase(L)) > 0);
-end;
-
 procedure NeedLicense(const DriverId, License: string; var AcceptFlag: Boolean);
 var
-  marker, ans: string;
+  ans: string;
 begin
-  if not IsGplLicense(License) then
+  if not TDriverFetch.IsGplLicense(License) then
     Exit;
   if AcceptFlag then
     Exit;
-  marker := CacheDir + PathDelim + 'license-' + LowerCase(DriverId) + '.accepted';
-  if FileExists(marker) then
+  if TDriverFetch.LicenseAccepted(DriverId) then
     Exit;
   Write('Driver ', DriverId, ' is ', License,
     '. Type ACCEPT to download: ');
   ReadLn(ans);
   if UpperCase(Trim(ans)) <> 'ACCEPT' then
     Fail('license not accepted for ' + DriverId);
-  with TStringList.Create do
-  try
-    Text := 'accepted ' + DateTimeToStr(Now);
-    SaveToFile(marker);
-  finally
-    Free;
-  end;
-end;
-
-function Downloader: string;
-begin
-  { Prefer curl where present; fall back to PowerShell Invoke-WebRequest so
-    stock Windows without curl still works. No hard curl dependency. }
-  if FileExists(GetEnvironmentVariable('SystemRoot') + '\System32\curl.exe') then
-    Exit('curl');
-  Result := 'powershell';
+  TDriverFetch.MarkLicenseAccepted(DriverId);
 end;
 
 function RunCapture(const Exe, Args: string; out Output: string): Boolean;
@@ -153,89 +98,6 @@ begin
   end;
 end;
 
-function RunToFile(const Exe, Args, OutFile: string): Boolean;
-var
-  P: TProcess;
-  fs: TFileStream;
-  buf: array[0..8191] of Byte;
-  n: Integer;
-begin
-  Result := False;
-  P := TProcess.Create(nil);
-  try
-    P.Executable := Exe;
-    P.Parameters.DelimitedText := Args;
-    P.Options := [poWaitOnExit, poUsePipes];
-    P.Execute;
-    fs := TFileStream.Create(OutFile, fmCreate);
-    try
-      repeat
-        n := P.Output.Read(buf, SizeOf(buf));
-        if n > 0 then
-          fs.WriteBuffer(buf, n);
-      until n <= 0;
-    finally
-      fs.Free;
-    end;
-    Result := P.ExitStatus = 0;
-  finally
-    P.Free;
-  end;
-end;
-
-function RunGet(const Exe, Args, OutFile: string): Boolean;
-var
-  dlArgs, final_: string;
-begin
-  if OutFile = '' then
-    Exit(RunToFile(Exe, Args, GetTempFileName('', 'mauout')));
-  { curl -o vs powershell -OutFile: normalize here so callers pass URLs only. }
-  if (Exe = 'powershell') and (Pos('http', Args) > 0) then
-  begin
-    dlArgs := '-NoProfile -Command Invoke-WebRequest ' + Trim(Args) + ' ' +
-      OutFile + '.tmp';
-    Result := RunToFile(Exe, dlArgs, OutFile + '.tmp');
-  end
-  else
-    Result := RunToFile(Exe, Args + ' -o "' + OutFile + '"', OutFile + '.tmp');
-  if not Result then
-    Exit(False);
-  { Atomic rename after successful download (no partial cache poison). }
-  final_ := OutFile;
-  if FileExists(final_) then
-    DeleteFile(final_);
-  Result := RenameFile(OutFile + '.tmp', final_);
-end;
-
-function FetchText(const URL: string): string;
-var
-  tmp: string;
-  sl: TStringList;
-  dl: string;
-begin
-  Result := '';
-  tmp := GetTempFileName('', 'mau');
-  try
-    dl := Downloader;
-    if dl = 'powershell' then
-    begin
-      if not RunGet(dl, URL, tmp) then
-        Fail('download failed: ' + URL);
-    end
-    else if not RunGet(dl, '-sL "' + URL + '"', tmp) then
-      Fail('download failed: ' + URL);
-    sl := TStringList.Create;
-    try
-      sl.LoadFromFile(tmp);
-      Result := Trim(sl.Text);
-    finally
-      sl.Free;
-    end;
-  finally
-    DeleteFile(tmp);
-  end;
-end;
-
 procedure CmdDriver(const Cfg, Id, OutDir: string; AcceptLicense: Boolean);
 var
   j: TJSONData;
@@ -255,11 +117,13 @@ begin
       Fail('unknown driver ' + Id);
     NeedLicense(Id, o.Strings['license'], AcceptLicense);
     maven := ReqStr(o, 'maven');
-    rel := MavenPath(maven, grp, art, ver);
-    url := MavenURL(rel);
+    rel := TDriverFetch.MavenPath(maven, grp, art, ver);
+    if rel = '' then
+      Fail('bad maven coordinate ' + maven);
+    url := TDriverFetch.MavenURL(rel);
     target := IncludeTrailingPathDelimiter(OutDir) + art + '-' + ver + '.jar';
     if (OutDir = 'drivers') or (Trim(OutDir) = '') then
-      target := CacheDir + PathDelim + art + '-' + ver + '.jar';
+      target := TDriverFetch.CacheDir + PathDelim + art + '-' + ver + '.jar';
     WriteLn('driver: ', ReqStr(o, 'id'));
     WriteLn('cache: ', target);
     WriteLn('maven: ', maven);
@@ -273,14 +137,14 @@ begin
       expectSha := o.Strings['sha1'];
     if expectSha = '' then
     begin
-      expectSha := FetchText(url + '.sha1');
+      expectSha := TDriverFetch.FetchText(url + '.sha1');
       WriteLn('upstream-sha1: ', expectSha);
     end
     else
       WriteLn('manifest-sha1: ', expectSha);
     if FileExists(target) then
     begin
-      gotSha := LowerCase(SHA1Print(SHA1File(target)));
+      gotSha := TDriverFetch.Sha1OfFile(target);
       WriteLn('local-sha1: ', gotSha);
       if gotSha = LowerCase(Trim(expectSha)) then
         WriteLn('checksum: VERIFIED (cache hit)')
@@ -292,21 +156,17 @@ begin
       { Cache miss: download, verify, atomically store. Proxy comes from
         environment (https_proxy) via curl/powershell defaults. }
       WriteLn('cache: MISS, downloading...');
-      if Downloader = 'powershell' then
-      begin
-        if not RunGet('powershell', url, target) then
-          Fail('download failed: ' + url);
-      end
-      else if not RunGet(Downloader, '-sL "' + url + '"', target) then
-        Fail('download failed: ' + url);
-      gotSha := LowerCase(SHA1Print(SHA1File(target)));
-      WriteLn('local-sha1: ', gotSha);
-      if gotSha <> LowerCase(Trim(expectSha)) then
-      begin
-        DeleteFile(target);
-        Fail('checksum MISMATCH for ' + target);
+      try
+        if TDriverFetch.FetchJar(url, expectSha, target) = frDownloaded then
+          WriteLn('checksum: VERIFIED (downloaded)')
+        else
+          WriteLn('checksum: VERIFIED (cache hit)');
+      except
+        on E: Exception do
+          Fail(E.Message);
       end;
-      WriteLn('checksum: VERIFIED (downloaded)');
+      gotSha := TDriverFetch.Sha1OfFile(target);
+      WriteLn('local-sha1: ', gotSha);
     end;
   finally
     j.Free;
@@ -331,11 +191,13 @@ begin
     if o = nil then
       Fail('unknown driver ' + Id);
     maven := ReqStr(o, 'maven');
-    rel := MavenPath(maven, grp, art, ver);
+    rel := TDriverFetch.MavenPath(maven, grp, art, ver);
+    if rel = '' then
+      Fail('bad maven coordinate ' + maven);
     target := IncludeTrailingPathDelimiter(OutDir) + art + '-' + ver + '.jar';
     if not FileExists(target) then
       Fail('file not present: ' + target);
-    gotSha := LowerCase(SHA1Print(SHA1File(target)));
+    gotSha := TDriverFetch.Sha1OfFile(target);
     WriteLn('file: ', target);
     WriteLn('expected-sha1: ', LowerCase(Trim(ExpectSha)));
     WriteLn('actual-sha1: ', gotSha);

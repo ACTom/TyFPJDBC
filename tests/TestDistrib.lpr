@@ -8,10 +8,11 @@ program TestDistrib;
   cache-dir + license-flag surface in help/usage. }
 
 uses
-  SysUtils, Classes, process;
+  SysUtils, Classes, process, TyFPJDBC.Driver.Fetch;
 
 var
   Fails: Integer = 0;
+  g, a, v: string;
 
 procedure Ok(const N: string; C: Boolean);
 begin
@@ -63,6 +64,11 @@ var
   outp: string;
   code: Integer;
 begin
+  Ok('gpl-gate', TDriverFetch.IsGplLicense('GPL-2'));
+  Ok('lgpl-open', not TDriverFetch.IsGplLicense('LGPL-2.1'));
+  Ok('bsd-open', not TDriverFetch.IsGplLicense('BSD-2-Clause'));
+  Ok('maven-path', TDriverFetch.MavenPath('com.h2database:h2:2.2.224', g, a, v) =
+    'com/h2database/h2/2.2.224/h2-2.2.224.jar');
   Run('--verify-manifests --config D:\Projects\TyFPJDBC\configs\drivers.json', outp, code);
   Ok('manifests', (code = 0) and (Pos('manifests verified', outp) > 0));
   Run('--verify-runtime --platform win64 --sha256 bc04cdab23b4468829ca29a2fcff008b3ea7dd78de41a7636247c8774b486cec --out D:\Projects\TyFPJDBC-Runtimes\zips', outp, code);
