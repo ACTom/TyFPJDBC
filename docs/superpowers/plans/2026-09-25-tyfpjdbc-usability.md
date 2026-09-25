@@ -1507,21 +1507,26 @@ git commit -m "feat: driver wizard dialog with in-library fetch"
 ### Task 5: 包上浮与全绿门禁
 
 **Files:**
-- Move: `src/lcl/tyfpjdbc.lpk` → `tyfpjdbc.lpk`
+- Move: `src/lcl/tyfpjdbc.lpk` → `tyfpjdbc_design.lpk`（包名同步改为
+  `tyfpjdbc_design`：原包名与单元命名空间 `TyFPJDBC.*` 撞名，根构建必败）
 - Modify: `scripts/run-matrix.ps1`
 - Modify: `scripts/guard.ps1`
 
 **Interfaces:**
 - Consumes: Task 1–4 全部。
-- Produces: 根 `tyfpjdbc.lpk`；四份证据（tests/launch/guard/matrix）。
+- Produces: 根 `tyfpjdbc_design.lpk`；四份证据（tests/launch/guard/matrix）。
 
 - [ ] **Step 1: 上浮 lpk 并改路径**
 
 ```bash
-git mv src/lcl/tyfpjdbc.lpk tyfpjdbc.lpk
+git mv src/lcl/tyfpjdbc.lpk tyfpjdbc_design.lpk
 ```
 
-`tyfpjdbc.lpk`：四个 `Filename`（Conn/Query/ConnDialog/tyfpjdbcreg，Task 4 已加 Wizard 共五个）分别加 `src/lcl/` 前缀（`UnitName` 不变）；`<OtherUnitFiles Value="../core;../db"/>` 改为 `<OtherUnitFiles Value="src/core;src/db"/>`。包名、版本 0.9.0 不动。
+`tyfpjdbc_design.lpk`：五个 `Filename` 分别加 `src/lcl/` 前缀（`UnitName` 不变）；
+`<OtherUnitFiles Value="../core;../db"/>` 改为
+`<OtherUnitFiles Value="src/core;src/db;src/lcl"/>`（根构建时包目录自身不在
+搜索路径，必须显式加 `src/lcl`，否则包装单元找不到 LCL 单元）。
+包版本 0.9.0 不动，包名改为 `tyfpjdbc_design`。
 
 - [ ] **Step 2: 矩阵 lpk 段改根路径**
 
@@ -1529,18 +1534,18 @@ git mv src/lcl/tyfpjdbc.lpk tyfpjdbc.lpk
 
 ```powershell
 Remove-Item "$ws\lib" -Recurse -Force -ErrorAction SilentlyContinue
-Remove-Item "$ws\tyfpjdbc.pas" -Force -ErrorAction SilentlyContinue
+Remove-Item "$ws\tyfpjdbc_design.pas" -Force -ErrorAction SilentlyContinue
 Remove-Item "$ws\packagefiles.xml" -Force -ErrorAction SilentlyContinue
-& lazbuild --build-all "$ws\tyfpjdbc.lpk" 2>&1
+& lazbuild --build-all "$ws\tyfpjdbc_design.lpk" 2>&1
 Check "lpk-build" ($LASTEXITCODE -eq 0)
-Remove-Item "$ws\tyfpjdbc.pas" -Force -ErrorAction SilentlyContinue
+Remove-Item "$ws\tyfpjdbc_design.pas" -Force -ErrorAction SilentlyContinue
 Remove-Item "$ws\packagefiles.xml" -Force -ErrorAction SilentlyContinue
 Remove-Item "$ws\lib" -Recurse -Force -ErrorAction SilentlyContinue
 ```
 
 - [ ] **Step 3: guard 加根 lib 门禁**
 
-`scripts/guard.ps1` 追加（`.lpk` 在根构建，`lib/` 落根；`tyfpjdbc.pas/packagefiles.xml` 是构建瞬态由矩阵清，不进门禁）：
+`scripts/guard.ps1` 追加（`.lpk` 在根构建，`lib/` 落根；`tyfpjdbc_design.pas/packagefiles.xml` 是构建瞬态由矩阵清，不进门禁）：
 
 ```powershell
 $root = Get-ChildItem -Path lib -Recurse -Include *.o,*.ppu -ErrorAction SilentlyContinue
@@ -1556,7 +1561,7 @@ Run: `pwsh -NoProfile -File scripts/run-matrix.ps1`，Expected: `MATRIX-FAILURES
 - [ ] **Step 5: 提交**
 
 ```bash
-git add tyfpjdbc.lpk scripts/run-matrix.ps1 scripts/guard.ps1
+git add tyfpjdbc_design.lpk scripts/run-matrix.ps1 scripts/guard.ps1
 git commit -m "chore: float package to repo root, gate green"
 ```
 

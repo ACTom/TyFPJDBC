@@ -50,11 +50,14 @@
 
 ## 3. 包目录上浮（已确认）
 
-- `src/lcl/tyfpjdbc.lpk` 上浮为仓库根 `tyfpjdbc.lpk`，
+- `src/lcl/tyfpjdbc.lpk` 上浮为仓库根 `tyfpjdbc_design.lpk`（包名同步改为
+  `tyfpjdbc_design`：原包名 `tyfpjdbc` 与单元命名空间 `TyFPJDBC.*`
+  大小写不敏感撞名，Lazarus 生成的包装单元 `unit tyfpjdbc` 非法，
+  根目录构建必败；改名后单元名保持 `TyFPJDBC.*` 不动），
   `Files` 直引 `src/lcl/...、src/core/...、src/db/...`，
-  `OtherUnitFiles` 相对路径同步改；包名与版本（0.9.0）不动。
-- `src/lcl/` 只留源码；矩阵、文档、`TestLcl` 注释中的 `lazbuild` 路径同步改。
-- 测试：`lazbuild tyfpjdbc.lpk` 根目录一次通过 + `TestLcl` 全过。
+  `OtherUnitFiles` 为 `src/core;src/db;src/lcl`；包版本（0.9.0）不动。
+- `src/lcl/` 只留源码；矩阵、文档中的 `lazbuild` 路径同步改。
+- 测试：`lazbuild tyfpjdbc_design.lpk` 根目录一次通过 + `TestLcl` 全过。
 
 ## 4. 非目标
 

@@ -245,11 +245,11 @@ Section "lpk-design-package"
 & "$ws\scripts\guard.ps1" 2>&1
 Check "guard-final" ($?)
 Remove-Item "$ws\lib" -Recurse -Force -ErrorAction SilentlyContinue
-Remove-Item "$ws\tyfpjdbc.pas" -Force -ErrorAction SilentlyContinue
+Remove-Item "$ws\tyfpjdbc_design.pas" -Force -ErrorAction SilentlyContinue
 Remove-Item "$ws\packagefiles.xml" -Force -ErrorAction SilentlyContinue
-& lazbuild --build-all "$ws\tyfpjdbc.lpk" 2>&1
+& lazbuild --build-all "$ws\tyfpjdbc_design.lpk" 2>&1
 Check "lpk-build" ($LASTEXITCODE -eq 0)
-Remove-Item "$ws\tyfpjdbc.pas" -Force -ErrorAction SilentlyContinue
+Remove-Item "$ws\tyfpjdbc_design.pas" -Force -ErrorAction SilentlyContinue
 Remove-Item "$ws\packagefiles.xml" -Force -ErrorAction SilentlyContinue
 Remove-Item "$ws\lib" -Recurse -Force -ErrorAction SilentlyContinue
 
