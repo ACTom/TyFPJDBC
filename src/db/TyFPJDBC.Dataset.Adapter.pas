@@ -16,6 +16,7 @@ type
     UnknownTypeFallback: TUnknownFallback;
     constructor Create;
     function MapType(const JdbcType: string; out AsMemo: Boolean): TFieldType;
+    function MapByCode(Code: Integer; out AsMemo: Boolean): TFieldType;
     procedure BuildFields(AQuery: TBufDataset; Names, TypeNames: TStrings);
     procedure FillField(F: TField; const U: UTF8String);
     procedure FillWindow(AQuery: TBufDataset; const Rows: TJdbcRows);
@@ -92,7 +93,33 @@ begin
     ufString: Exit(ftWideString);
     ufBytes: Exit(ftBlob);
   else
+    // single truth table with MapByCode
     raise EJDBCError.CreateChain('unknown jdbc type', 'HY000', 45, JdbcType);
+  end;
+end;
+
+function TDatasetAdapter.MapByCode(Code: Integer; out AsMemo: Boolean): TFieldType;
+begin
+  AsMemo := False;
+  case Code of
+    -5: Exit(ftLargeint);
+    4, 5, -6, -7: Exit(ftInteger);
+    2, 3: Exit(ftFmtBCD);
+    6, 7, 8: Exit(ftFloat);
+    16: Exit(ftBoolean);
+    91: Exit(ftDate);
+    92: Exit(ftTime);
+    93: Exit(ftDateTime);
+    -2, -3, -4, 2004: Exit(ftBlob);
+    1, 12, -9, -15: Exit(ftWideString);
+    2005, 2011, 2003, 2002, 1111:
+      begin AsMemo := True; Exit(ftWideMemo); end;
+  end;
+  case UnknownTypeFallback of
+    ufString: Exit(ftWideString);
+    ufBytes: Exit(ftBlob);
+  else
+    raise EJDBCError.CreateChain('unknown jdbc code', 'HY000', 45, IntToStr(Code));
   end;
 end;
 

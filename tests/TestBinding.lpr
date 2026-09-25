@@ -8,8 +8,9 @@ program TestBinding;
   env or local defaults when jars exist; unreachable DB = SKIP, H2 must pass. }
 
 uses
-  SysUtils, Classes, TyFPJDBC.Handles, TyFPJDBC.JVM.Manager,
-  TyFPJDBC.JNI.Bridge, TyFPJDBC.Engine, TyFPJDBC.Command;
+  SysUtils, Classes, DB, TyFPJDBC.Handles, TyFPJDBC.JVM.Manager,
+  TyFPJDBC.JNI.Bridge, TyFPJDBC.Engine, TyFPJDBC.Command,
+  TyFPJDBC.Dataset.Adapter;
 
 var
   Fails: Integer = 0;
@@ -90,6 +91,11 @@ var
   same: Boolean;
   raised: Boolean;
   st: string;
+  codes: TIntArray;
+  tnames: TStringList;
+  ad: TDatasetAdapter;
+  m1, c1: TFieldType;
+  mm, mm2: Boolean;
 begin
   cfg := DefaultPoolCfg(Url, Driver);
   cfg.User := UTF8String(User);
@@ -142,6 +148,23 @@ begin
           Break;
         end;
     Ok(DbId + '-blob-twice', same);
+    stmt := bridge.Prepare(conn, 'SELECT c_big, c_str FROM rt WHERE 1=0');
+    try
+      cur := bridge.QueryOpen(stmt, 10);
+      try
+        codes := bridge.CursorTypeCodes(cur); tnames := bridge.CursorTypeNames(cur);
+        try
+          Ok(DbId + '-codemap', (Length(codes) = 2) and (tnames.Count >= 2));
+          if (Length(codes) = 2) and (tnames.Count >= 2) then begin
+            ad := TDatasetAdapter.Create;
+            try
+              m1 := ad.MapType(tnames[0], mm); c1 := ad.MapByCode(codes[0], mm2);
+              Ok(DbId + '-code-name-agree', m1 = c1);
+            finally ad.Free; end;
+          end;
+        finally tnames.Free; end;
+      finally bridge.CloseCursor(cur); end;
+    finally bridge.CloseStmt(stmt); end;
     stmt := bridge.Prepare(conn, 'INSERT INTO rt(id) VALUES(1)');
     try
       raised := False;

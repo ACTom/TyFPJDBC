@@ -55,6 +55,24 @@ begin
   end;
 end;
 
+procedure CheckCode(Code: Integer; Expected: TFieldType);
+var
+  memo: Boolean;
+  got: TFieldType;
+begin
+  got := Adapter.MapByCode(Code, memo);
+  if got = Expected then
+  begin
+    Inc(PassCount);
+    WriteLn('PASS: code-', Code, ' -> ', FTName(got));
+  end
+  else
+  begin
+    Inc(FailCount);
+    WriteLn('FAIL: code-', Code, ' got ', FTName(got), ' want ', FTName(Expected));
+  end;
+end;
+
 begin
   Adapter := TDatasetAdapter.Create;
   CheckMap('VARCHAR', ftWideString);
@@ -109,6 +127,10 @@ begin
   Adapter.UnknownTypeFallback := ufError;
   CheckMap('varchar', ftWideString);
   CheckMap('numeric(10,2)', ftFmtBCD);
+  CheckCode(4, ftInteger); CheckCode(-5, ftLargeint); CheckCode(3, ftFmtBCD);
+  CheckCode(8, ftFloat); CheckCode(16, ftBoolean); CheckCode(91, ftDate);
+  CheckCode(92, ftTime); CheckCode(93, ftDateTime); CheckCode(2004, ftBlob);
+  CheckCode(12, ftWideString); CheckCode(2005, ftWideMemo); CheckCode(1111, ftWideMemo);
   Adapter.Free;
   WriteLn('TOTAL pass=', PassCount, ' fail=', FailCount);
   if FailCount > 0 then
