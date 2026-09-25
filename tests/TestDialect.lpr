@@ -94,9 +94,22 @@ begin
   e.UrlTemplate := 'jdbc:mydb://{host}:{port}/{database}';
   e.DefaultPort := 1234; e.TestQuery := 'SELECT 1';
   e.License := 'MIT'; e.Maven := 'com.example:mydb:1.0'; e.Sha := '';
+  e.Embedded := False; e.Paging := psLimitOffset; e.Quote := qsDouble;
+  e.KeyReturn := krNone; e.ParamSep := ';'; SetLength(e.TypeAliases, 0);
   TDriverRegistry.Register(e);
   Ok('custom-driver', TDriverRegistry.BuildUrl('mydb', 'h', 0, 'd', nil) =
     'jdbc:mydb://h:1234/d');
+  extra := TStringList.Create;
+  try
+    extra.Values['ssl'] := 'true';
+    Ok('custom-driver-sep', TDriverRegistry.BuildUrl('mydb', 'h', 0, 'd', extra) =
+      'jdbc:mydb://h:1234/d;ssl=true');
+  finally
+    extra.Free;
+  end;
+  Ok('embedded-sqlite', TDriverRegistry.IsEmbedded('sqlite'));
+  Ok('embedded-mydb-false', not TDriverRegistry.IsEmbedded('mydb'));
+  Ok('embedded-unknown-false', not TDriverRegistry.IsEmbedded('nosuchdb'));
   CheckUrl('duckdb', '', 0, 'mem.db', 'jdbc:duckdb:mem.db');
   CheckUrl('derby', '', 0, 'appdb', 'jdbc:derby:appdb;create=true');
   CheckUrl('hsqldb', '', 0, 'appdb', 'jdbc:hsqldb:file:appdb');
