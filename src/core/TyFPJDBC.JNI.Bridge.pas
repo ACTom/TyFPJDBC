@@ -185,6 +185,10 @@ procedure TBridge.CheckJ(const What: string);
 var
   e: PJNIEnv;
   chain: UTF8String;
+  st: string;
+  code: Integer;
+  p, q, r: Integer;
+  codeStr: string;
 begin
   e := TJVMManager.GetJNIEnv;
   if e^^.ExceptionOccurred(e) <> nil then
@@ -193,7 +197,33 @@ begin
     chain := SafeErrorChain;
     if chain = '' then
       chain := 'jni exception';
-    raise EJDBCError.CreateChain('bridge.' + What + ' failed', 'HY000', 99, chain);
+    { Preserve the driver SQLState/code from the ThreadLocal chain
+      (format SQLState=XXXXX;code=N;msg=...). Without this every driver
+      error flattens to HY000/99 and breaks HY092/43 + constraint
+      classification. }
+    st := 'HY000';
+    code := 99;
+    p := Pos('SQLState=', string(chain));
+    if p > 0 then
+    begin
+      st := Copy(string(chain), p + 9, 5);
+      if Length(st) <> 5 then
+        st := 'HY000';
+    end;
+    q := Pos(';code=', string(chain));
+    if q > 0 then
+    begin
+      r := q + 6;
+      codeStr := '';
+      while (r <= Length(chain)) and (chain[r] in ['0'..'9']) do
+      begin
+        codeStr := codeStr + string(chain[r]);
+        Inc(r);
+      end;
+      if codeStr <> '' then
+        code := StrToIntDef(codeStr, 99);
+    end;
+    raise EJDBCError.CreateChain('bridge.' + What + ' failed', st, code, chain);
   end;
 end;
 

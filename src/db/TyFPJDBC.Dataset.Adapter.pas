@@ -124,6 +124,8 @@ begin
 end;
 
 procedure TDatasetAdapter.FillField(F: TField; const U: UTF8String);
+var
+  us: string;
 begin
   { Proven pattern: AsUTF8String bypasses the ANSI codepage on this FPC
     build; UTF8Decode/AsWideString corrupts CJK here (verified red). }
@@ -134,8 +136,16 @@ begin
     F.Clear;
     Exit;
   end;
+  if F.DataType = ftBoolean then
+  begin
+    us := UpperCase(Trim(U));
+    F.AsBoolean := (us = '1') or (us = 'TRUE') or (us = 'T') or (us = 'Y');
+    Exit;
+  end;
   if F.DataType = ftBlob then
   begin
+    { Blob placeholder: window carries length only; content via
+      Bridge.FetchBlob. Contract, not data loss. }
     if (Length(U) > 6) and (Copy(U, 1, 6) = '<blob:') then
       F.Clear
     else
@@ -197,6 +207,9 @@ var
   i: Integer;
   F: TField;
   s: UTF8String;
+  InvFS, LocFS: TFormatSettings;
+  ms: TMemoryStream;
+  bb: TBytes;
 begin
   { Collect via AsUTF8String (proven V1 pattern): the field content leaves
     as exact UTF-8 bytes for JNI, no ANSI round trip. }
@@ -206,7 +219,26 @@ begin
     F := AQuery.Fields[i];
     if F.IsNull then
     begin
-      Result[i] := BNull(SQL_VARCHAR);
+      case F.DataType of
+        ftInteger, ftSmallint:
+          Result[i] := BNull(4);
+        ftLargeint, ftAutoInc:
+          Result[i] := BNull(-5);
+        ftFloat, ftCurrency, ftBCD, ftFmtBCD:
+          Result[i] := BNull(8);
+        ftDate:
+          Result[i] := BNull(91);
+        ftTime:
+          Result[i] := BNull(92);
+        ftDateTime:
+          Result[i] := BNull(93);
+        ftBlob, ftMemo, ftWideMemo:
+          Result[i] := BNull(2004);
+        ftBoolean:
+          Result[i] := BNull(16);
+      else
+        Result[i] := BNull(12);
+      end;
       Continue;
     end;
     case F.DataType of
@@ -214,10 +246,32 @@ begin
         Result[i] := BInt(F.AsInteger);
       ftLargeint, ftAutoInc:
         Result[i] := BInt64(F.AsLargeInt);
-      ftFloat, ftCurrency, ftBCD, ftFmtBCD:
+      ftFloat:
         begin
+          InvFS := DefaultFormatSettings;
+          InvFS.DecimalSeparator := '.';
+          InvFS.ThousandSeparator := #0;
+          s := UTF8String(FormatFloat('0.###############', F.AsFloat, InvFS));
+          Result[i] := BBigDec(string(s));
+        end;
+      ftCurrency, ftBCD, ftFmtBCD:
+        begin
+          { High-precision decimals never go through Double: keep the
+            dataset string and normalize separators to invariant '.'. }
           s := F.AsUTF8String;
-          Result[i] := BBigDec(StringReplace(string(s), ',', '.', [rfReplaceAll]));
+          LocFS := DefaultFormatSettings;
+          if LocFS.DecimalSeparator <> '.' then
+          begin
+            if LocFS.ThousandSeparator <> #0 then
+              s := UTF8String(StringReplace(string(s),
+                string(LocFS.ThousandSeparator), '', [rfReplaceAll]));
+            s := UTF8String(StringReplace(string(s),
+              string(LocFS.DecimalSeparator), '.', [rfReplaceAll]));
+          end
+          else if LocFS.ThousandSeparator <> #0 then
+            s := UTF8String(StringReplace(string(s),
+              string(LocFS.ThousandSeparator), '', [rfReplaceAll]));
+          Result[i] := BBigDec(string(s));
         end;
       ftBoolean:
         Result[i] := BInt(Ord(F.AsBoolean));
@@ -227,6 +281,24 @@ begin
         Result[i] := BTime(FormatDateTime('hh:nn:ss', F.AsDateTime));
       ftDateTime:
         Result[i] := BStamp(FormatDateTime('yyyy-mm-dd hh:nn:ss', F.AsDateTime));
+      ftBlob:
+        begin
+          { Binary-safe: blob bytes via stream, never AsUTF8String which
+            truncates NULs and mangles non-UTF8 bytes. }
+          ms := TMemoryStream.Create;
+          try
+            TBlobField(F).SaveToStream(ms);
+            SetLength(bb, ms.Size);
+            if ms.Size > 0 then
+            begin
+              ms.Position := 0;
+              ms.ReadBuffer(bb[0], ms.Size);
+            end;
+            Result[i] := BBytes(bb);
+          finally
+            ms.Free;
+          end;
+        end;
     else
       Result[i] := BStr(F.AsUTF8String);
     end;

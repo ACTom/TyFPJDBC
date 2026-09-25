@@ -374,7 +374,7 @@ begin
   b := FEngine.Bridge;
   for i := 0 to High(Row) do
     case Row[i].Kind of
-      bvInt: b.BindLong(FStmt, i + 1, Row[i].I64);
+      bvInt: b.BindLong(FStmt, i + 1, Row[i].I64); // ftBoolean arrives as BInt(0/1) by CollectRow contract
       bvInt64: b.BindLong(FStmt, i + 1, Row[i].I64);
       bvDouble: b.BindDouble(FStmt, i + 1, Row[i].F64);
       bvBigDec: b.BindBigDecimal(FStmt, i + 1, Row[i].S);

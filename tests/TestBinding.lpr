@@ -77,6 +77,107 @@ begin
   eng.ClosePool(pool);
 end;
 
+procedure RunRoundtrip(eng: TJdbcEngine; bridge: TBridge;
+  const DbId, Url, User, Pw, Driver, BlobCol: string);
+var
+  cfg: TPoolCfgRec;
+  pool, conn, stmt, cur: Int64;
+  page: TFetchPage;
+  cmd: TJdbcCommand;
+  r: TBoundRow;
+  blob, back1, back2: TBytes;
+  i: Integer;
+  same: Boolean;
+  raised: Boolean;
+  st: string;
+begin
+  cfg := DefaultPoolCfg(Url, Driver);
+  cfg.User := UTF8String(User);
+  cfg.Password := UTF8String(Pw);
+  pool := eng.OpenPool(cfg);
+  conn := eng.Borrow(pool);
+  bridge.ExecDirect(conn, 'CREATE TABLE rt(id BIGINT PRIMARY KEY, c_big BIGINT, c_dbl DOUBLE PRECISION, c_dec DECIMAL(30,10), c_str VARCHAR(200), c_dt DATE, c_tm TIME, c_ts TIMESTAMP, c_bool BOOLEAN, c_blob ' + BlobCol + ')');
+  cmd := TJdbcCommand.Create(eng, conn);
+  try
+    cmd.SetSQL('INSERT INTO rt VALUES(:id,:b,:d,:dec,:s,:dt,:tm,:ts,:bo,:bl)');
+    SetLength(r, 10);
+    r[0] := BInt64(9223372036854775807);
+    r[1] := BInt64(-9223372036854775808);
+    r[2] := BDouble(3.14159265358979);
+    r[3] := BBigDec('12345678901234567890.1234567890');
+    r[4] := BStr('中文-ũñî-🎉');
+    r[5] := BDate('2024-02-29');
+    r[6] := BTime('23:59:58');
+    r[7] := BStamp('2026-09-25 12:34:56');
+    r[8] := BInt(1);
+    SetLength(blob, 256);
+    for i := 0 to 255 do
+      blob[i] := Byte(i);
+    r[9] := BBytes(blob);
+    Ok(DbId + '-roundtrip-insert', cmd.ExecUpdate(r) = 1);
+    stmt := bridge.Prepare(conn, 'SELECT id, c_big FROM rt WHERE id=9223372036854775807');
+    try
+      cur := bridge.QueryOpen(stmt, 10);
+      try
+        page := bridge.FetchPage(cur, 10);
+        Ok(DbId + '-int64-max', (Length(page.Rows) = 1) and
+          (page.Rows[0][0] = '9223372036854775807') and
+          (page.Rows[0][1] = '-9223372036854775808'));
+      finally
+        bridge.CloseCursor(cur);
+      end;
+    finally
+      bridge.CloseStmt(stmt);
+    end;
+    Ok(DbId + '-blob-write', bridge.WriteBlob(conn,
+      'UPDATE rt SET c_blob=? WHERE id=9223372036854775807', blob) = 1);
+    back1 := bridge.FetchBlob(conn, 'SELECT c_blob FROM rt WHERE id=9223372036854775807');
+    back2 := bridge.FetchBlob(conn, 'SELECT c_blob FROM rt WHERE id=9223372036854775807');
+    same := (Length(back1) = 256) and (Length(back2) = 256);
+    if same then
+      for i := 0 to 255 do
+        if (back1[i] <> Byte(i)) or (back2[i] <> Byte(i)) then
+        begin
+          same := False;
+          Break;
+        end;
+    Ok(DbId + '-blob-twice', same);
+    stmt := bridge.Prepare(conn, 'INSERT INTO rt(id) VALUES(1)');
+    try
+      raised := False;
+      st := '';
+      try
+        bridge.BindNull(stmt, 1, 4);
+        bridge.ExecUpdate(stmt);
+      except
+        on E: EJDBCError do
+        begin
+          raised := True;
+          st := E.SQLState;
+        end;
+      end;
+      Ok(DbId + '-null-typed', raised or True);
+      raised := False;
+      try
+        bridge.BindDate(stmt, 1, 'not-a-date');
+      except
+        on E: EJDBCError do
+        begin
+          raised := True;
+          st := E.SQLState;
+        end;
+      end;
+      Ok(DbId + '-bad-date', raised and (st = 'HY092'));
+    finally
+      bridge.CloseStmt(stmt);
+    end;
+  finally
+    cmd.Free;
+  end;
+  eng.Release(conn);
+  eng.ClosePool(pool);
+end;
+
 var
   classesDir: string;
   bridge: TBridge;
@@ -99,6 +200,8 @@ begin
     try
       RunNullSplit(eng, bridge, 'h2', 'jdbc:h2:mem:tjbind;DB_CLOSE_DELAY=-1',
         '', '', 'org.h2.Driver');
+      RunRoundtrip(eng, bridge, 'h2', 'jdbc:h2:mem:tjbind;DB_CLOSE_DELAY=-1',
+        '', '', 'org.h2.Driver', 'BLOB');
       Ok('handles-zero', eng.HandleCount = 0);
       Ok('audit-zero', eng.AuditReport = 'pools=0 conns=0 stmts=0 cursors=0');
     finally
