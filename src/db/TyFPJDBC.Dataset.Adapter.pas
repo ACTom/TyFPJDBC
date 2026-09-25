@@ -24,6 +24,9 @@ type
 
 implementation
 
+uses
+  TyFPJDBC.Config;
+
 constructor TDatasetAdapter.Create;
 begin
   inherited Create;
@@ -94,17 +97,24 @@ end;
 
 procedure TDatasetAdapter.BuildFields(AQuery: TBufDataset; Names, TypeNames: TStrings);
 var
-  i: Integer;
+  i, wide: Integer;
   ft: TFieldType;
   memo: Boolean;
+  cfg: TJdbcConfig;
 begin
   AQuery.Close;
   AQuery.FieldDefs.Clear;
+  cfg := TJdbcConfig.Default;
+  try
+    wide := cfg.Field_WideWidth;
+  finally
+    cfg.Free;
+  end;
   for i := 0 to Names.Count - 1 do
   begin
     ft := MapType(TypeNames[i], memo);
     if ft in [ftWideString, ftWideMemo] then
-      AQuery.FieldDefs.Add(Names[i], ft, 255)
+      AQuery.FieldDefs.Add(Names[i], ft, wide)
     else
       AQuery.FieldDefs.Add(Names[i], ft);
   end;

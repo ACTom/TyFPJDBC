@@ -133,25 +133,35 @@ type
 
 implementation
 
+uses
+  TyFPJDBC.Config;
+
 function DefaultPoolCfg(const Url, DriverClass: UTF8String): TPoolCfgRec;
+var
+  cfg: TJdbcConfig;
 begin
-  Result.Url := Url;
-  Result.User := '';
-  Result.Password := '';
-  Result.DriverClass := DriverClass;
-  Result.MaximumPoolSize := 10;
-  Result.MinimumIdle := 2;
-  Result.ConnectionTimeoutMs := 30000;
-  Result.MaxLifetimeMs := 1800000;
-  Result.KeepaliveTimeMs := 30000;
-  Result.LeakDetectionThresholdMs := 0;
-  Result.ConnectionTestQuery := 'SELECT 1';
-  Result.ValidationTimeoutMs := 5000;
-  Result.ReadOnly := False;
-  Result.AutoCommit := True;
-  Result.IsolationName := 'READ_COMMITTED';
-  Result.Catalog := '';
-  Result.Schema := '';
+  cfg := TJdbcConfig.Default;
+  try
+    Result.Url := Url;
+    Result.User := '';
+    Result.Password := '';
+    Result.DriverClass := DriverClass;
+    Result.MaximumPoolSize := cfg.Pool_MaxPool;
+    Result.MinimumIdle := cfg.Pool_MinIdle;
+    Result.ConnectionTimeoutMs := cfg.Pool_ConnTimeoutMs;
+    Result.MaxLifetimeMs := cfg.Pool_MaxLifetimeMs;
+    Result.KeepaliveTimeMs := cfg.Pool_KeepaliveMs;
+    Result.LeakDetectionThresholdMs := cfg.Pool_LeakMs;
+    Result.ConnectionTestQuery := UTF8String(cfg.Pool_TestQuery);
+    Result.ValidationTimeoutMs := cfg.Pool_ValidTimeoutMs;
+    Result.ReadOnly := False;
+    Result.AutoCommit := True;
+    Result.IsolationName := 'READ_COMMITTED';
+    Result.Catalog := '';
+    Result.Schema := '';
+  finally
+    cfg.Free;
+  end;
 end;
 
 function TBridge.Env: PJNIEnv;

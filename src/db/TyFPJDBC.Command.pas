@@ -79,6 +79,9 @@ const
 
 implementation
 
+uses
+  TyFPJDBC.Config;
+
 function IsRewriteNameStart(C: Char): Boolean;
 begin
   Result := C in ['A'..'Z', 'a'..'z', '_'];
@@ -393,12 +396,19 @@ end;
 
 function TJdbcCommand.ExecBatch(const Rows: array of TBoundRow; BatchSize: Integer): Integer;
 var
-  i, total, n: Integer;
+  i, total, n, limit: Integer;
+  cfg: TJdbcConfig;
 begin
   CheckHandle('stmt', FStmt);
+  cfg := TJdbcConfig.Default;
+  try
+    limit := cfg.Exec_BatchLimit;
+  finally
+    cfg.Free;
+  end;
   if BatchSize < 1 then
     raise EJDBCError.CreateChain('bad batch size', 'HY092', 44, IntToStr(BatchSize));
-  if BatchSize > 10000 then
+  if BatchSize > limit then
     raise EJDBCError.CreateChain('bad batch size', 'HY092', 44, IntToStr(BatchSize));
   { BatchSize caps driver round trips: ExecBatch ships the whole addBatch
     set at once, so pre-split into BatchSize chunks. }

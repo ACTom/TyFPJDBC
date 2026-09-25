@@ -37,6 +37,9 @@ type
 
 implementation
 
+uses
+  TyFPJDBC.Config;
+
 constructor TJdbcEngine.Create(ABridge: TBridge);
 begin
   inherited Create;
@@ -137,10 +140,17 @@ end;
 
 procedure TJdbcEngine.Savepoint(ConnId: Int64; const Name: UTF8String);
 var
-  i: Integer;
+  i, maxLen: Integer;
+  cfg: TJdbcConfig;
 begin
   CheckHandle('conn', ConnId);
-  if (Name = '') or (Length(Name) > 64) then
+  cfg := TJdbcConfig.Default;
+  try
+    maxLen := cfg.Savepoint_MaxLen;
+  finally
+    cfg.Free;
+  end;
+  if (Name = '') or (Length(Name) > maxLen) then
     raise EJDBCError.CreateChain('bad savepoint', 'HY092', 41, string(Name));
   if not (Name[1] in ['A'..'Z', 'a'..'z', '_']) then
     raise EJDBCError.CreateChain('bad savepoint', 'HY092', 41, string(Name));

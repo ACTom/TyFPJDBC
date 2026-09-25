@@ -45,7 +45,12 @@ type
 
 implementation
 
+uses
+  TyFPJDBC.Config;
+
 constructor TJdbcQuery.Create(AOwner: TComponent);
+var
+  cfg: TJdbcConfig;
 begin
   inherited Create(AOwner);
   FAdapter := TDatasetAdapter.Create;
@@ -53,7 +58,12 @@ begin
   FCmd := nil;
   FCursor := 0;
   FConn := 0;
-  FWindowSize := 1000;
+  cfg := TJdbcConfig.Default;
+  try
+    FWindowSize := cfg.Exec_WindowSize;
+  finally
+    cfg.Free;
+  end;
   FBaseCount := 0;
   FWindowFetches := 0;
 end;

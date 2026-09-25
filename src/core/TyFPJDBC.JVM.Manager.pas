@@ -73,6 +73,9 @@ type
 
 implementation
 
+uses
+  TyFPJDBC.Config;
+
 class constructor TJVMManager.Create;
 begin
   FLock := TCriticalSection.Create;
@@ -87,13 +90,20 @@ begin
 end;
 
 constructor TJVMOptions.Create;
+var
+  cfg: TJdbcConfig;
 begin
   inherited Create;
-  Mode := jvmAuto;
-  Xmx := '512m';
-  MaxRAMPercentage := 60.0;
-  Headless := True;
-  FileEncoding := 'UTF-8';
+  cfg := TJdbcConfig.Default;
+  try
+    Mode := jvmAuto;
+    Xmx := cfg.JVM_Xmx;
+    MaxRAMPercentage := cfg.JVM_MaxRAMPercentage;
+    Headless := cfg.JVM_Headless;
+    FileEncoding := cfg.JVM_FileEncoding;
+  finally
+    cfg.Free;
+  end;
   EnableCheckJNI := False;
   ExtraArgs := TStringList.Create;
 end;
