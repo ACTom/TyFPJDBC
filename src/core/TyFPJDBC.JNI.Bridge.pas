@@ -134,7 +134,7 @@ type
 implementation
 
 uses
-  TyFPJDBC.Config;
+  TyFPJDBC.Config, TyFPJDBC.Errors;
 
 function DefaultPoolCfg(const Url, DriverClass: UTF8String): TPoolCfgRec;
 var
@@ -713,7 +713,7 @@ begin
   FMErrorChain := Mid('getErrorChain', '()Ljava/lang/String;');
   if GetVersion <> '0.9.0' then
     raise EJDBCError.CreateChain('bridge version mismatch', 'HY000', 99,
-      'expected 0.9.0 got ' + string(GetVersion));
+      'expected 0.9.0 got ' + string(GetVersion) + '; ' + ErrAdvice(ecConfig));
 end;
 
 destructor TBridge.Destroy;

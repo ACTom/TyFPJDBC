@@ -38,7 +38,7 @@ type
 implementation
 
 uses
-  TyFPJDBC.Config;
+  TyFPJDBC.Config, TyFPJDBC.Errors;
 
 constructor TJdbcEngine.Create(ABridge: TBridge);
 begin
@@ -151,12 +151,15 @@ begin
     cfg.Free;
   end;
   if (Name = '') or (Length(Name) > maxLen) then
-    raise EJDBCError.CreateChain('bad savepoint', 'HY092', 41, string(Name));
+    raise EJDBCError.CreateChain('bad savepoint', 'HY092', 41,
+      string(Name) + '; ' + ErrAdvice(ecConfig));
   if not (Name[1] in ['A'..'Z', 'a'..'z', '_']) then
-    raise EJDBCError.CreateChain('bad savepoint', 'HY092', 41, string(Name));
+    raise EJDBCError.CreateChain('bad savepoint', 'HY092', 41,
+      string(Name) + '; ' + ErrAdvice(ecConfig));
   for i := 2 to Length(Name) do
     if not (Name[i] in ['A'..'Z', 'a'..'z', '0'..'9', '_']) then
-      raise EJDBCError.CreateChain('bad savepoint', 'HY092', 41, string(Name));
+      raise EJDBCError.CreateChain('bad savepoint', 'HY092', 41,
+        string(Name) + '; ' + ErrAdvice(ecConfig));
   FBridge.Savepoint(ConnId, Name);
 end;
 

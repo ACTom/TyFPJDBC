@@ -16,6 +16,9 @@ type
 
 implementation
 
+uses
+  TyFPJDBC.Errors;
+
 class function TJDBCScript.Split(const SQL: string): TStringList;
 var
   i, n: Integer;
@@ -144,7 +147,8 @@ begin
         except
           on E: EJDBCError do
             raise EJDBCError.CreateChain('script stmt ' + IntToStr(i + 1) +
-              ' failed', E.SQLState, E.VendorCode, parts[i]);
+              ' failed', E.SQLState, E.VendorCode,
+              parts[i] + '; ' + ErrAdvice(JdbcErrClassOf(E)));
         end;
         Inc(Result);
       end;
