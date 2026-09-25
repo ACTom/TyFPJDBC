@@ -13,7 +13,8 @@ program TestTiers;
 
 uses
   SysUtils, Classes, TyFPJDBC.Handles, TyFPJDBC.JVM.Manager,
-  TyFPJDBC.JNI.Bridge, TyFPJDBC.Engine, TyFPJDBC.Command;
+  TyFPJDBC.JNI.Bridge, TyFPJDBC.Engine, TyFPJDBC.Command,
+  TyFPJDBC.Observe;
 
 var
   Fails: Integer = 0;
@@ -49,7 +50,8 @@ begin
   Result := GetHeapStatus.TotalAllocated div 1024;
 end;
 
-procedure RunTier(B: TBridge; Eng: TJdbcEngine; const WorkDir: string; NRows: Integer);
+procedure RunTier(B: TBridge; Eng: TJdbcEngine; Obs: TJdbcObserve;
+  const WorkDir: string; NRows: Integer);
 var
   db: string;
   pool, c, stmt, cur: Int64;
@@ -58,7 +60,9 @@ var
   batch: array of TBoundRow;
   i, off, cnt, pages: Integer;
   fetched: TJdbcRows;
-  t0, msIns, msScan, msPage, msUpd: Int64;
+  t0, msIns, msScan, msPage, msUpd, msPageOne: Int64;
+  pageTimes: array of Int64;
+  k: Integer;
   cntStr, sumStr, want: string;
 
   procedure FetchAll(const SQL: string; Size: Integer; out Rows: TJdbcRows);
@@ -183,8 +187,10 @@ begin
 
     t0 := GetTickCount64;
     off := 0; cnt := 0; pages := 0;
+    SetLength(pageTimes, 0);
     while off < NRows do
     begin
+      t0 := GetTickCount64;
       stmt := B.Prepare(c,
         'SELECT id, name FROM bench ORDER BY id LIMIT 1000 OFFSET ' +
         IntToStr(off));
@@ -198,20 +204,28 @@ begin
       finally
         B.CloseStmt(stmt);
       end;
+      msPageOne := GetTickCount64 - t0;
+      SetLength(pageTimes, Length(pageTimes) + 1);
+      pageTimes[High(pageTimes)] := msPageOne;
+      Obs.Timed('tier-page', msPageOne);
       if Length(fetched) = 0 then
         Break;
       Inc(cnt, Length(fetched));
       Inc(off, Length(fetched));
       Inc(pages);
     end;
-    msPage := GetTickCount64 - t0;
+    msPage := 0;
+    for k := 0 to High(pageTimes) do
+      msPage := msPage + pageTimes[k];
     Ok('tier-' + IntToStr(NRows) + '-paged',
       (cnt = NRows) and (pages = ((NRows + 999) div 1000)));
-    WriteLn('PERF tier=', NRows, ' paged ms=', msPage, ' pages=', pages);
+    WriteLn('PERF tier=', NRows, ' paged ms=', msPage, ' pages=', pages,
+      ' p95-page-ms=', Obs.P95Ms);
 
     t0 := GetTickCount64;
     B.ExecDirect(c, 'UPDATE bench SET qty=qty+1 WHERE id%2=0');
     msUpd := GetTickCount64 - t0;
+    Obs.Timed('tier-update', msUpd);
     FetchAll('SELECT SUM(qty) FROM bench', 10, fetched);
     sumStr := string(fetched[0][0]);
     want := IntToStr((Int64(NRows div 100) * 4950) + (NRows div 2));
@@ -220,7 +234,9 @@ begin
 
     WriteLn('PERF tier=', NRows, ' fpc-peak-kb=', FpcPeakKB,
       ' heap-used=', B.HeapUsed,
-      ' heap-max=', B.HeapMax);
+      ' heap-max=', B.HeapMax,
+      ' obs-p95-ms=', Obs.P95Ms,
+      ' snap=', Eng.PoolSnapshot(pool));
     Eng.Release(c);
   finally
     Eng.ClosePool(pool);
@@ -233,6 +249,8 @@ var
   classesDir, workDir: string;
   eng: TJdbcEngine;
   bridge: TBridge;
+  logger: TJdbcLogger;
+  obs: TJdbcObserve;
   rep, tier, maxTier: Integer;
 begin
   if ParamStr(1) <> '' then
@@ -259,15 +277,19 @@ begin
   TJVMManager.AttachThread;
   bridge := TBridge.Create;
   eng := TJdbcEngine.Create(bridge);
+  logger := TJdbcLogger.Create;
+  obs := TJdbcObserve.Create(logger);
   try
     for tier := 1 to maxTier do
       case tier of
-        1: RunTier(bridge, eng, workDir, 10000);
-        2: RunTier(bridge, eng, workDir, 100000);
-        3: RunTier(bridge, eng, workDir, 1000000);
+        1: RunTier(bridge, eng, obs, workDir, 10000);
+        2: RunTier(bridge, eng, obs, workDir, 100000);
+        3: RunTier(bridge, eng, obs, workDir, 1000000);
       end;
     WriteLn('PERF-REP rep=', rep, ' done');
   finally
+    obs.Free;
+    logger.Free;
     eng.Free;
     bridge.Free;
   end;

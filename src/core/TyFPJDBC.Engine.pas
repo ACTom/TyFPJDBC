@@ -37,6 +37,7 @@ type
     function PoolActive(PoolId: Int64): Integer;
     function PoolIdle(PoolId: Int64): Integer;
     function PoolWaiting(PoolId: Int64): Integer;
+    function PoolSnapshot(PoolId: Int64): string;
     property Bridge: TBridge read FBridge;
   end;
 
@@ -222,6 +223,16 @@ function TJdbcEngine.PoolWaiting(PoolId: Int64): Integer;
 begin
   CheckHandle('pool', PoolId);
   Result := FBridge.PoolStats(PoolId).Waiting;
+end;
+
+function TJdbcEngine.PoolSnapshot(PoolId: Int64): string;
+var
+  st: TPoolStatRec;
+begin
+  CheckHandle('pool', PoolId);
+  st := FBridge.PoolStats(PoolId);
+  Result := 'active=' + IntToStr(st.Active) + ' idle=' + IntToStr(st.Idle) +
+    ' waiting=' + IntToStr(st.Waiting) + ' leak=' + IntToStr(st.Leak);
 end;
 
 end.

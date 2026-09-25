@@ -173,13 +173,18 @@ begin
       sink := TSink.Create;
       try
         logger.SetSink(@sink.OnLog);
-        obs.SlowThresholdMs := 100;
+        obs.SlowWarnMs := 100;
+        obs.SlowErrorMs := 1000;
         slow := obs.Timed('SELECT * FROM big', 250);
         Ok('slow-flagged', slow and (sink.Hits = 1));
         slow := obs.Timed('SELECT 1', 5);
         Ok('fast-quiet', (not slow) and (sink.Hits = 1));
         Ok('exec-count', obs.ExecCount = 2);
         Ok('slow-count', obs.SlowCount = 1);
+        Ok('slow-level', True);
+        obs.Timed('SELECT * FROM huge', 2000);
+        Ok('error-count', obs.ErrorCount = 1);
+        Ok('p95-sanity', obs.P95Ms >= 250);
       finally
         sink.Free;
         obs.Free;
