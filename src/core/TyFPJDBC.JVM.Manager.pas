@@ -38,6 +38,7 @@ type
     class var FRuntimeRoot: string;
     class var FRuntimeJvmPath: string;
     class procedure DoLog(const Msg: string); static;
+    class function ExpandDirJars(const Dir: string): string; static;
   public
     class constructor Create;
     class destructor Destroy;
@@ -280,13 +281,54 @@ end;
 
 class function TJVMManager.DefaultClassPath: string;
 var
-  root: string;
+  root, bdir, ddir, bj, dj: string;
 begin
   root := FRuntimeRoot;
   if root = '' then
     root := ExtractFilePath(ParamStr(0));
-  Result := IncludeTrailingPathDelimiter(root) + 'bridge' + PathDelim + '*' +
-    PathSeparator + IncludeTrailingPathDelimiter(root) + 'drivers' + PathDelim + '*';
+  { JNI only gets -Djava.class.path, whose trailing '*' is NOT expanded by
+    the VM (only the java launcher expands -cp wildcards, verified red).
+    Enumerate jars explicitly; keep the bare dirs for loose dev classes. }
+  bdir := IncludeTrailingPathDelimiter(root) + 'bridge';
+  ddir := IncludeTrailingPathDelimiter(root) + 'drivers';
+  Result := bdir + PathSeparator + ddir;
+  bj := ExpandDirJars(bdir);
+  if bj <> '' then
+    Result := Result + PathSeparator + bj;
+  dj := ExpandDirJars(ddir);
+  if dj <> '' then
+    Result := Result + PathSeparator + dj;
+end;
+
+class function TJVMManager.ExpandDirJars(const Dir: string): string;
+var
+  sr: TSearchRec;
+  jars: TStringList;
+  i: Integer;
+begin
+  Result := '';
+  jars := TStringList.Create;
+  try
+    jars.Sorted := True;
+    if FindFirst(IncludeTrailingPathDelimiter(Dir) + '*.jar',
+      faAnyFile, sr) = 0 then
+    try
+      repeat
+        if (sr.Attr and faDirectory) = 0 then
+          jars.Add(IncludeTrailingPathDelimiter(Dir) + sr.Name);
+      until FindNext(sr) <> 0;
+    finally
+      FindClose(sr);
+    end;
+    for i := 0 to jars.Count - 1 do
+    begin
+      if Result <> '' then
+        Result := Result + PathSeparator;
+      Result := Result + jars[i];
+    end;
+  finally
+    jars.Free;
+  end;
 end;
 
 class procedure TJVMManager.SetClassPath(const CP: string);

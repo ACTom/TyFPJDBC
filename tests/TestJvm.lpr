@@ -86,6 +86,9 @@ begin
   TJVMManager.SetRuntimeConfig('', '');
   Ok('default-cp-shape', (Pos('bridge', TJVMManager.DefaultClassPath) > 0) and
     (Pos('drivers', TJVMManager.DefaultClassPath) > 0));
+  { JNI 下 -Djava.class.path 的 '*' 不会被虚拟机展开（只有 java 启动器
+    展开 -cp），默认 classpath 里不许出现通配符，必须是显式 jar 列表。 }
+  Ok('default-cp-no-wildcard', Pos('*', TJVMManager.DefaultClassPath) = 0);
   WriteLn('TOTAL fails=', Fails);
   if Fails > 0 then Halt(1);
 end.
