@@ -55,43 +55,49 @@ end;
 
 constructor TCustomDriverDialog.Create(AOwner: TComponent);
 var
-  t: Integer;
+  idGroup, distGroup, diaGroup: TGroupBox;
 
-  function MkEdit(const Cap: string; Y: Integer): TEdit;
+  function MkGroup(const Cap: string; Y, H: Integer): TGroupBox;
   begin
-    with TLabel.Create(Self) do
-    begin
-      Parent := Self;
-      Left := 12;
-      Top := Y;
-      Width := 130;
-      Caption := Cap;
-    end;
-    Result := TEdit.Create(Self);
+    Result := TGroupBox.Create(Self);
     Result.Parent := Self;
-    Result.Left := 150;
-    Result.Top := Y - 3;
-    Result.Width := 278;
+    Result.Caption := Cap;
+    Result.Left := 12;
+    Result.Top := Y;
+    Result.Width := 496;
+    Result.Height := H;
   end;
 
-  function MkCombo(const Cap: string; Y: Integer;
+  function MkLab(P: TWinControl; const Cap: string; Y: Integer): TLabel;
+  begin
+    Result := TLabel.Create(Self);
+    Result.Parent := P;
+    Result.Caption := Cap;
+    Result.Left := 12;
+    Result.Top := Y;
+    Result.Width := 110;
+  end;
+
+  function MkEdit(P: TWinControl; Y, W: Integer): TEdit;
+  begin
+    Result := TEdit.Create(Self);
+    Result.Parent := P;
+    Result.Left := 128;
+    Result.Top := Y - 3;
+    Result.Width := W;
+  end;
+
+  function MkCombo(P: TWinControl; const Cap: string; Y: Integer;
     const Items: array of string): TComboBox;
   var
     s: string;
   begin
-    with TLabel.Create(Self) do
-    begin
-      Parent := Self;
-      Left := 12;
-      Top := Y;
-      Width := 130;
-      Caption := Cap;
-    end;
+    MkLab(P, Cap, Y);
     Result := TComboBox.Create(Self);
-    Result.Parent := Self;
-    Result.Left := 150;
+    Result.Parent := P;
+    Result.Left := 128;
     Result.Top := Y - 3;
-    Result.Width := 278;
+    Result.Width := 356;
     Result.Style := csDropDownList;
     for s in Items do
       Result.Items.Add(s);
@@ -102,57 +108,74 @@ var
 begin
   inherited CreateNew(AOwner);
   Caption := 'TyFPJDBC Custom Driver';
-  ClientWidth := 440;
-  ClientHeight := 520;
+  ClientWidth := 520;
+  ClientHeight := 574;
   Position := poScreenCenter;
-  t := 12;
-  IdEdit := MkEdit('Id', t); Inc(t, 28);
-  ClassEdit := MkEdit('Driver class', t); Inc(t, 28);
-  UrlEdit := MkEdit('URL template', t); Inc(t, 28);
+  BorderStyle := bsDialog;
+
+  idGroup := MkGroup('Identity', 8, 172);
+  MkLab(idGroup, 'Id', 20);
+  IdEdit := MkEdit(idGroup, 20, 356);
+  MkLab(idGroup, 'Driver class', 48);
+  ClassEdit := MkEdit(idGroup, 48, 356);
+  MkLab(idGroup, 'URL template', 76);
+  UrlEdit := MkEdit(idGroup, 76, 356);
   UrlEdit.TextHint := 'jdbc:mydb://{host}:{port}/{database}';
-  PortEdit := MkEdit('Default port', t); Inc(t, 28);
-  TestEdit := MkEdit('Test query', t); Inc(t, 28);
-  LicenseEdit := MkEdit('License', t); Inc(t, 28);
-  MavenEdit := MkEdit('Maven (optional)', t); Inc(t, 28);
-  MavenEdit.TextHint := 'group:artifact:version (enables Download)';
-  ShaEdit := MkEdit('Sha1 (optional)', t); Inc(t, 28);
-  SepEdit := MkEdit('Param separator', t); Inc(t, 28);
+  MkLab(idGroup, 'Default port', 104);
+  PortEdit := MkEdit(idGroup, 104, 120);
+  PortEdit.NumbersOnly := True;
+  MkLab(idGroup, 'Test query', 132);
+  TestEdit := MkEdit(idGroup, 132, 356);
+
+  distGroup := MkGroup('Distribution (jar download)', 188, 116);
+  MkLab(distGroup, 'License', 20);
+  LicenseEdit := MkEdit(distGroup, 20, 356);
+  MkLab(distGroup, 'Maven', 48);
+  MavenEdit := MkEdit(distGroup, 48, 356);
+  MavenEdit.TextHint := 'group:artifact:version (optional, enables Download)';
+  MkLab(distGroup, 'Sha1', 76);
+  ShaEdit := MkEdit(distGroup, 76, 356);
+  ShaEdit.TextHint := 'optional';
+
+  diaGroup := MkGroup('Dialect & options', 312, 172);
   EmbeddedCheck := TCheckBox.Create(Self);
-  EmbeddedCheck.Parent := Self;
-  EmbeddedCheck.Left := 150;
-  EmbeddedCheck.Top := t;
+  EmbeddedCheck.Parent := diaGroup;
+  EmbeddedCheck.Left := 128;
+  EmbeddedCheck.Top := 20;
+  EmbeddedCheck.Width := 356;
   EmbeddedCheck.Caption := 'Embedded (file database)';
-  Inc(t, 28);
-  PagingBox := MkCombo('Paging', t,
-    ['limit-offset', 'offset-fetch-next', 'offset-fetch-first']); Inc(t, 28);
-  QuoteBox := MkCombo('Quoting', t,
-    ['double', 'backtick', 'bracket']); Inc(t, 28);
-  KeyBox := MkCombo('Key return', t, ['none', 'returning']); Inc(t, 28);
+  PagingBox := MkCombo(diaGroup, 'Paging', 48,
+    ['limit-offset', 'offset-fetch-next', 'offset-fetch-first']);
+  QuoteBox := MkCombo(diaGroup, 'Quoting', 76,
+    ['double', 'backtick', 'bracket']);
+  KeyBox := MkCombo(diaGroup, 'Key return', 104, ['none', 'returning']);
+  MkLab(diaGroup, 'Param separator', 132);
+  SepEdit := MkEdit(diaGroup, 132, 120);
+
   HintLbl := TLabel.Create(Self);
   HintLbl.Parent := Self;
   HintLbl.Left := 12;
-  HintLbl.Top := t;
-  HintLbl.Width := 416;
+  HintLbl.Top := 492;
+  HintLbl.Width := 496;
   HintLbl.Height := 32;
   HintLbl.Caption := 'Register works for this IDE session only. ' +
     'For runtimes, Copy code and paste it into the project.';
   HintLbl.WordWrap := True;
-  Inc(t, 40);
   with TButton.Create(Self) do
   begin
     Parent := Self;
-    Caption := 'Register';
+    Caption := 'Register for session';
     Left := 12;
-    Top := t;
-    Width := 120;
+    Top := 532;
+    Width := 150;
     OnClick := @RegBtnClick;
   end;
   with TButton.Create(Self) do
   begin
     Parent := Self;
     Caption := 'Copy code';
-    Left := 140;
-    Top := t;
+    Left := 170;
+    Top := 532;
     Width := 120;
     OnClick := @CopyBtnClick;
   end;
@@ -160,10 +183,11 @@ begin
   begin
     Parent := Self;
     Caption := 'Close';
-    Left := 308;
-    Top := t;
+    Left := 388;
+    Top := 532;
     Width := 120;
     ModalResult := mrCancel;
+    Cancel := True;
   end;
 end;
 

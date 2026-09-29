@@ -24,10 +24,13 @@ type
     Progress: TProgressBar;
     LicenseCheck: TCheckBox;
     HostEdit, PortEdit, DbEdit, UserEdit, PassEdit, TimeoutEdit,
-    MavenEdit, MaxPoolEdit: TEdit;
+    MavenEdit, MaxPoolEdit, UrlEdit: TEdit;
+    ClassLbl, StatusLbl: TLabel;
     TestBtn, OkBtn, CancelBtn: TButton;
     function SelectedId: string;
     procedure FillDrivers(const KeepId: string);
+    procedure UpdatePreview;
+    procedure InputChanged(Sender: TObject);
     function GetTestedOk: Boolean;
     function GetOnTest: TTestFunc;
     procedure SetOnTest(V: TTestFunc);
@@ -50,107 +53,161 @@ implementation
 constructor TJdbcConnDialog.Create(AOwner: TComponent);
 var
   t: Integer;
+  drvGroup, connGroup: TGroupBox;
 
-  function MkEdit(const Cap: string; Y: Integer): TEdit;
+  function MkGroup(const Cap: string; Y, H: Integer): TGroupBox;
   begin
-    with TLabel.Create(Self) do
-    begin
-      Parent := Self;
-      Left := 12;
-      Top := Y;
-      Caption := Cap;
-    end;
-    Result := TEdit.Create(Self);
+    Result := TGroupBox.Create(Self);
     Result.Parent := Self;
-    Result.Left := 120;
+    Result.Caption := Cap;
+    Result.Left := 12;
+    Result.Top := Y;
+    Result.Width := 496;
+    Result.Height := H;
+  end;
+
+  function MkLab(P: TWinControl; const Cap: string; Y: Integer): TLabel;
+  begin
+    Result := TLabel.Create(Self);
+    Result.Parent := P;
+    Result.Caption := Cap;
+    Result.Left := 12;
+    Result.Top := Y;
+    Result.Width := 90;
+  end;
+
+  function MkEdit(P: TWinControl; Y, W: Integer): TEdit;
+  begin
+    Result := TEdit.Create(Self);
+    Result.Parent := P;
+    Result.Left := 108;
     Result.Top := Y - 3;
-    Result.Width := 160;
+    Result.Width := W;
   end;
 
 begin
   inherited CreateNew(AOwner);
   Caption := 'TyFPJDBC Connection';
-  ClientWidth := 300;
-  ClientHeight := 480;
+  ClientWidth := 520;
+  ClientHeight := 548;
   Position := poScreenCenter;
+  BorderStyle := bsDialog;
   FWizard := TJdbcDriverWizard.Create;
   FWizard.OnTest := @DefaultTest;
-  t := 12;
+
+  drvGroup := MkGroup('Driver', 8, 172);
+  MkLab(drvGroup, 'Driver', 20);
   DriverBox := TComboBox.Create(Self);
-  DriverBox.Parent := Self;
-  DriverBox.Left := 12;
-  DriverBox.Top := t;
-  DriverBox.Width := 160;
+  DriverBox.Parent := drvGroup;
+  DriverBox.Left := 108;
+  DriverBox.Top := 17;
+  DriverBox.Width := 376;
   DriverBox.Style := csDropDownList;
   DriverBox.OnChange := @DriverBoxChange;
-  Inc(t, 28);
+  DriverBox.TabOrder := 0;
+  MkLab(drvGroup, 'Class', 48);
+  ClassLbl := TLabel.Create(Self);
+  ClassLbl.Parent := drvGroup;
+  ClassLbl.Left := 108;
+  ClassLbl.Top := 48;
+  ClassLbl.Width := 376;
+  ClassLbl.ShowHint := True;
+  MkLab(drvGroup, 'Jar', 76);
   StateLbl := TLabel.Create(Self);
-  StateLbl.Parent := Self;
-  StateLbl.Left := 12;
-  StateLbl.Top := t;
-  StateLbl.Width := 276;
-  Inc(t, 24);
+  StateLbl.Parent := drvGroup;
+  StateLbl.Left := 108;
+  StateLbl.Top := 76;
+  StateLbl.Width := 180;
   DownloadBtn := TButton.Create(Self);
-  DownloadBtn.Parent := Self;
-  DownloadBtn.Caption := 'Download driver';
-  DownloadBtn.Left := 12;
-  DownloadBtn.Top := t;
-  DownloadBtn.Width := 130;
+  DownloadBtn.Parent := drvGroup;
+  DownloadBtn.Caption := 'Download...';
+  DownloadBtn.Left := 292;
+  DownloadBtn.Top := 73;
+  DownloadBtn.Width := 100;
   DownloadBtn.OnClick := @DownloadBtnClick;
   Progress := TProgressBar.Create(Self);
-  Progress.Parent := Self;
-  Progress.Left := 150;
-  Progress.Top := t + 4;
-  Progress.Width := 130;
+  Progress.Parent := drvGroup;
+  Progress.Left := 398;
+  Progress.Top := 77;
+  Progress.Width := 86;
   Progress.Style := pbstMarquee;
   Progress.Visible := False;
-  Inc(t, 32);
+  MkLab(drvGroup, 'Maven', 104);
+  MavenEdit := MkEdit(drvGroup, 104, 376);
+  MavenEdit.TextHint := 'group:artifact:version (custom drivers)';
   LicenseCheck := TCheckBox.Create(Self);
-  LicenseCheck.Parent := Self;
+  LicenseCheck.Parent := drvGroup;
   LicenseCheck.Left := 12;
-  LicenseCheck.Top := t;
-  LicenseCheck.Width := 276;
+  LicenseCheck.Top := 132;
+  LicenseCheck.Width := 472;
   LicenseCheck.Caption := 'Accept GPL license';
+
+  connGroup := MkGroup('Connection', 188, 228);
+  t := 20;
+  MkLab(connGroup, 'Host', t);
+  HostEdit := MkEdit(connGroup, t, 376);
+  HostEdit.OnChange := @InputChanged;
   Inc(t, 28);
-  HostEdit := MkEdit('Host', t);
+  MkLab(connGroup, 'Port', t);
+  PortEdit := MkEdit(connGroup, t, 120);
+  PortEdit.NumbersOnly := True;
+  PortEdit.OnChange := @InputChanged;
   Inc(t, 28);
-  PortEdit := MkEdit('Port', t);
+  MkLab(connGroup, 'Database', t);
+  DbEdit := MkEdit(connGroup, t, 376);
+  DbEdit.OnChange := @InputChanged;
   Inc(t, 28);
-  DbEdit := MkEdit('Database', t);
+  MkLab(connGroup, 'User', t);
+  UserEdit := MkEdit(connGroup, t, 376);
   Inc(t, 28);
-  UserEdit := MkEdit('User', t);
-  Inc(t, 28);
-  PassEdit := MkEdit('Password', t);
+  MkLab(connGroup, 'Password', t);
+  PassEdit := MkEdit(connGroup, t, 376);
   PassEdit.PasswordChar := '*';
   Inc(t, 28);
-  TimeoutEdit := MkEdit('Timeout(s)', t);
+  MkLab(connGroup, 'Timeout(s)', t);
+  TimeoutEdit := MkEdit(connGroup, t, 120);
+  TimeoutEdit.NumbersOnly := True;
   Inc(t, 28);
-  MavenEdit := MkEdit('Maven', t);
-  MavenEdit.TextHint := 'group:artifact:version (custom drivers)';
-  Inc(t, 28);
-  MaxPoolEdit := MkEdit('MaxPool', t);
-  Inc(t, 32);
+  MkLab(connGroup, 'MaxPool', t);
+  MaxPoolEdit := MkEdit(connGroup, t, 120);
+  MaxPoolEdit.NumbersOnly := True;
+
+  MkLab(Self, 'URL', 427);
+  UrlEdit := MkEdit(Self, 427, 400);
+  UrlEdit.ReadOnly := True;
+  UrlEdit.TabStop := False;
+
+  StatusLbl := TLabel.Create(Self);
+  StatusLbl.Parent := Self;
+  StatusLbl.Left := 12;
+  StatusLbl.Top := 459;
+  StatusLbl.Width := 496;
+  StatusLbl.Height := 32;
+  StatusLbl.WordWrap := True;
+
   TestBtn := TButton.Create(Self);
   TestBtn.Parent := Self;
   TestBtn.Caption := 'Test';
-  TestBtn.Left := 12;
-  TestBtn.Top := t;
-  TestBtn.Width := 130;
+  TestBtn.Left := 240;
+  TestBtn.Top := 502;
+  TestBtn.Width := 84;
   TestBtn.OnClick := @TestBtnClick;
   OkBtn := TButton.Create(Self);
   OkBtn.Parent := Self;
   OkBtn.Caption := 'OK';
-  OkBtn.Left := 104;
-  OkBtn.Top := 440;
+  OkBtn.Left := 332;
+  OkBtn.Top := 502;
   OkBtn.Width := 84;
   OkBtn.ModalResult := mrOk;
+  OkBtn.Default := True;
   CancelBtn := TButton.Create(Self);
   CancelBtn.Parent := Self;
   CancelBtn.Caption := 'Cancel';
-  CancelBtn.Left := 196;
-  CancelBtn.Top := 440;
+  CancelBtn.Left := 424;
+  CancelBtn.Top := 502;
   CancelBtn.Width := 84;
   CancelBtn.ModalResult := mrCancel;
+  CancelBtn.Cancel := True;
   FillDrivers('');
   RefreshState;
 end;
@@ -242,8 +299,21 @@ begin
     Exit;
   end;
   e := TDriverRegistry.Find(id);
-  LicenseCheck.Visible := TDriverFetch.IsGplLicense(e.License) and
-    not TDriverFetch.LicenseAccepted(id);
+  ClassLbl.Caption := e.DriverClass;
+  ClassLbl.Hint := e.DriverClass;
+  if TDriverFetch.IsGplLicense(e.License) and
+    not TDriverFetch.LicenseAccepted(id) then
+  begin
+    LicenseCheck.Caption := 'Accept GPL license (' + e.License + ')';
+    LicenseCheck.Enabled := True;
+    LicenseCheck.Checked := False;
+  end
+  else
+  begin
+    LicenseCheck.Caption := 'License: ' + e.License;
+    LicenseCheck.Enabled := False;
+    LicenseCheck.Checked := True;
+  end;
   MavenEdit.Text := FWizard.EffectiveMaven(id);
   if FWizard.MavenOverrideValid then
     MavenEdit.Color := clWindow
@@ -254,10 +324,9 @@ begin
     jsMismatch: StateLbl.Caption := 'driver jar MISMATCH, re-download';
     jsMissing: StateLbl.Caption := 'driver jar missing';
   end;
-  if FWizard.TestedOk and (FWizard.JarState(id) = jsReady) then
-    StateLbl.Caption := StateLbl.Caption + ' + connection ok';
   DownloadBtn.Enabled := True;
   OkBtn.Enabled := FWizard.CanConfirm;
+  UpdatePreview;
 end;
 
 procedure TJdbcConnDialog.DriverBoxChange(Sender: TObject);
@@ -276,8 +345,35 @@ begin
     else
       FillDrivers(FWizard.DriverId);
   end;
+  if Trim(PortEdit.Text) = '' then
+  try
+    if TDriverRegistry.DefaultPort(SelectedId) > 0 then
+      PortEdit.Text := IntToStr(TDriverRegistry.DefaultPort(SelectedId));
+  except
+  end;
   PullFromEdits;
   RefreshState;
+end;
+
+procedure TJdbcConnDialog.InputChanged(Sender: TObject);
+begin
+  UpdatePreview;
+end;
+
+procedure TJdbcConnDialog.UpdatePreview;
+begin
+  try
+    UrlEdit.Text := TDriverRegistry.BuildUrlNil(SelectedId,
+      Trim(HostEdit.Text), StrToIntDef(Trim(PortEdit.Text), 0),
+      Trim(DbEdit.Text));
+    UrlEdit.Font.Color := clWindowText;
+  except
+    on E: Exception do
+    begin
+      UrlEdit.Text := E.Message;
+      UrlEdit.Font.Color := clRed;
+    end;
+  end;
 end;
 
 procedure TJdbcConnDialog.DownloadBtnClick(Sender: TObject);
@@ -298,7 +394,7 @@ end;
 
 procedure TJdbcConnDialog.TestBtnClick(Sender: TObject);
 var
-  id, keep: string;
+  id: string;
 begin
   PullFromEdits;
   id := SelectedId;
@@ -306,7 +402,7 @@ begin
   begin
     if not FWizard.MavenOverrideValid then
     begin
-      StateLbl.Caption := 'bad maven coordinates, fix them first';
+      StatusLbl.Caption := 'bad maven coordinates, fix them first';
       RefreshState;
       Exit;
     end;
@@ -321,14 +417,11 @@ begin
     if FWizard.JarState(id) <> jsReady then
       Exit;
   end;
-  keep := '';
   if FWizard.Test then
-    keep := 'connection ok'
-  else
-    keep := StateLbl.Caption;
+    StatusLbl.Caption := 'Connection OK'
+  else if StatusLbl.Caption = '' then
+    StatusLbl.Caption := 'Test failed.';
   RefreshState;
-  if keep <> '' then
-    StateLbl.Caption := keep;
 end;
 
 function TJdbcConnDialog.DefaultTest(const DriverId, Url: string): Boolean;
@@ -381,7 +474,7 @@ begin
     end;
   except
     on Ex: Exception do
-      StateLbl.Caption := 'test: ' + Ex.Message;
+      StatusLbl.Caption := 'test: ' + Ex.Message;
   end;
 end;
 
@@ -409,6 +502,7 @@ begin
   MaxPoolEdit.Text := IntToStr(AConn.MaxPool);
   PullFromEdits;
   MavenEdit.Text := FWizard.EffectiveMaven(FWizard.DriverId);
+  StatusLbl.Caption := '';
   RefreshState;
   Result := ShowModal = mrOk;
   if Result then
