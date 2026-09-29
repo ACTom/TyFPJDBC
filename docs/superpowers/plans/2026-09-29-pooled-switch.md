@@ -214,7 +214,7 @@ git commit -m "feat: engine OpenDirect + direct tests"
 In `tests/TestLcl.lpr` config section beside `conn-override-default`, add:
 ```pascal
 Ok('pooled-default', c.Pooled);
-Ok('conn-effective-default', c.EffectiveDriverClass = 'org.sqlite.JDBC');
+Ok('conn-effective-default', c.EffectiveDriverClass = 'org.postgresql.Driver');
 c.DriverClassOverride := 'com.example.Wrapper';
 Ok('conn-effective-override', c.EffectiveDriverClass = 'com.example.Wrapper');
 ```
@@ -228,7 +228,7 @@ New public function `function EffectiveDriverClass: string;` returning `Trim(FDr
 
 - [ ] **Step 3: Verify green + full regression**
 
-Recompile TestLcl (Step 1 command, exit 0); run config-only (no args): `TOTAL fails=0`. Then run live suites with fresh classes: TestEngine, TestLcl (with classes dir arg), TestDialect, TestTx per `run-matrix.ps1` conventions — each `TOTAL fails=0` and no `^FAIL ` lines. Run `pwsh -NoProfile -File scripts/guard.ps1` → `guard ok`. Rebuild Demo (`lazbuild D:\Projects\ContactsDemo\contacts.lpi`, exit 0) and run `--selftest` + `--verifyform` → both `TOTAL fails=0`, contacts.db stays 3 rows.
+Recompile TestLcl (Step 1 command, exit 0); run config-only (no args): `TOTAL fails=0`. Then run live suites with fresh classes: TestEngine, TestLcl (with classes dir arg), TestDialect, TestTx per `run-matrix.ps1` conventions — each `TOTAL fails=0` and no `^FAIL ` lines. Run `pwsh -NoProfile -File scripts/guard.ps1` → `guard ok`. Demo board (`lazbuild` + `--selftest`/`--verifyform`) is Task 4's gate, not this task's: the shipped Demo jar lacks `directConnect` until Task 4 refreshes it, so any Demo run before that fails at `TBridge.Create` with `bridge.method directConnect` (verified 2026-09-29).
 
 - [ ] **Step 4: Commit**
 

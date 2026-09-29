@@ -15,6 +15,8 @@ type
   TJdbcConnection = class(TComponent)
   private
     FDriverId: string;
+    FDriverClassOverride: string;
+    FPooled: Boolean;
     FHost: string;
     FPort: Integer;
     FDatabase: string;
@@ -38,6 +40,7 @@ type
     destructor Destroy; override;
     function BuiltUrl(UrlFor: TUrlForFunc): string;
     function BuiltUrlDefault: string;
+    function EffectiveDriverClass: string;
     procedure Connect;
     procedure Disconnect;
     function TestConnection(out Msg: string): Boolean;
@@ -46,6 +49,15 @@ type
     property LastError: string read FLastError;
   published
     property DriverId: string read FDriverId write FDriverId;
+    { Optional driver-class swap for the same URL shape (wire-compatible
+      drivers). Empty (default) uses the registry entry's class;
+      dialect (paging/quote/RETURNING) always comes from DriverId. }
+    property DriverClassOverride: string read FDriverClassOverride
+      write FDriverClassOverride;
+    { Pool switch: True (default) opens a Hikari pool; False opens one
+      direct DriverManager connection (no pool library involved).
+      MaxPool/MinIdle are ignored when not pooled. }
+    property Pooled: Boolean read FPooled write FPooled default True;
     property Host: string read FHost write FHost;
     property Port: Integer read FPort write FPort;
     property Database: string read FDatabase write FDatabase;
@@ -72,6 +84,8 @@ begin
   cfg := TJdbcConfig.Default;
   try
     FDriverId := 'sqlite';
+    FDriverClassOverride := '';
+    FPooled := True;
     FHost := '';
     FPort := 0;
     FDatabase := '';
@@ -169,6 +183,13 @@ begin
   Result := FEngine;
 end;
 
+function TJdbcConnection.EffectiveDriverClass: string;
+begin
+  if Trim(FDriverClassOverride) <> '' then
+    Exit(Trim(FDriverClassOverride));
+  Result := TDriverRegistry.Find(FDriverId).DriverClass;
+end;
+
 function TJdbcConnection.LiveConn: Int64;
 begin
   if not GetConnected then
@@ -197,14 +218,22 @@ begin
       FEngine := TJdbcEngine.Create(TBridge(FBridge));
       e := TDriverRegistry.Find(FDriverId);
       url := BuiltUrlDefault;
-      cfg := DefaultPoolCfg(UTF8String(url), UTF8String(e.DriverClass));
+      cfg := DefaultPoolCfg(UTF8String(url), UTF8String(EffectiveDriverClass));
       cfg.User := UTF8String(FUser);
       cfg.Password := UTF8String(FPassword);
       cfg.MaximumPoolSize := FMaxPool;
       cfg.MinimumIdle := FMinIdle;
       cfg.ConnectionTimeoutMs := Int64(FLoginTimeoutSecs) * 1000;
-      FPool := TJdbcEngine(FEngine).OpenPool(cfg);
-      FConn := TJdbcEngine(FEngine).Borrow(FPool);
+      if FPooled then
+      begin
+        FPool := TJdbcEngine(FEngine).OpenPool(cfg);
+        FConn := TJdbcEngine(FEngine).Borrow(FPool);
+      end
+      else
+      begin
+        FPool := 0;
+        FConn := TJdbcEngine(FEngine).OpenDirect(cfg);
+      end;
       stmt := TBridge(FBridge).Prepare(FConn, UTF8String(e.TestQuery));
       try
         cur := TBridge(FBridge).QueryOpen(stmt, 1);

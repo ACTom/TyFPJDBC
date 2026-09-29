@@ -109,6 +109,9 @@ var
   probe: TWizProbe;
   wizDir: string;
   c2: TJdbcConnection;
+  wiz0: TJdbcDriverWizard;
+  ce: TDriverEntry;
+  code: string;
 begin
   def := TJdbcConfig.Default;
   try
@@ -121,6 +124,11 @@ begin
       c.Port := 0;
       c.Database := 'app';
       Ok('conn-url', c.BuiltUrl(@TDriverRegistry.BuildUrlNil) = 'jdbc:postgresql://db:5432/app');
+      Ok('conn-override-default', c.DriverClassOverride = '');
+      Ok('pooled-default', c.Pooled);
+      Ok('conn-effective-default', c.EffectiveDriverClass = 'org.postgresql.Driver');
+      c.DriverClassOverride := 'com.example.Wrapper';
+      Ok('conn-effective-override', c.EffectiveDriverClass = 'com.example.Wrapper');
     finally
       c.Free;
     end;
@@ -132,6 +140,51 @@ begin
       Ok('query-props', (qd.SQLText = 'SELECT 1') and (qd.KeyField = 'id'));
     finally
       qd.Free;
+    end;
+    { Wizard pure paths (no JVM): custom registration, maven override,
+      register-code snippet. }
+    ce.Id := 'testwizdb';
+    ce.DriverClass := 'com.example.JdbcDriver';
+    ce.UrlTemplate := 'jdbc:mydb://{host}:{port}/{database}';
+    ce.DefaultPort := 1234;
+    ce.TestQuery := 'SELECT 1';
+    ce.License := 'Commercial';
+    ce.Maven := 'com.example:mydb-jdbc:1.2.3';
+    ce.Sha := '';
+    ce.Embedded := False;
+    ce.Paging := psLimitOffset;
+    ce.Quote := qsDouble;
+    ce.KeyReturn := krNone;
+    ce.ParamSep := '&';
+    SetLength(ce.TypeAliases, 0);
+    TDriverRegistry.Register(ce);
+    wiz0 := TJdbcDriverWizard.Create;
+    try
+      wiz0.Root := 'C:\tmp\wizz';
+      Ok('wiz-custom-roundtrip',
+        TDriverRegistry.Find('testwizdb').DriverClass = 'com.example.JdbcDriver');
+      Ok('wiz-target-default', wiz0.JarTarget('h2') =
+        'C:\tmp\wizz\drivers' + PathDelim + 'h2-2.2.224.jar');
+      Ok('wiz-override-empty', (wiz0.MavenOverride = '') and
+        wiz0.MavenOverrideValid and
+        (wiz0.EffectiveMaven('testwizdb') = 'com.example:mydb-jdbc:1.2.3'));
+      wiz0.MavenOverride := 'com.example:mydb-jdbc:2.0.0';
+      Ok('wiz-override-target', wiz0.MavenOverrideValid and
+        (wiz0.JarTarget('testwizdb') =
+        'C:\tmp\wizz\drivers' + PathDelim + 'mydb-jdbc-2.0.0.jar'));
+      wiz0.MavenOverride := 'not-a-coord';
+      Ok('wiz-override-bad', (not wiz0.MavenOverrideValid) and
+        (wiz0.EffectiveMaven('testwizdb') = '') and
+        (wiz0.JarTarget('testwizdb') =
+        'C:\tmp\wizz\drivers' + PathDelim + 'testwizdb.jar'));
+      wiz0.MavenOverride := '';
+      code := TJdbcDriverWizard.BuildRegisterCode(ce);
+      Ok('wiz-codegen', (Pos('testwizdb', code) > 0) and
+        (Pos('com.example.JdbcDriver', code) > 0) and
+        (Pos('TDriverRegistry.Register', code) > 0) and
+        (Pos('jdbc:mydb://{host}:{port}/{database}', code) > 0));
+    finally
+      wiz0.Free;
     end;
   finally
     def.Free;
