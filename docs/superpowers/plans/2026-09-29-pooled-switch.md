@@ -218,7 +218,21 @@ Ok('conn-effective-default', c.EffectiveDriverClass = 'org.postgresql.Driver');
 c.DriverClassOverride := 'com.example.Wrapper';
 Ok('conn-effective-override', c.EffectiveDriverClass = 'com.example.Wrapper');
 ```
-(`c.DriverId` is `'sqlite'` at that point in the existing test; `EffectiveDriverClass` is a new public pure function on `TJdbcConnection` returning the override when non-blank else the entry class — headless-testable, no JVM.)
+(`c.DriverId` is `'postgresql'` at that point in the existing test; `EffectiveDriverClass` is a new public pure function on `TJdbcConnection` returning the override when non-blank else the entry class — headless-testable, no JVM.)
+
+Live component coverage (added per final review — same file, live H2 section after the wizard block; harness JVM must already be up, and `TJVMManager.SetRuntimeConfig('', FindJvmDll)` points the component at it since the component's own `FindLibJvm` finds no exe-adjacent `jre/`):
+```pascal
+c3.DriverId := 'h2';
+c3.Database := 'lcl;DB_CLOSE_DELAY=-1';
+c3.Pooled := False;
+c3.Connected := True;            // Ok('conn-direct-live', ...)
+qlive.OpenQuery(...c3.LiveConn, 'grid', 'SELECT ...', 100);
+                                 // Ok('conn-direct-rows', RecordCount >= 1)
+                                 // Ok('conn-direct-tracked', PoolCount=0, ConnCount=1)
+c3.Connected := False;           // Ok('conn-direct-clean', not Connected)
+c3.DriverClassOverride := 'org.h2.Driver'; reconnect → Ok('conn-direct-override', ...)
+```
+(Do NOT read `EnginePtr` after `Disconnect` — the engine is freed inside `Shutdown`; counts must be asserted pre-disconnect.)
 Compile with `fpc -Mobjfpc -Sh -FuD:\Projects\TyFPJDBC\src\core -FuD:\Projects\TyFPJDBC\src\db -FuD:\Projects\TyFPJDBC\src\lcl -FUD:\Projects\TyFPJDBC\test-results\work\units -oD:\Projects\TyFPJDBC\test-results\bin\testlcl.exe D:\Projects\TyFPJDBC\tests\TestLcl.lpr` (absolute `-o…​.exe`, see Task 2 note).
 Expected: FAIL — `identifier idents no member "Pooled"`.
 

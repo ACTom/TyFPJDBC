@@ -109,6 +109,8 @@ var
   probe: TWizProbe;
   wizDir: string;
   c2: TJdbcConnection;
+  c3: TJdbcConnection;
+  qlive: TJdbcQuery;
   wiz0: TJdbcDriverWizard;
   ce: TDriverEntry;
   code: string;
@@ -268,6 +270,41 @@ begin
       DeleteFile(wizDir + PathDelim + 'license-mysql.accepted');
       RemoveDir(wizDir + PathDelim + 'drivers');
       RemoveDir(wizDir);
+      { Live direct-connect component path (reviewer gap): Pooled=False
+        must connect, serve rows, and release cleanly — incl. override.
+        SetRuntimeConfig points the component at this harness JVM
+        (its own FindLibJvm would otherwise find no exe-adjacent jre/). }
+      TJVMManager.SetRuntimeConfig('', FindJvmDll);
+      c3 := TJdbcConnection.Create(nil);
+      try
+        c3.DriverId := 'h2';
+        c3.Database := 'lcl;DB_CLOSE_DELAY=-1';
+        c3.Pooled := False;
+        c3.Connected := True;
+        Ok('conn-direct-live', c3.Connected);
+        qlive := TJdbcQuery.Create(nil);
+        try
+          qlive.KeyField := 'id';
+          qlive.OpenQuery(TJdbcEngine(c3.EnginePtr), c3.LiveConn,
+            'grid', 'SELECT id,name FROM grid ORDER BY id', 100);
+          Ok('conn-direct-rows', qlive.RecordCount >= 1);
+          qlive.CloseQuery;
+        finally
+          qlive.Free;
+        end;
+        Ok('conn-direct-tracked', (TJdbcEngine(c3.EnginePtr).PoolCount = 0) and
+          (TJdbcEngine(c3.EnginePtr).ConnCount = 1));
+        c3.Connected := False;
+        { NOTE: EnginePtr dangles after Disconnect (engine freed inside);
+          read counts before disconnecting. }
+        Ok('conn-direct-clean', not c3.Connected);
+        c3.DriverClassOverride := 'org.h2.Driver';
+        c3.Connected := True;
+        Ok('conn-direct-override', c3.Connected);
+        c3.Connected := False;
+      finally
+        c3.Free;
+      end;
       eng.Release(conn);
       eng.ClosePool(pool);
       Ok('handles-zero', eng.HandleCount = 0);
