@@ -69,6 +69,11 @@ begin
   Ok('bsd-open', not TDriverFetch.IsGplLicense('BSD-2-Clause'));
   Ok('maven-path', TDriverFetch.MavenPath('com.h2database:h2:2.2.224', g, a, v) =
     'com/h2database/h2/2.2.224/h2-2.2.224.jar');
+  Ok('dlargs-curl', TDriverFetch.DownloadArgs('curl', 'https://x/y.jar',
+    'C:\t\f.tmp') = '-sL "https://x/y.jar" -o "C:\t\f.tmp"');
+  Ok('dlargs-ps', TDriverFetch.DownloadArgs('powershell', 'https://x/y.jar',
+    'C:\t\f.tmp') = '-NoProfile -Command Invoke-WebRequest ' +
+    '-UseBasicParsing "https://x/y.jar" -OutFile "C:\t\f.tmp"');
   Run('--verify-manifests --config D:\Projects\TyFPJDBC\configs\drivers.json', outp, code);
   Ok('manifests', (code = 0) and (Pos('manifests verified', outp) > 0));
   Run('--verify-runtime --platform win64 --sha256 bc04cdab23b4468829ca29a2fcff008b3ea7dd78de41a7636247c8774b486cec --out D:\Projects\TyFPJDBC-Runtimes\zips', outp, code);

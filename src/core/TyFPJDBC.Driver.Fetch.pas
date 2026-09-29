@@ -22,6 +22,7 @@ type
     class function MavenPath(const Maven: string; out Group, Artifact, Ver: string): string; static;
     class function MavenURL(const Rel: string): string; static;
     class function Sha1OfFile(const P: string): string; static;
+    class function DownloadArgs(const Exe, URL, OutTmp: string): string; static;
     class function FetchText(const URL: string): string; static;
     class function FetchJar(const URL, ExpectSha, Target: string): TFetchResult; static;
   end;
@@ -135,52 +136,47 @@ begin
   Result := 'powershell';
 end;
 
-function RunToFile(const Exe, Args, OutFile: string): Boolean;
+class function TDriverFetch.DownloadArgs(const Exe, URL, OutTmp: string): string;
+begin
+  if Exe = 'powershell' then
+    Result := '-NoProfile -Command Invoke-WebRequest -UseBasicParsing "' +
+      Trim(URL) + '" -OutFile "' + OutTmp + '"'
+  else
+    Result := '-sL "' + Trim(URL) + '" -o "' + OutTmp + '"';
+end;
+
+function RunDownload(const Exe, Args: string): Boolean;
 var
   P: TProcess;
-  fs: TFileStream;
-  buf: array[0..8191] of Byte;
-  n: Integer;
 begin
+  { File downloaders write the file themselves (curl -o / -OutFile);
+    never pipe stdout into it (that truncates the download), and never
+    show a console window (poNoConsole kills the black flash). }
   Result := False;
   P := TProcess.Create(nil);
   try
     P.Executable := Exe;
     P.Parameters.DelimitedText := Args;
-    P.Options := [poWaitOnExit, poUsePipes];
+    P.Options := [poWaitOnExit, poNoConsole];
     P.Execute;
-    fs := TFileStream.Create(OutFile, fmCreate);
-    try
-      repeat
-        n := P.Output.Read(buf, SizeOf(buf));
-        if n > 0 then
-          fs.WriteBuffer(buf, n);
-      until n <= 0;
-    finally
-      fs.Free;
-    end;
     Result := P.ExitStatus = 0;
   finally
     P.Free;
   end;
 end;
 
-function RunGet(const Exe, Args, OutFile: string): Boolean;
+function RunGet(const Exe, URL, OutFile: string): Boolean;
 var
-  dlArgs, final_: string;
+  final_: string;
 begin
+  Result := False;
+  if Trim(URL) = '' then
+    Exit(False);
   if OutFile = '' then
-    Exit(RunToFile(Exe, Args, GetTempFileName('', 'mauout')));
-  { curl -o vs powershell -OutFile: normalize here so callers pass URLs only. }
-  if (Exe = 'powershell') and (Pos('http', Args) > 0) then
-  begin
-    dlArgs := '-NoProfile -Command Invoke-WebRequest ' + Trim(Args) + ' ' +
-      OutFile + '.tmp';
-    Result := RunToFile(Exe, dlArgs, OutFile + '.tmp');
-  end
-  else
-    Result := RunToFile(Exe, Args + ' -o "' + OutFile + '"', OutFile + '.tmp');
-  if not Result then
+    Exit(RunDownload(Exe, TDriverFetch.DownloadArgs(Exe, URL,
+      GetTempFileName('', 'mauout'))));
+  if not RunDownload(Exe, TDriverFetch.DownloadArgs(Exe, URL,
+    OutFile + '.tmp')) then
     Exit(False);
   { Atomic rename after successful download (no partial cache poison). }
   final_ := OutFile;
@@ -199,12 +195,7 @@ begin
   tmp := GetTempFileName('', 'mau');
   try
     dl := Downloader;
-    if dl = 'powershell' then
-    begin
-      if not RunGet(dl, URL, tmp) then
-        raise Exception.Create('download failed: ' + URL);
-    end
-    else if not RunGet(dl, '-sL "' + URL + '"', tmp) then
+    if not RunGet(dl, URL, tmp) then
       raise Exception.Create('download failed: ' + URL);
     sl := TStringList.Create;
     try
@@ -235,12 +226,7 @@ begin
   { Cache miss: download, verify, atomically store. Proxy comes from
     environment (https_proxy) via curl/powershell defaults. }
   dl := Downloader;
-  if dl = 'powershell' then
-  begin
-    if not RunGet('powershell', URL, Target) then
-      raise Exception.Create('download failed: ' + URL);
-  end
-  else if not RunGet(dl, '-sL "' + URL + '"', Target) then
+  if not RunGet(dl, URL, Target) then
     raise Exception.Create('download failed: ' + URL);
   gotSha := Sha1OfFile(Target);
   if gotSha <> LowerCase(Trim(ExpectSha)) then
