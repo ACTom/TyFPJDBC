@@ -20,6 +20,7 @@ type
     FDriverId, FHost, FDatabase, FUser, FPassword: string;
     FPort, FMaxPool, FLoginTimeoutSecs: Integer;
     FRoot: string;
+    FMavenOverride: string;
     FTestedOk: Boolean;
     FOnFetch: TFetchFunc;
     FOnTest: TTestFunc;
@@ -36,6 +37,11 @@ type
     property MaxPool: Integer read FMaxPool write FMaxPool;
     property LoginTimeoutSecs: Integer read FLoginTimeoutSecs write FLoginTimeoutSecs;
     property Root: string read FRoot write FRoot;
+    { Manual maven coordinates for the download dialog (custom drivers).
+      Empty (default) uses the registry entry's Maven. }
+    property MavenOverride: string read FMavenOverride write FMavenOverride;
+    function MavenOverrideValid: Boolean;
+    function EffectiveMaven(const Id: string): string;
     property OnFetch: TFetchFunc read FOnFetch write FOnFetch;
     property OnTest: TTestFunc read FOnTest write FOnTest;
     property TestedOk: Boolean read FTestedOk;
@@ -46,6 +52,7 @@ type
     function Test: Boolean;
     function CanConfirm: Boolean;
     procedure ApplyTo(Conn: TJdbcConnection);
+    class function BuildRegisterCode(const E: TDriverEntry): string; static;
   end;
 
 implementation
@@ -69,6 +76,7 @@ begin
     cfg.Free;
   end;
   FRoot := '';
+  FMavenOverride := '';
   FTestedOk := False;
 end;
 
@@ -89,26 +97,63 @@ end;
 function TJdbcDriverWizard.JarTarget(const Id: string): string;
 var
   e: TDriverEntry;
-  grp, art, ver, dir: string;
+  grp, art, ver, dir, maven: string;
 begin
-  e := TDriverRegistry.Find(Id);
-  TDriverFetch.MavenPath(e.Maven, grp, art, ver);
+  maven := EffectiveMaven(Id);
   dir := FRoot;
   if dir = '' then
     dir := ExtractFilePath(ParamStr(0));
-  Result := IncludeTrailingPathDelimiter(dir) + 'drivers' + PathDelim +
-    art + '-' + ver + '.jar';
+  dir := IncludeTrailingPathDelimiter(dir) + 'drivers' + PathDelim;
+  if maven = '' then
+  begin
+    { Custom driver without maven coordinates (or a malformed override):
+      local jar named by id. Find still validates the id is known. }
+    e := TDriverRegistry.Find(Id);
+    Result := dir + e.Id + '.jar';
+    Exit;
+  end;
+  TDriverFetch.MavenPath(maven, grp, art, ver);
+  Result := dir + art + '-' + ver + '.jar';
+end;
+
+function TJdbcDriverWizard.MavenOverrideValid: Boolean;
+var
+  grp, art, ver: string;
+begin
+  if Trim(FMavenOverride) = '' then
+    Exit(True);
+  Result := TDriverFetch.MavenPath(Trim(FMavenOverride), grp, art, ver) <> '';
+end;
+
+function TJdbcDriverWizard.EffectiveMaven(const Id: string): string;
+var
+  grp, art, ver: string;
+begin
+  Result := '';
+  if Trim(FMavenOverride) <> '' then
+  begin
+    if TDriverFetch.MavenPath(Trim(FMavenOverride), grp, art, ver) = '' then
+      Exit('');
+    Exit(Trim(FMavenOverride));
+  end;
+  Result := TDriverRegistry.Find(Id).Maven;
 end;
 
 function TJdbcDriverWizard.JarState(const Id: string): TJarState;
 var
+  e: TDriverEntry;
   target, expect, side: string;
   sl: TStringList;
 begin
   target := JarTarget(Id);
   if not FileExists(target) then
     Exit(jsMissing);
-  expect := TDriverRegistry.Find(Id).Sha;
+  e := TDriverRegistry.Find(Id);
+  { The pinned Sha only applies to the entry's own coordinates; an
+    override (or no maven at all) falls back to the sidecar file. }
+  expect := '';
+  if EffectiveMaven(Id) = e.Maven then
+    expect := e.Sha;
   if expect = '' then
   begin
     side := target + '.sha1';
@@ -155,11 +200,13 @@ begin
     if not TDriverFetch.LicenseAccepted(Id) then
       Exit(False);
   end;
-  rel := TDriverFetch.MavenPath(e.Maven, grp, art, ver);
+  rel := TDriverFetch.MavenPath(EffectiveMaven(Id), grp, art, ver);
   if rel = '' then
     Exit(False);
   url := TDriverFetch.MavenURL(rel);
-  sha := e.Sha;
+  sha := '';
+  if EffectiveMaven(Id) = e.Maven then
+    sha := e.Sha;
   if sha = '' then
     try
       sha := Trim(TDriverFetch.FetchText(url + '.sha1'));
@@ -219,6 +266,75 @@ begin
   Conn.Password := FPassword;
   Conn.MaxPool := FMaxPool;
   Conn.LoginTimeoutSecs := FLoginTimeoutSecs;
+end;
+
+class function TJdbcDriverWizard.BuildRegisterCode(const E: TDriverEntry): string;
+
+  function Q(const S: string): string;
+  begin
+    Result := '''' + StringReplace(S, '''', '''''', [rfReplaceAll]) + '''';
+  end;
+
+  function PagingName(P: TPagingStyle): string;
+  begin
+    case P of
+      psOffsetFetchNext: Result := 'psOffsetFetchNext';
+      psOffsetFetchFirst: Result := 'psOffsetFetchFirst';
+    else
+      Result := 'psLimitOffset';
+    end;
+  end;
+
+  function QuoteName(QS: TQuoteStyle): string;
+  begin
+    case QS of
+      qsBacktick: Result := 'qsBacktick';
+      qsBracket: Result := 'qsBracket';
+    else
+      Result := 'qsDouble';
+    end;
+  end;
+
+  function KeyName(K: TKeyReturnStyle): string;
+  begin
+    if K = krReturning then
+      Result := 'krReturning'
+    else
+      Result := 'krNone';
+  end;
+
+var
+  L: TStringList;
+begin
+  { Paste-ready registration: call once at startup before Connect.
+    Session registration inside the IDE does not survive restart. }
+  L := TStringList.Create;
+  try
+    L.Add('{ Custom driver for TyFPJDBC: call once at startup before Connect. }');
+    L.Add('uses TyFPJDBC.Driver.Registry;');
+    L.Add('var');
+    L.Add('  e: TDriverEntry;');
+    L.Add('begin');
+    L.Add('  e.Id := ' + Q(E.Id) + ';');
+    L.Add('  e.DriverClass := ' + Q(E.DriverClass) + ';');
+    L.Add('  e.UrlTemplate := ' + Q(E.UrlTemplate) + ';');
+    L.Add('  e.DefaultPort := ' + IntToStr(E.DefaultPort) + ';');
+    L.Add('  e.TestQuery := ' + Q(E.TestQuery) + ';');
+    L.Add('  e.License := ' + Q(E.License) + ';');
+    L.Add('  e.Maven := ' + Q(E.Maven) + ';');
+    L.Add('  e.Sha := ' + Q(E.Sha) + ';');
+    L.Add('  e.Embedded := ' + BoolToStr(E.Embedded, True) + ';');
+    L.Add('  e.Paging := ' + PagingName(E.Paging) + ';');
+    L.Add('  e.Quote := ' + QuoteName(E.Quote) + ';');
+    L.Add('  e.KeyReturn := ' + KeyName(E.KeyReturn) + ';');
+    L.Add('  e.ParamSep := ' + Q(E.ParamSep) + ';');
+    L.Add('  SetLength(e.TypeAliases, 0);');
+    L.Add('  TDriverRegistry.Register(e);');
+    L.Add('end;');
+    Result := L.Text;
+  finally
+    L.Free;
+  end;
 end;
 
 end.

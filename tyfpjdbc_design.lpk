@@ -10,7 +10,7 @@
     <CompilerOptions>
       <Version Value="11"/>
       <SearchPaths>
-        <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)/$(LCLWidgetType)"/>
+        <UnitOutputDirectory Value="test-results/work/units/$(TargetCPU)-$(TargetOS)-$(LCLWidgetType)"/>
         <OtherUnitFiles Value="src/core;src/db;src/lcl"/>
       </SearchPaths>
       <Other>
@@ -44,6 +44,10 @@
       <Item>
         <Filename Value="src/lcl/TyFPJDBC.LCL.ConnDialog.pas"/>
         <UnitName Value="TyFPJDBC.LCL.ConnDialog"/>
+      </Item>
+      <Item>
+        <Filename Value="src/lcl/TyFPJDBC.LCL.CustomDriver.pas"/>
+        <UnitName Value="TyFPJDBC.LCL.CustomDriver"/>
       </Item>
       <Item>
         <Filename Value="src/lcl/tyfpjdbcreg.pas"/>

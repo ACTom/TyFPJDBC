@@ -5,10 +5,10 @@ unit TyFPJDBC.LCL.ConnDialog;
 interface
 
 uses
-  SysUtils, Classes, Forms, Controls, StdCtrls, ComCtrls,
+  SysUtils, Classes, Forms, Controls, Graphics, StdCtrls, ComCtrls, Dialogs,
   TyFPJDBC.Handles, TyFPJDBC.JVM.Manager, TyFPJDBC.JNI.Bridge,
   TyFPJDBC.Engine, TyFPJDBC.Driver.Registry, TyFPJDBC.Driver.Fetch,
-  TyFPJDBC.LCL.Conn, TyFPJDBC.LCL.Wizard;
+  TyFPJDBC.LCL.Conn, TyFPJDBC.LCL.Wizard, TyFPJDBC.LCL.CustomDriver;
 
 type
   { Driver wizard dialog: pick driver, check jar, one-click fetch
@@ -23,9 +23,11 @@ type
     DownloadBtn: TButton;
     Progress: TProgressBar;
     LicenseCheck: TCheckBox;
-    HostEdit, PortEdit, DbEdit, UserEdit, PassEdit, TimeoutEdit: TEdit;
+    HostEdit, PortEdit, DbEdit, UserEdit, PassEdit, TimeoutEdit,
+    MavenEdit, MaxPoolEdit: TEdit;
     TestBtn, OkBtn, CancelBtn: TButton;
     function SelectedId: string;
+    procedure FillDrivers(const KeepId: string);
     function GetTestedOk: Boolean;
     function GetOnTest: TTestFunc;
     procedure SetOnTest(V: TTestFunc);
@@ -47,8 +49,7 @@ implementation
 
 constructor TJdbcConnDialog.Create(AOwner: TComponent);
 var
-  t, i: Integer;
-  ids: TDriverIdArray;
+  t: Integer;
 
   function MkEdit(const Cap: string; Y: Integer): TEdit;
   begin
@@ -70,7 +71,7 @@ begin
   inherited CreateNew(AOwner);
   Caption := 'TyFPJDBC Connection';
   ClientWidth := 300;
-  ClientHeight := 424;
+  ClientHeight := 480;
   Position := poScreenCenter;
   FWizard := TJdbcDriverWizard.Create;
   FWizard.OnTest := @DefaultTest;
@@ -123,6 +124,11 @@ begin
   PassEdit.PasswordChar := '*';
   Inc(t, 28);
   TimeoutEdit := MkEdit('Timeout(s)', t);
+  Inc(t, 28);
+  MavenEdit := MkEdit('Maven', t);
+  MavenEdit.TextHint := 'group:artifact:version (custom drivers)';
+  Inc(t, 28);
+  MaxPoolEdit := MkEdit('MaxPool', t);
   Inc(t, 32);
   TestBtn := TButton.Create(Self);
   TestBtn.Parent := Self;
@@ -135,22 +141,39 @@ begin
   OkBtn.Parent := Self;
   OkBtn.Caption := 'OK';
   OkBtn.Left := 104;
-  OkBtn.Top := 384;
+  OkBtn.Top := 440;
   OkBtn.Width := 84;
   OkBtn.ModalResult := mrOk;
   CancelBtn := TButton.Create(Self);
   CancelBtn.Parent := Self;
   CancelBtn.Caption := 'Cancel';
   CancelBtn.Left := 196;
-  CancelBtn.Top := 384;
+  CancelBtn.Top := 440;
   CancelBtn.Width := 84;
   CancelBtn.ModalResult := mrCancel;
-  ids := FWizard.DriverIds;
-  for i := 0 to High(ids) do
-    DriverBox.Items.Add(ids[i]);
-  if DriverBox.Items.Count > 0 then
-    DriverBox.ItemIndex := 0;
+  FillDrivers('');
   RefreshState;
+end;
+
+procedure TJdbcConnDialog.FillDrivers(const KeepId: string);
+var
+  i: Integer;
+  ids: TDriverIdArray;
+begin
+  ids := FWizard.DriverIds;
+  DriverBox.Items.BeginUpdate;
+  try
+    DriverBox.Items.Clear;
+    for i := 0 to High(ids) do
+      DriverBox.Items.Add(ids[i]);
+    DriverBox.Items.Add(CustomItem);
+    if KeepId <> '' then
+      DriverBox.ItemIndex := DriverBox.Items.IndexOf(KeepId);
+    if DriverBox.ItemIndex < 0 then
+      DriverBox.ItemIndex := 0;
+  finally
+    DriverBox.Items.EndUpdate;
+  end;
 end;
 
 destructor TJdbcConnDialog.Destroy;
@@ -161,7 +184,8 @@ end;
 
 function TJdbcConnDialog.SelectedId: string;
 begin
-  if DriverBox.ItemIndex >= 0 then
+  if (DriverBox.ItemIndex >= 0) and
+    (DriverBox.Items[DriverBox.ItemIndex] <> CustomItem) then
     Result := DriverBox.Items[DriverBox.ItemIndex]
   else
     Result := '';
@@ -183,6 +207,8 @@ begin
 end;
 
 procedure TJdbcConnDialog.PullFromEdits;
+var
+  e: TDriverEntry;
 begin
   FWizard.DriverId := SelectedId;
   FWizard.Host := Trim(HostEdit.Text);
@@ -191,6 +217,15 @@ begin
   FWizard.User := Trim(UserEdit.Text);
   FWizard.Password := PassEdit.Text;
   FWizard.LoginTimeoutSecs := StrToIntDef(Trim(TimeoutEdit.Text), 15);
+  FWizard.MaxPool := StrToIntDef(Trim(MaxPoolEdit.Text), FWizard.MaxPool);
+  FWizard.MavenOverride := '';
+  if SelectedId <> '' then
+  try
+    e := TDriverRegistry.Find(SelectedId);
+    if (Trim(MavenEdit.Text) <> '') and (Trim(MavenEdit.Text) <> e.Maven) then
+      FWizard.MavenOverride := Trim(MavenEdit.Text);
+  except
+  end;
 end;
 
 procedure TJdbcConnDialog.RefreshState;
@@ -209,6 +244,11 @@ begin
   e := TDriverRegistry.Find(id);
   LicenseCheck.Visible := TDriverFetch.IsGplLicense(e.License) and
     not TDriverFetch.LicenseAccepted(id);
+  MavenEdit.Text := FWizard.EffectiveMaven(id);
+  if FWizard.MavenOverrideValid then
+    MavenEdit.Color := clWindow
+  else
+    MavenEdit.Color := clCream;
   case FWizard.JarState(id) of
     jsReady: StateLbl.Caption := 'driver jar ready';
     jsMismatch: StateLbl.Caption := 'driver jar MISMATCH, re-download';
@@ -221,7 +261,21 @@ begin
 end;
 
 procedure TJdbcConnDialog.DriverBoxChange(Sender: TObject);
+var
+  id: string;
 begin
+  if (DriverBox.ItemIndex >= 0) and
+    (DriverBox.Items[DriverBox.ItemIndex] = CustomItem) then
+  begin
+    id := EditCustomDriver(FWizard.DriverId);
+    if id <> '' then
+    begin
+      FillDrivers(id);
+      FWizard.DriverId := id;
+    end
+    else
+      FillDrivers(FWizard.DriverId);
+  end;
   PullFromEdits;
   RefreshState;
 end;
@@ -244,9 +298,29 @@ end;
 
 procedure TJdbcConnDialog.TestBtnClick(Sender: TObject);
 var
-  keep: string;
+  id, keep: string;
 begin
   PullFromEdits;
+  id := SelectedId;
+  if (id <> '') and (FWizard.JarState(id) <> jsReady) then
+  begin
+    if not FWizard.MavenOverrideValid then
+    begin
+      StateLbl.Caption := 'bad maven coordinates, fix them first';
+      RefreshState;
+      Exit;
+    end;
+    if MessageDlg('Download driver?',
+      'Driver jar is missing or mismatched. Download it now?',
+      mtConfirmation, [mbYes, mbNo], 0) <> mrYes then
+    begin
+      RefreshState;
+      Exit;
+    end;
+    DownloadBtnClick(Sender);
+    if FWizard.JarState(id) <> jsReady then
+      Exit;
+  end;
   keep := '';
   if FWizard.Test then
     keep := 'connection ok'
@@ -323,6 +397,8 @@ begin
   FWizard.MaxPool := AConn.MaxPool;
   FWizard.LoginTimeoutSecs := AConn.LoginTimeoutSecs;
   DriverBox.ItemIndex := DriverBox.Items.IndexOf(AConn.DriverId);
+  if DriverBox.ItemIndex < 0 then
+    DriverBox.ItemIndex := 0; { unknown (unregistered custom) id: fall back }
   HostEdit.Text := AConn.Host;
   if AConn.Port > 0 then
     PortEdit.Text := IntToStr(AConn.Port);
@@ -330,6 +406,9 @@ begin
   UserEdit.Text := AConn.User;
   PassEdit.Text := AConn.Password;
   TimeoutEdit.Text := IntToStr(AConn.LoginTimeoutSecs);
+  MaxPoolEdit.Text := IntToStr(AConn.MaxPool);
+  PullFromEdits;
+  MavenEdit.Text := FWizard.EffectiveMaven(FWizard.DriverId);
   RefreshState;
   Result := ShowModal = mrOk;
   if Result then
