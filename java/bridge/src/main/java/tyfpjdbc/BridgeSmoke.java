@@ -113,6 +113,29 @@ public class BridgeSmoke {
 
     b.closeConn(conn);
     b.destroyPool(pool);
+
+    long d = b.directConnect("jdbc:h2:mem:direct;DB_CLOSE_DELAY=-1", "", "", "org.h2.Driver");
+    ok("direct-open", d > 0);
+    ok("direct-ddl", b.execDirect(d, "CREATE TABLE dt(id BIGINT PRIMARY KEY, v VARCHAR(20))") == 0);
+    long di = b.prepare(d, "INSERT INTO dt VALUES(?, ?)");
+    b.bindLong(di, 1, 7L);
+    b.bindString(di, 2, "seven");
+    ok("direct-roundtrip", b.execUpdate(di) == 1);
+    b.closeStmt(di);
+    long dq = b.prepare(d, "SELECT v FROM dt WHERE id=7");
+    long dc = b.queryOpen(dq, 10);
+    String[][] dw = b.fetchWindow(dc, 10);
+    ok("direct-read", dw.length == 1 && "seven".equals(dw[0][0]));
+    b.closeCursor(dc);
+    b.closeStmt(dq);
+    b.closeConn(d);
+    boolean badCls = false;
+    try {
+      b.directConnect("jdbc:h2:mem:bad;DB_CLOSE_DELAY=-1", "", "", "no.such.Driver");
+    } catch (java.sql.SQLException e) {
+      badCls = "08000".equals(e.getSQLState());
+    }
+    ok("direct-badclass", badCls);
     System.out.println("TOTAL fails=" + fails);
     if (fails > 0) System.exit(1);
   }

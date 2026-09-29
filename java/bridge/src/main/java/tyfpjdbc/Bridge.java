@@ -107,6 +107,31 @@ public class Bridge {
     if (ds != null) ds.close();
   }
 
+  /** Direct (pool-bypassing) connection for the Pooled=False path:
+   *  same ConnBox/handle contract, never touches the pools table. */
+  public long directConnect(String jdbcUrl, String user, String pw,
+      String driverClass) throws SQLException {
+    if (jdbcUrl == null || jdbcUrl.isEmpty())
+      throw new SQLException("bad url", "HY092", 40);
+    try {
+      Class.forName(driverClass == null ? "" : driverClass);
+    } catch (ClassNotFoundException e) {
+      SQLException s = new SQLException("no driver class " + driverClass,
+        "08000", 33);
+      recordChain(s);
+      throw s;
+    }
+    try {
+      Connection c = java.sql.DriverManager.getConnection(jdbcUrl,
+        user == null ? "" : user, pw == null ? "" : pw);
+      ConnBox b = new ConnBox();
+      b.c = c;
+      long id = ids.incrementAndGet();
+      conns.put(id, b);
+      return id;
+    } catch (SQLException e) { recordChain(e); throw e; }
+  }
+
   public int poolActive(long poolId) {
     HikariDataSource ds = pools.get(poolId);
     if (ds == null) return -1;

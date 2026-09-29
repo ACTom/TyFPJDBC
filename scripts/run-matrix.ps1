@@ -41,7 +41,7 @@ Check "javac-main" ($LASTEXITCODE -eq 0)
 $smoke = & "$jh\bin\java.exe" "-Dfile.encoding=UTF-8" -cp "$jm;$cp" tyfpjdbc.BridgeSmoke 2>&1 | Out-String
 Write-Output $smoke
 Check "smoke-fails-0" ($smoke -match "TOTAL fails=0")
-Check "smoke-17" (([regex]::Matches($smoke, "(?m)^PASS ").Count) -eq 17)
+Check "smoke-22" (([regex]::Matches($smoke, "(?m)^PASS ").Count) -eq 22)
 
 Section "fpc-pure-tests"
 # No JVM, no DB: named-param rewrite, type mapping, real-world SQL shapes.
