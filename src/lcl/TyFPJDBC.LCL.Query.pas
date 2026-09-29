@@ -25,6 +25,7 @@ type
     procedure SetParams(V: TStrings);
     procedure CheckBound;
     procedure CloseLive;
+    procedure LoadFromQuery(Q: TBufDataset);
   protected
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
   public
@@ -150,6 +151,72 @@ begin
   FActive := False;
 end;
 
+procedure TJdbcConnQuery.LoadFromQuery(Q: TBufDataset);
+var
+  i: Integer;
+  src, dst: TField;
+  ms: TMemoryStream;
+begin
+  { Mirror the live TJdbcQuery window into the inherited dataset so
+    TDataSource/DBGrid see rows. Both sides carry adapter-built metadata
+    from the same cursor, so positions and types line up 1:1.
+    The grid stays a read-only browse surface: edits land here, writes
+    go through ExecSQL (same contract as the demo). }
+  inherited Close;
+  FieldDefs.Assign(Q.FieldDefs);
+  CreateDataset;
+  { inherited Open: unqualified Open would re-enter this class's override
+    and recurse forever (observed as an M1/M2 loop). }
+  inherited Open;
+  DisableControls;
+  try
+    Q.First;
+    while not Q.Eof do
+    begin
+      Append;
+      for i := 0 to FieldCount - 1 do
+        if i < Q.FieldCount then
+        begin
+          src := Q.Fields[i];
+          dst := Fields[i];
+          if src.IsNull then
+            dst.Clear
+          else case src.DataType of
+            ftLargeint, ftAutoInc:
+              dst.AsLargeInt := src.AsLargeInt;
+            ftInteger, ftSmallint:
+              dst.AsInteger := src.AsInteger;
+            ftFloat, ftCurrency:
+              dst.AsFloat := src.AsFloat;
+            ftBoolean:
+              dst.AsBoolean := src.AsBoolean;
+            ftDate, ftTime, ftDateTime:
+              dst.AsDateTime := src.AsDateTime;
+            ftBlob, ftMemo, ftWideMemo:
+              begin
+                ms := TMemoryStream.Create;
+                try
+                  TBlobField(src).SaveToStream(ms);
+                  ms.Position := 0;
+                  TBlobField(dst).LoadFromStream(ms);
+                finally
+                  ms.Free;
+                end;
+              end;
+          else
+            dst.AsUTF8String := src.AsUTF8String;
+          end;
+        end;
+      Post;
+      Q.Next;
+    end;
+    Q.First;
+    First;
+  finally
+    EnableControls;
+  end;
+end;
+
 procedure TJdbcConnQuery.Open;
 var
   eng: TJdbcEngine;
@@ -192,6 +259,7 @@ begin
       TJdbcQuery(FQuery).OpenQuery(eng,
         TJdbcConnection(FConnection).LiveConn, '', FSQLText, FWindowSize);
       TJdbcQuery(FQuery).First;
+      LoadFromQuery(TJdbcQuery(FQuery));
       FActive := True;
     except
       FreeAndNil(FQuery);
