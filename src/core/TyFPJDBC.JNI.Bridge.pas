@@ -46,6 +46,7 @@ type
     FObj: jobject;
     FClass: jclass;
     FMGetVersion, FMCreatePoolFlat, FMDestroyPool, FMBorrow, FMCloseConn: jmethodID;
+    FMDirectConnect: jmethodID;
     FMSetAutoCommit, FMCommit, FMRollback, FMSavepoint, FMRollbackTo, FMReleaseSp: jmethodID;
     FMSetReadOnly, FMSetCatalog, FMSetSchema, FMSetIsolation, FMIsValid, FMDbMeta: jmethodID;
     FMPrepare, FMPrepareCall, FMSetTimeout: jmethodID;
@@ -87,6 +88,8 @@ type
     function CreatePool(const Cfg: TPoolCfgRec): Int64;
     procedure DestroyPool(PoolId: Int64);
     function BorrowConn(PoolId: Int64): Int64;
+    function DirectConnect(const Url, User, Password,
+      DriverClass: UTF8String): Int64;
     procedure CloseConn(ConnId: Int64);
     procedure SetAutoCommit(ConnId: Int64; Auto: Boolean);
     procedure Commit(ConnId: Int64);
@@ -699,6 +702,8 @@ begin
     '(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIJJJJLjava/lang/String;JZZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;)J');
   FMDestroyPool := Mid('destroyPool', '(J)V');
   FMBorrow := Mid('borrowConn', '(J)J');
+  FMDirectConnect := Mid('directConnect',
+    '(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)J');
   FMCloseConn := Mid('closeConn', '(J)V');
   FMSetAutoCommit := Mid('setAutoCommit', '(JZ)V');
   FMCommit := Mid('commit', '(J)V');
@@ -820,6 +825,28 @@ begin
   CheckHandle('pool', PoolId);
   Result := CallLong1(FMBorrow, PoolId);
   CheckHandle('conn', Result);
+end;
+
+function TBridge.DirectConnect(const Url, User, Password,
+  DriverClass: UTF8String): Int64;
+var
+  e: PJNIEnv;
+  args: array[0..3] of jvalue;
+  su, ss, sp, sd: jstring;
+begin
+  e := TJVMManager.GetJNIEnv;
+  FillChar(args, SizeOf(args), 0);
+  su := JStr(Url); ss := JStr(User); sp := JStr(Password);
+  sd := JStr(DriverClass);
+  try
+    args[0].l := su; args[1].l := ss; args[2].l := sp; args[3].l := sd;
+    Result := e^^.CallLongMethodA(e, FObj, FMDirectConnect, @args[0]);
+    CheckJ('directconnect');
+    CheckHandle('conn', Result);
+  finally
+    e^^.DeleteLocalRef(e, su); e^^.DeleteLocalRef(e, ss);
+    e^^.DeleteLocalRef(e, sp); e^^.DeleteLocalRef(e, sd);
+  end;
 end;
 
 procedure TBridge.CloseConn(ConnId: Int64);

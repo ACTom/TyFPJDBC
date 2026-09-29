@@ -27,6 +27,7 @@ type
     function OpenPool(const Cfg: TPoolCfgRec): Int64;
     procedure ClosePool(PoolId: Int64);
     function Borrow(PoolId: Int64): Int64;
+    function OpenDirect(const Cfg: TPoolCfgRec): Int64;
     procedure Release(ConnId: Int64);
     procedure SetAutoCommit(ConnId: Int64; Auto: Boolean);
     procedure Commit(ConnId: Int64);
@@ -142,6 +143,14 @@ function TJdbcEngine.Borrow(PoolId: Int64): Int64;
 begin
   CheckHandle('pool', PoolId);
   Result := FBridge.BorrowConn(PoolId);
+  CheckHandle('conn', Result);
+  Track(FConns, Result);
+end;
+
+function TJdbcEngine.OpenDirect(const Cfg: TPoolCfgRec): Int64;
+begin
+  Result := FBridge.DirectConnect(Cfg.Url, Cfg.User, Cfg.Password,
+    Cfg.DriverClass);
   CheckHandle('conn', Result);
   Track(FConns, Result);
 end;

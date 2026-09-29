@@ -48,6 +48,8 @@ var
   eng: TJdbcEngine;
   cfg: TPoolCfgRec;
   pool, conn, stmt, cur: Int64;
+  dconn: Int64;
+  cfgBad: TPoolCfgRec;
   rows: TJdbcRows;
   raised: Boolean;
   st: string;
@@ -171,6 +173,43 @@ begin
       eng.ClosePool(pool);
       Ok('handles-zero', eng.HandleCount = 0);
       Ok('audit-zero', eng.AuditReport = 'pools=0 conns=0 stmts=0 cursors=0');
+
+      dconn := eng.OpenDirect(cfg);
+      Ok('direct-open', (dconn > 0) and (eng.PoolCount = 0) and (eng.ConnCount = 1));
+      Ok('direct-ddl', bridge.ExecDirect(dconn,
+        'CREATE TABLE dt(id BIGINT PRIMARY KEY, v VARCHAR(20))') = 0);
+      stmt := bridge.Prepare(dconn, 'INSERT INTO dt VALUES(?,?)');
+      try
+        bridge.BindLong(stmt, 1, 7);
+        bridge.BindString(stmt, 2, 'seven');
+        Ok('direct-exec', bridge.ExecUpdate(stmt) = 1);
+      finally
+        bridge.CloseStmt(stmt);
+      end;
+      stmt := bridge.Prepare(dconn, 'SELECT v FROM dt WHERE id=7');
+      try
+        cur := bridge.QueryOpen(stmt, 10);
+        try
+          rows := bridge.FetchWindow(cur, 10);
+          Ok('direct-read', (Length(rows) = 1) and (rows[0][0] = 'seven'));
+        finally
+          bridge.CloseCursor(cur);
+        end;
+      finally
+        bridge.CloseStmt(stmt);
+      end;
+      eng.Release(dconn);
+      Ok('direct-release-zero', (eng.HandleCount = 0) and
+        (eng.AuditReport = 'pools=0 conns=0 stmts=0 cursors=0'));
+      cfgBad := DefaultPoolCfg('jdbc:h2:mem:bad;DB_CLOSE_DELAY=-1', 'no.such.Driver');
+      raised := False;
+      try
+        eng.OpenDirect(cfgBad);
+      except
+        on E: EJDBCError do
+          raised := E.SQLState = '08000';
+      end;
+      Ok('direct-badclass', raised);
     finally
       eng.Free;
     end;
