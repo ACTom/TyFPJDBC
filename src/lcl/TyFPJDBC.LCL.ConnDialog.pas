@@ -6,9 +6,14 @@ interface
 
 uses
   SysUtils, Classes, Forms, Controls, Graphics, StdCtrls, ComCtrls, Dialogs,
+  LazIDEIntf, ProjectIntf,
   TyFPJDBC.Handles, TyFPJDBC.JVM.Manager, TyFPJDBC.JNI.Bridge,
   TyFPJDBC.Engine, TyFPJDBC.Driver.Registry, TyFPJDBC.Driver.Fetch,
   TyFPJDBC.LCL.Conn, TyFPJDBC.LCL.Wizard, TyFPJDBC.LCL.CustomDriver;
+
+var
+  { Session-picked design JVM dir (this IDE session only). }
+  GDesignJvmDir: string = '';
 
 type
   { Driver wizard dialog: pick driver, check jar, one-click fetch
@@ -31,6 +36,7 @@ type
     procedure FillDrivers(const KeepId: string);
     procedure UpdatePreview;
     procedure InputChanged(Sender: TObject);
+    function ResolveDesignJvm: string;
     function GetTestedOk: Boolean;
     function GetOnTest: TTestFunc;
     procedure SetOnTest(V: TTestFunc);
@@ -424,6 +430,55 @@ begin
   RefreshState;
 end;
 
+function TJdbcConnDialog.ResolveDesignJvm: string;
+var
+  proj: TLazProject;
+  pdir: string;
+begin
+  { Design-time JVM search (NOT the runtime FindLibJvm: at design time the
+    "exe" is the IDE itself, so look where the user's program lives):
+    session pick -> project dir -> IDE dir -> ask. }
+  Result := TJdbcDriverWizard.JvmDllInDir(GDesignJvmDir);
+  if Result <> '' then
+    Exit;
+  if Assigned(LazarusIDE) then
+  begin
+    proj := LazarusIDE.ActiveProject;
+    if Assigned(proj) then
+    begin
+      pdir := ExtractFilePath(proj.ProjectInfoFile);
+      Result := TJdbcDriverWizard.JvmDllInDir(pdir);
+      if Result <> '' then
+        Exit;
+    end;
+  end;
+  Result := TJdbcDriverWizard.JvmDllInDir(ExtractFilePath(ParamStr(0)));
+  if Result <> '' then
+    Exit;
+  Result := '';
+  if MessageDlg('JVM not found',
+    'No jre/ next to the project or the IDE. Get ' +
+    'jre-25-tyfpjdbc-<platform>.zip from TyFPJDBC-Runtimes releases, ' +
+    'unpack it, rename the inner directory to "jre/" beside your exe. ' +
+    'Select the folder containing jre/ now?',
+    mtConfirmation, [mbYes, mbNo], 0) <> mrYes then
+    Exit;
+  with TSelectDirectoryDialog.Create(nil) do
+  try
+    Title := 'Select the folder containing jre/';
+    if Execute then
+    begin
+      Result := TJdbcDriverWizard.JvmDllInDir(FileName);
+      if Result <> '' then
+        GDesignJvmDir := FileName
+      else
+        StatusLbl.Caption := 'no jvm under ' + FileName;
+    end;
+  finally
+    Free;
+  end;
+end;
+
 function TJdbcConnDialog.DefaultTest(const DriverId, Url: string): Boolean;
 var
   jvm: string;
@@ -436,7 +491,13 @@ var
 begin
   Result := False;
   try
-    jvm := TJVMManager.FindLibJvm('');
+    jvm := ResolveDesignJvm;
+    if jvm = '' then
+    begin
+      if StatusLbl.Caption = '' then
+        StatusLbl.Caption := 'jvm not found: bundle jre/ next to the project';
+      Exit;
+    end;
     TJVMManager.EnsureStarted(jvm, TJVMManager.BuildDesktopArgs);
     bridge := TBridge.Create;
     try

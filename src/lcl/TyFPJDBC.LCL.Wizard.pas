@@ -42,6 +42,7 @@ type
     property MavenOverride: string read FMavenOverride write FMavenOverride;
     function MavenOverrideValid: Boolean;
     function EffectiveMaven(const Id: string): string;
+    class function JvmDllInDir(const Dir: string): string; static;
     property OnFetch: TFetchFunc read FOnFetch write FOnFetch;
     property OnTest: TTestFunc read FOnTest write FOnTest;
     property TestedOk: Boolean read FTestedOk;
@@ -114,6 +115,30 @@ begin
   end;
   TDriverFetch.MavenPath(maven, grp, art, ver);
   Result := dir + art + '-' + ver + '.jar';
+end;
+
+class function TJdbcDriverWizard.JvmDllInDir(const Dir: string): string;
+var
+  base, cand: string;
+begin
+  { Same three layouts as TJVMManager.FindLibJvm, rooted at an explicit
+    directory (design-time search: picked dir, project dir, IDE dir). }
+  Result := '';
+  if Trim(Dir) = '' then
+    Exit;
+  base := IncludeTrailingPathDelimiter(Trim(Dir));
+  cand := base + 'jre' + PathDelim + 'bin' + PathDelim + 'server' +
+    PathDelim + 'jvm.dll';
+  if FileExists(cand) then
+    Exit(cand);
+  cand := base + 'jre' + PathDelim + 'lib' + PathDelim + 'server' +
+    PathDelim + 'libjvm.so';
+  if FileExists(cand) then
+    Exit(cand);
+  cand := base + 'jre' + PathDelim + 'lib' + PathDelim + 'server' +
+    PathDelim + 'libjvm.dylib';
+  if FileExists(cand) then
+    Exit(cand);
 end;
 
 function TJdbcDriverWizard.MavenOverrideValid: Boolean;

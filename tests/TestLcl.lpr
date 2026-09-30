@@ -114,6 +114,7 @@ var
   wiz0: TJdbcDriverWizard;
   ce: TDriverEntry;
   code: string;
+  tmpJ: string;
 begin
   def := TJdbcConfig.Default;
   try
@@ -185,6 +186,16 @@ begin
         (Pos('com.example.JdbcDriver', code) > 0) and
         (Pos('TDriverRegistry.Register', code) > 0) and
         (Pos('jdbc:mydb://{host}:{port}/{database}', code) > 0));
+      tmpJ := IncludeTrailingPathDelimiter(GetTempDir) + 'tjdesignjvm';
+      ForceDirectories(tmpJ + PathDelim + 'jre' + PathDelim + 'bin' +
+        PathDelim + 'server');
+      with TFileStream.Create(tmpJ + PathDelim + 'jre' + PathDelim + 'bin' +
+        PathDelim + 'server' + PathDelim + 'jvm.dll', fmCreate) do
+        Free;
+      Ok('designjvm-found', TJdbcDriverWizard.JvmDllInDir(tmpJ) <> '');
+      Ok('designjvm-missing', TJdbcDriverWizard.JvmDllInDir(tmpJ + '-nope') = '');
+      DeleteFile(tmpJ + PathDelim + 'jre' + PathDelim + 'bin' +
+        PathDelim + 'server' + PathDelim + 'jvm.dll');
     finally
       wiz0.Free;
     end;
