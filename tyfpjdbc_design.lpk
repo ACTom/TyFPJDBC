@@ -10,7 +10,7 @@
     <CompilerOptions>
       <Version Value="11"/>
       <SearchPaths>
-        <UnitOutputDirectory Value="test-results/work/units/$(TargetCPU)-$(TargetOS)-$(LCLWidgetType)"/>
+        <UnitOutputDirectory Value="units/$(TargetCPU)-$(TargetOS)/$(LCLWidgetType)"/>
         <OtherUnitFiles Value="src/core;src/db;src/lcl"/>
       </SearchPaths>
       <Other>
