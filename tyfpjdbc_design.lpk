@@ -28,6 +28,9 @@
         <PackageName Value="FCL"/>
       </Item>
     </RequiredPkgs>
+    <UsageOptions>
+      <UnitPath Value="$(PkgOutDir)"/>
+    </UsageOptions>
     <Files>
       <Item>
         <Filename Value="src/lcl/TyFPJDBC.LCL.Conn.pas"/>
