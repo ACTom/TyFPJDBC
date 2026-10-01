@@ -8,13 +8,13 @@
       "modules": ["java.base", "java.sql", "java.naming", "java.logging", "java.management", "java.xml", "java.security.sasl", "jdk.unsupported", "java.transaction.xa"],
       "jdepsModules": ["java.base", "java.management", "java.naming", "java.sql"],
       "bridgeVersion": "0.9.0",
-      "releaseTag": "",
+      "releaseTag": "runtime/jre25.0.4.1-bridge0.9.0",
       "asset": "jre-25-tyfpjdbc-win64.zip",
-      "packedBytes": 24733112,
-      "unpackedBytes": 38443839,
+      "packedBytes": 24738202,
+      "unpackedBytes": 38458617,
       "verifiedNote": "Built 2026-09-24 by same-vendor cross-host jlink: Microsoft 25.0.4.1 Windows jlink binary against Microsoft 25.0.4.1 win64 jmods (flags: --disable-plugin generate-jli-classes --vm server, --compress=zip-9, --exclude-resources classes*.jsa), plus bridge/ (Bridge.class, HikariCP 5.1.0, slf4j-api 2.0.9) and drivers/README. Packed with scripts/build-runtime-zip.ps1 under PowerShell 7 (sorted, fixed 2026-01-01 timestamp, Optimal): rebuild of same stage dir is byte-identical, verified. Boots java -version.",
-      "url": "TyFPJDBC-Runtimes Release asset: jre-25-tyfpjdbc-win64.zip",
-      "sha256": "bc04cdab23b4468829ca29a2fcff008b3ea7dd78de41a7636247c8774b486cec"
+      "url": "https://github.com/ACTom/TyFPJDBC/releases/download/runtime/jre25.0.4.1-bridge0.9.0/jre-25-tyfpjdbc-win64.zip",
+      "sha256": "20b4e27b4001b59a568c5dfbeac52db0a775368031e8afee08e621a6b70bc05c"
     },
     {
       "platform": "linux-x64",
@@ -24,13 +24,13 @@
       "modules": ["java.base", "java.sql", "java.naming", "java.logging", "java.management", "java.xml", "java.security.sasl", "jdk.unsupported", "java.transaction.xa"],
       "moduleSet": "9-module trim, release MODULES verified",
       "bridgeVersion": "0.9.0",
-      "releaseTag": "",
+      "releaseTag": "runtime/jre25.0.4.1-bridge0.9.0",
       "asset": "jre-25-tyfpjdbc-linux-x64.zip",
-      "packedBytes": 27222395,
-      "unpackedBytes": 48583396,
+      "packedBytes": 27278034,
+      "unpackedBytes": 48543849,
       "verifiedNote": "Built 2026-09-24 by Microsoft 25.0.4.1 Windows jlink binary against Microsoft 25.0.4.1 linux-x64 jmods (same flags as win64). Packed with scripts/build-runtime-zip.ps1 under PowerShell 7: byte-identical rebuild verified. Layout: ELF launcher and lib/server/libjvm.so, zero dll/exe, 9-module release MODULES.",
-      "url": "TyFPJDBC-Runtimes Release asset: jre-25-tyfpjdbc-linux-x64.zip",
-      "sha256": "3a680947b9cb7d857c4681f6294fd2db33c3c74a7938b7ebb87c190187900ae0"
+      "url": "https://github.com/ACTom/TyFPJDBC/releases/download/runtime/jre25.0.4.1-bridge0.9.0/jre-25-tyfpjdbc-linux-x64.zip",
+      "sha256": "e5cc08e74f52bb8b27e3265f0f4672ad4237b46959a24f8894014840355b5ea3"
     },
     {
       "platform": "linux-arm64",
@@ -40,13 +40,13 @@
       "modules": ["java.base", "java.sql", "java.naming", "java.logging", "java.management", "java.xml", "java.security.sasl", "jdk.unsupported", "java.transaction.xa"],
       "moduleSet": "9-module trim, release MODULES verified",
       "bridgeVersion": "0.9.0",
-      "releaseTag": "",
+      "releaseTag": "runtime/jre25.0.4.1-bridge0.9.0",
       "asset": "jre-25-tyfpjdbc-linux-arm64.zip",
-      "packedBytes": 26452135,
-      "unpackedBytes": 46965193,
+      "packedBytes": 26503829,
+      "unpackedBytes": 46902701,
       "verifiedNote": "Built 2026-09-24 by Microsoft 25.0.4.1 Windows jlink against Microsoft 25.0.4.1 linux-aarch64 jmods (same flags). Packed with scripts/build-runtime-zip.ps1: byte-identical rebuild verified. Layout: ELF launcher and lib/server/libjvm.so, zero dll/exe, 9-module release MODULES.",
-      "url": "TyFPJDBC-Runtimes Release asset: jre-25-tyfpjdbc-linux-arm64.zip",
-      "sha256": "30d3016245ac4b32d05351c3ac9c091c9ffa4ee493f55091ea404bd17a3c3ab8"
+      "url": "https://github.com/ACTom/TyFPJDBC/releases/download/runtime/jre25.0.4.1-bridge0.9.0/jre-25-tyfpjdbc-linux-arm64.zip",
+      "sha256": "eea3798444e4e573832565bed7ac369b3a273da762acd04e1b4bbc02dbb9cbfd"
     },
     {
       "platform": "macos-x64",
@@ -56,13 +56,13 @@
       "modules": ["java.base", "java.sql", "java.naming", "java.logging", "java.management", "java.xml", "java.security.sasl", "jdk.unsupported", "java.transaction.xa"],
       "moduleSet": "9-module trim, release MODULES verified",
       "bridgeVersion": "0.9.0",
-      "releaseTag": "",
+      "releaseTag": "runtime/jre25.0.4.1-bridge0.9.0",
       "asset": "jre-25-tyfpjdbc-macos-x64.zip",
-      "packedBytes": 24178740,
-      "unpackedBytes": 41323422,
+      "packedBytes": 24244320,
+      "unpackedBytes": 41281536,
       "verifiedNote": "Built 2026-09-24 by Microsoft 25.0.4.1 Windows jlink against Microsoft 25.0.4.1 mac-x64 jmods (same flags). Packed with scripts/build-runtime-zip.ps1: byte-identical rebuild verified. Layout: Mach-O launcher and lib/server/libjvm.dylib, zero .so, 9-module release MODULES.",
-      "url": "TyFPJDBC-Runtimes Release asset: jre-25-tyfpjdbc-macos-x64.zip",
-      "sha256": "2e21359b710f49c2105ee5ac15ca7e4fd28e96b536e51b75562dc0045f5d6db5"
+      "url": "https://github.com/ACTom/TyFPJDBC/releases/download/runtime/jre25.0.4.1-bridge0.9.0/jre-25-tyfpjdbc-macos-x64.zip",
+      "sha256": "acd31751e91c1a9aa40ab1a3278c125445789f41b81265a3871c2efbe2fba3a9"
     },
     {
       "platform": "macos-arm64",
@@ -72,13 +72,13 @@
       "modules": ["java.base", "java.sql", "java.naming", "java.logging", "java.management", "java.xml", "java.security.sasl", "jdk.unsupported", "java.transaction.xa"],
       "moduleSet": "9-module trim, release MODULES verified",
       "bridgeVersion": "0.9.0",
-      "releaseTag": "",
+      "releaseTag": "runtime/jre25.0.4.1-bridge0.9.0",
       "asset": "jre-25-tyfpjdbc-macos-arm64.zip",
-      "packedBytes": 23191427,
-      "unpackedBytes": 39104964,
+      "packedBytes": 23271358,
+      "unpackedBytes": 39117266,
       "verifiedNote": "Built 2026-09-24 by Microsoft 25.0.4.1 Windows jlink against Microsoft 25.0.4.1 mac-aarch64 jmods (same flags). Packed with scripts/build-runtime-zip.ps1: byte-identical rebuild verified. Layout: Mach-O launcher and lib/server/libjvm.dylib, zero .so, 9-module release MODULES.",
-      "url": "TyFPJDBC-Runtimes Release asset: jre-25-tyfpjdbc-macos-arm64.zip",
-      "sha256": "95c90b3b49fd6db12ed79058f735e8fc927a0ed2191c8e72c711ebc67fffba16"
+      "url": "https://github.com/ACTom/TyFPJDBC/releases/download/runtime/jre25.0.4.1-bridge0.9.0/jre-25-tyfpjdbc-macos-arm64.zip",
+      "sha256": "77e0494edcd7a33e7859e917317921ced999a7f2ac5a09c2d47f6745893fae61"
     }
   ]
 }
