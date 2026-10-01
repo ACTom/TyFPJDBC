@@ -1,0 +1,346 @@
+name: runtime-release
+
+# Mono-repo runtime release: rebuilds all 5 jlink-trimmed JREs natively
+# (one job per platform), refreshes configs/runtimes.json, and publishes
+# the TyFPJDBC-Runtimes release. Triggers are dispatch + runtime/* tags
+# ONLY -- there is deliberately no push-to-master trigger here.
+on:
+  workflow_dispatch:
+    inputs:
+      jdk_version:
+        description: 'JDK version (tag is runtime/jre<jdkVersion>-bridge<bridgeVersion>)'
+        required: false
+        default: '25.0.4.1'
+      bridge_ref:
+        description: 'Bridge source ref (commit SHA; empty = triggering SHA)'
+        required: false
+        default: ''
+      platforms:
+        description: 'Comma-separated subset (default: all five platforms)'
+        required: false
+        default: 'win64,linux-x64,linux-arm64,macos-x64,macos-arm64'
+  push:
+    tags:
+      - 'runtime/*'
+
+concurrency:
+  group: runtime-release
+  cancel-in-progress: false
+
+# No secret beyond the automatic GITHUB_TOKEN.
+permissions:
+  contents: write
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.versions.outputs.tag }}
+      jdk_version: ${{ steps.versions.outputs.jdk_version }}
+      bridge_version: ${{ steps.versions.outputs.bridge_version }}
+      bridge_ref: ${{ steps.refs.outputs.bridge_ref }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: checkout bridge sources
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.bridge_ref || github.sha }}
+
+      # FAIL-FAST gate: runs before any build. Tag versions must agree
+      # with Bridge.VERSION; a mismatch aborts the whole workflow here.
+      - name: fail-fast version handshake
+        id: versions
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          JDK_INPUT: ${{ inputs.jdk_version }}
+        run: |
+          set -euo pipefail
+          BV_FILE="$(grep -oP 'VERSION = "\K[^"]+' java/bridge/src/main/java/tyfpjdbc/Bridge.java)"
+          echo "bridge-version-file=${BV_FILE}"
+          if [ "${EVENT_NAME}" = "push" ]; then
+            TAG="${REF_NAME}"
+          else
+            TAG="runtime/jre${JDK_INPUT}-bridge${BV_FILE}"
+          fi
+          echo "tag=${TAG}"
+          if [[ ! "${TAG}" =~ ^runtime/jre([0-9.]+)-bridge([0-9.]+)$ ]]; then
+            echo "bad tag format: ${TAG} (want runtime/jre<jdkVersion>-bridge<bridgeVersion>)"
+            exit 1
+          fi
+          JV_TAG="${BASH_REMATCH[1]}"
+          BV_TAG="${BASH_REMATCH[2]}"
+          if [ "${BV_TAG}" != "${BV_FILE}" ]; then
+            echo "version mismatch: tag bridge=${BV_TAG} != Bridge.VERSION=${BV_FILE}; refusing to build"
+            exit 1
+          fi
+          echo "jdk_version=${JV_TAG}" >> "$GITHUB_OUTPUT"
+          echo "bridge_version=${BV_FILE}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "handshake ok: ${TAG}"
+
+      - name: resolve bridge ref
+        id: refs
+        shell: bash
+        env:
+          INPUT_REF: ${{ inputs.bridge_ref }}
+        run: |
+          set -euo pipefail
+          if [ -n "${INPUT_REF}" ]; then
+            echo "bridge_ref=${INPUT_REF}" >> "$GITHUB_OUTPUT"
+          else
+            echo "bridge_ref=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Runner labels verified 2026-10-01 against the GitHub-hosted runners
+      # reference (docs.github.com/en/actions/reference/runners/github-hosted-runners):
+      # windows-latest (x64), ubuntu-latest (x64), ubuntu-24.04-arm,
+      # macos-15-intel (Intel still offered), macos-15 (arm64, pinned instead
+      # of macos-latest for stability). RE-CHECK these labels before any
+      # future edit -- GitHub retires images regularly.
+      - name: build platform matrix
+        id: matrix
+        shell: bash
+        env:
+          PLATFORMS_INPUT: ${{ inputs.platforms }}
+        run: |
+          set -euo pipefail
+          python3 - <<'EOF' >> "$GITHUB_OUTPUT"
+          import json, os
+          runners = {
+            "win64":       {"runs-on": "windows-latest", "jvm_rel": "jre/bin/server/jvm.dll"},
+            "linux-x64":   {"runs-on": "ubuntu-latest",  "jvm_rel": "jre/lib/server/libjvm.so"},
+            "linux-arm64": {"runs-on": "ubuntu-24.04-arm","jvm_rel": "jre/lib/server/libjvm.so"},
+            "macos-x64":   {"runs-on": "macos-15-intel", "jvm_rel": "jre/lib/server/libjvm.dylib"},
+            "macos-arm64": {"runs-on": "macos-15",       "jvm_rel": "jre/lib/server/libjvm.dylib"},
+          }
+          want = (os.environ.get("PLATFORMS_INPUT") or "").strip()
+          if not want:
+            want = ",".join(runners)
+          picked = [p.strip() for p in want.split(",") if p.strip()]
+          unknown = [p for p in picked if p not in runners]
+          if unknown:
+            raise SystemExit("unknown platforms: " + ",".join(unknown))
+          include = [{"platform": p, **runners[p]} for p in picked]
+          print("matrix=" + json.dumps({"include": include}))
+          EOF
+
+  build:
+    needs: setup
+    strategy:
+      fail-fast: true
+      matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
+    runs-on: ${{ matrix.runs-on }}
+    steps:
+      - name: checkout bridge sources
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.setup.outputs.bridge_ref }}
+
+      - name: set up JDK 25 (Microsoft)
+        uses: actions/setup-java@v4
+        with:
+          distribution: microsoft
+          java-version: '25'
+
+      - name: fetch bridge dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p libs classes
+          base=https://repo1.maven.org/maven2
+          curl -fsSL -o libs/HikariCP-5.1.0.jar     "$base/com/zaxxer/HikariCP/5.1.0/HikariCP-5.1.0.jar"
+          curl -fsSL -o libs/slf4j-api-2.0.9.jar    "$base/org/slf4j/slf4j-api/2.0.9/slf4j-api-2.0.9.jar"
+          curl -fsSL -o libs/h2-2.2.224.jar         "$base/com/h2database/h2/2.2.224/h2-2.2.224.jar"
+          # Fail on empty downloads (curl -f alone accepts zero-byte bodies).
+          test -s libs/HikariCP-5.1.0.jar
+          test -s libs/slf4j-api-2.0.9.jar
+          test -s libs/h2-2.2.224.jar
+
+      - name: compile bridge
+        shell: bash
+        run: |
+          set -euo pipefail
+          CP="libs/HikariCP-5.1.0.jar:libs/slf4j-api-2.0.9.jar:libs/h2-2.2.224.jar"
+          # setup-java puts javac first on PATH; separators are ':' on every
+          # runner here because this step always runs under bash (git-bash on
+          # windows-latest included).
+          javac -encoding UTF-8 -cp "$CP" -d classes \
+            java/bridge/src/main/java/tyfpjdbc/PoolCfg.java \
+            java/bridge/src/main/java/tyfpjdbc/Bridge.java \
+            java/bridge/src/main/java/tyfpjdbc/BridgeSmoke.java
+
+      - name: run BridgeSmoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          CP="classes:libs/HikariCP-5.1.0.jar:libs/slf4j-api-2.0.9.jar:libs/h2-2.2.224.jar"
+          OUT="$(java -Dfile.encoding=UTF-8 -cp "$CP" tyfpjdbc.BridgeSmoke)"
+          echo "$OUT"
+          echo "$OUT" | grep -q "TOTAL fails=0"
+          # BridgeSmoke.java currently holds 22 ok( calls (plus the ok helper
+          # definition itself); recount from the file if this ever drifts.
+          test "$(echo "$OUT" | grep -c '^PASS ')" -eq 22
+
+      - name: assemble BridgeDir
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf bridgedir && mkdir -p bridgedir
+          cp classes/tyfpjdbc/Bridge.class bridgedir/
+          cp libs/HikariCP-5.1.0.jar libs/slf4j-api-2.0.9.jar bridgedir/
+
+      - name: jlink trim (native for this platform)
+        shell: pwsh
+        run: |
+          # Native jlink: the platform's own JDK home is BOTH host and
+          # target. The old --module-path cross-host trick is gone on
+          # purpose; each runner trims its own platform.
+          ./scripts/runtime/build-jlink.ps1 -Platform '${{ matrix.platform }}' `
+            -WindowsJavaHome $env:JAVA_HOME -TargetJdkHome $env:JAVA_HOME `
+            -OutRoot dist -BridgeDir bridgedir
+
+      - name: verify layout, budgets, hash
+        id: verify
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $stage = "dist/jre-25-tyfpjdbc-${{ matrix.platform }}"
+          $zip = "${stage}.zip"
+          # 1. JVM binary for this platform exists.
+          if (-not (Test-Path (Join-Path $stage '${{ matrix.jvm_rel }}'))) {
+            throw "jvm missing: ${{ matrix.jvm_rel }}"
+          }
+          # 2. bridge/ carries exactly Bridge.class + the 2 shipped jars.
+          $bridge = @(Get-ChildItem (Join-Path $stage 'bridge') -File | ForEach-Object { $_.Name } | Sort-Object)
+          $want = @('Bridge.class', 'HikariCP-5.1.0.jar', 'slf4j-api-2.0.9.jar')
+          if (($bridge -join ',') -ne ($want -join ',')) { throw "bridge/ content wrong: $($bridge -join ',')" }
+          # 3. Budgets (same numbers mautool CheckRuntimes enforces).
+          $u = (Get-ChildItem $stage -Recurse -File | Measure-Object Length -Sum).Sum
+          $b = (Get-Item $zip).Length
+          if ($u -gt 83886080) { throw "unpacked $u over 80MB budget" }
+          if ($b -gt 52428800) { throw "zip $b over 50MB budget" }
+          $h = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          "sha256=$h" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "packed=$b" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "unpacked=$u" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          # Per-platform meta file: the release job reads packed/unpacked/sha
+          # from here (the unpacked stage no longer exists there).
+          $plat = '${{ matrix.platform }}'
+          $meta = @{ platform = $plat; asset = "jre-25-tyfpjdbc-$plat.zip"; sha256 = $h; packedBytes = $b; unpackedBytes = $u } | ConvertTo-Json -Compress
+          $meta | Out-File -FilePath "meta-$plat.json" -Encoding utf8NoBOM
+          Write-Output "packed=$b unpacked=$u sha256=$h"
+
+      - name: upload runtime zip + meta
+        uses: actions/upload-artifact@v4
+        with:
+          name: jre-25-tyfpjdbc-${{ matrix.platform }}
+          path: |
+            dist/jre-25-tyfpjdbc-${{ matrix.platform }}.zip
+            meta-${{ matrix.platform }}.json
+          if-no-files-found: error
+
+  release:
+    needs: [setup, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout master
+        uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - name: download all runtime zips
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: refresh manifest from fresh build values
+        shell: pwsh
+        env:
+          TAG: ${{ needs.setup.outputs.tag }}
+          JDK_VERSION: ${{ needs.setup.outputs.jdk_version }}
+          BRIDGE_VERSION: ${{ needs.setup.outputs.bridge_version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $repo = "${{ github.repository }}"
+          foreach ($p in @('win64','linux-x64','linux-arm64','macos-x64','macos-arm64')) {
+            $asset = "jre-25-tyfpjdbc-$p.zip"
+            $zip = Get-ChildItem -Path dist -Recurse -Filter $asset | Select-Object -First 1
+            if ($null -eq $zip) { throw "missing artifact: $asset" }
+            $meta = Get-Content -Raw -Path "dist/meta-$p.json" | ConvertFrom-Json
+            # Re-hash the downloaded zip and confirm the build-time values.
+            $h = (Get-FileHash $zip.FullName -Algorithm SHA256).Hash.ToLower()
+            if ($h -ne $meta.sha256) { throw "sha changed in transit for $asset" }
+            if ((Get-Item $zip.FullName).Length -ne $meta.packedBytes) { throw "size changed in transit for $asset" }
+            # Manifest records fresh values, never asserts equality with old ones.
+            ./scripts/runtime/update-manifest.ps1 -ManifestPath configs/runtimes.json `
+              -Platform $p -PackedBytes $meta.packedBytes -UnpackedBytes $meta.unpackedBytes `
+              -Sha256 $meta.sha256 -JdkVersion $env:JDK_VERSION -BridgeVersion $env:BRIDGE_VERSION `
+              -ReleaseTag $env:TAG `
+              -AssetUrl "https://github.com/$repo/releases/download/$env:TAG/$asset"
+          }
+          git diff -- configs/runtimes.json
+
+      - name: build mautool and verify manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq fpc
+          mkdir -p build-units
+          fpc -FU./build-units -Fu./src/core -o./mautool ./src/tools/mautool.lpr
+          # Gate: fails stop the release BEFORE any commit or upload.
+          ./mautool --verify-manifests
+          for p in win64 linux-x64 linux-arm64 macos-x64 macos-arm64; do
+            sha="$(python3 -c "import json;print([r for r in json.load(open('configs/runtimes.json'))['runtimes'] if r['platform']=='$p'][0]['sha256'])")"
+            ./mautool --verify-runtime --platform "$p" --sha256 "$sha" --out dist
+          done
+
+      - name: commit manifest to master
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add configs/runtimes.json
+          git commit -m "runtimes: refresh manifest for ${{ needs.setup.outputs.tag }}" || echo "nothing to commit"
+          git push origin master
+
+      - name: write build log
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "tag=${{ needs.setup.outputs.tag }}"
+            echo "jdk_version=${{ needs.setup.outputs.jdk_version }}"
+            echo "bridge_version=${{ needs.setup.outputs.bridge_version }}"
+            echo "bridge_ref=${{ needs.setup.outputs.bridge_ref }}"
+            echo
+            git diff -- configs/runtimes.json || true
+          } > build.log
+
+      - name: create release with zips
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="${{ needs.setup.outputs.tag }}"
+          NOTES="$(mktemp)"
+          {
+            echo "TyFPJDBC trimmed JREs (jlink, 9 modules) + Bridge ${{ needs.setup.outputs.bridge_version }}."
+            echo
+            echo "After extraction run \`chmod +x bin/*\` on Linux/macOS (zips store no unix permission bits)."
+            echo
+            python3 - <<'EOF'
+          import json
+          m = json.load(open('configs/runtimes.json'))
+          for r in m['runtimes']:
+            print("- %(asset)s  sha256=%(sha256)s  packed=%(packedBytes)d unpacked=%(unpackedBytes)d" % r)
+          EOF
+          } > "$NOTES"
+          # Creates the tag on dispatch; on a tag push the tag already exists.
+          gh release create "$TAG" dist/jre-25-tyfpjdbc-*.zip build.log \
+            --title "$TAG" --notes-file "$NOTES"
