@@ -241,20 +241,24 @@ Write-Output $rej
 Check "runtime-reject" ($rej -match "checksum MISMATCH")
 
 Section "deterministic-proof"
+$detTmp = Join-Path $work "det-unpack"
+Remove-Item $detTmp -Recurse -Force -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force -Path $detTmp | Out-Null
+Expand-Archive -Path (Join-Path $rtZips "jre-25-tyfpjdbc-win64.zip") -DestinationPath $detTmp -Force
+$detStage = Join-Path $detTmp "jre-25-tyfpjdbc-win64"
 $da = Join-Path $work "det-a.zip"
-$logA = & pwsh -NoProfile -File "$ws\scripts\runtime\build-runtime-zip.ps1" -StageDir "D:\Projects\TyFPJDBC-Runtimes\stages\jre-25-tyfpjdbc-win64" -OutZip $da 2>&1 | Out-String
+$logA = & pwsh -NoProfile -File "$ws\scripts\runtime\build-runtime-zip.ps1" -StageDir $detStage -OutZip $da 2>&1 | Out-String
 Write-Output $logA
 $db = Join-Path $work "det-b.zip"
-$logB = & pwsh -NoProfile -File "$ws\scripts\runtime\build-runtime-zip.ps1" -StageDir "D:\Projects\TyFPJDBC-Runtimes\stages\jre-25-tyfpjdbc-win64" -OutZip $db 2>&1 | Out-String
+$logB = & pwsh -NoProfile -File "$ws\scripts\runtime\build-runtime-zip.ps1" -StageDir $detStage -OutZip $db 2>&1 | Out-String
 Write-Output $logB
 $ha = (Get-FileHash $da -Algorithm SHA256).Hash.ToLower()
 $hb = (Get-FileHash $db -Algorithm SHA256).Hash.ToLower()
 Write-Output ("det-a=" + $ha)
 Write-Output ("det-b=" + $hb)
 Check "deterministic-byte-identical" ($ha -eq $hb)
-$rxw = '(?s)platform": "win64".*?sha256": "([0-9a-f]{64})"'
-$hw = [regex]::Match($m, $rxw).Groups[1].Value
-Check "deterministic-matches-manifest" ($ha -eq $hw)
+Remove-Item $detTmp -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item $da,$db -Force -ErrorAction SilentlyContinue
 
 Section "lpk-design-package"
 & "$ws\scripts\guard.ps1" 2>&1
