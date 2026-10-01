@@ -22,12 +22,12 @@ mkdir test-results/bin
 fpc "-Fusrc/core" "-otest-results/bin/mautool.exe" "src/tools/mautool.lpr"
 cd examples\ex20_contacts
 lazbuild contacts.lpi
-..\..\test-results\bin\mautool.exe --fetch-runtime --platform win64 --out runtime
+..\..\test-results\bin\mautool.exe --fetch-runtime --platform win64 --out runtime --config ..\..\configs\drivers.json
 Expand-Archive runtime\jre-25-tyfpjdbc-win64.zip .
 Rename-Item jre-25-tyfpjdbc-win64 jre
 Move-Item jre\bridge .
 Move-Item jre\drivers .
-..\..\test-results\bin\mautool.exe --fetch-driver sqlite --out drivers
+..\..\test-results\bin\mautool.exe --fetch-driver sqlite --out drivers --config ..\..\configs\drivers.json
 .\contacts.exe --selftest
 ```
 
