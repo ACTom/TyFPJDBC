@@ -22,7 +22,7 @@ Get-Content verifyform.log    # 期望 TOTAL fails=0
 
 > mautool 本体先编出来（在仓库根执行）：先 `mkdir test-results/bin`
 > （干净克隆里没有这个目录），再
-> `fpc -Fusrc/core -otest-results/bin/mautool.exe src/tools/mautool.lpr`。
+> `fpc "-Fusrc/core" "-otest-results/bin/mautool.exe" "src/tools/mautool.lpr"`。
 > GPL 许可的驱动（如 MySQL）下载时需另行确认，见输出提示。
 
 `mautool` 会把运行时摆成程序要的样子（`jre/` + `bridge/` + `drivers/` 全在
