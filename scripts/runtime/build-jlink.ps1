@@ -31,7 +31,9 @@ if ($Platform -like "macos-*") {
   if (Test-Path (Join-Path $homeDir "jmods")) { $targetJmods = Join-Path $homeDir "jmods" }
 }
 if (-not (Test-Path (Join-Path $targetJmods "java.base.jmod"))) { throw "target jmods missing: $targetJmods" }
-$jlink = Join-Path $WindowsJavaHome "bin/jlink.exe"
+$jlinkName = "jlink.exe"
+if (-not [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)) { $jlinkName = "jlink" }
+$jlink = Join-Path (Join-Path $WindowsJavaHome "bin") $jlinkName
 if (-not (Test-Path $jlink)) { throw "jlink not found under $WindowsJavaHome" }
 
 $out = Join-Path $OutRoot ("jre-25-tyfpjdbc-" + $Platform)
