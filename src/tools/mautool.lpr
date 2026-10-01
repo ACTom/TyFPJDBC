@@ -339,6 +339,67 @@ begin
   end;
 end;
 
+procedure CmdFetchRuntime(const Cfg, Platform, Dir, FlagTag: string);
+var
+  j: TJSONData;
+  arr: TJSONArray;
+  i: Integer;
+  o: TJSONObject;
+  tag, asset, url, target, expectSha, gotSha: string;
+begin
+  j := LoadJSON(Cfg);
+  try
+    arr := TJSONObject(j).Arrays['runtimes'];
+    o := nil;
+    for i := 0 to arr.Count - 1 do
+      if arr.Objects[i].Strings['platform'] = Platform then
+        o := arr.Objects[i];
+    if o = nil then
+      Fail('unknown platform ' + Platform);
+    tag := FlagTag;
+    if Trim(tag) = '' then
+    begin
+      if o.Find('releaseTag') <> nil then
+        tag := o.Strings['releaseTag'];
+      if Trim(tag) = '' then
+        Fail('no releaseTag for platform ' + Platform + ' (pass --tag runtime/jre<ver>-bridge<ver>)');
+    end;
+    asset := 'jre-25-tyfpjdbc-' + Platform + '.zip';
+    url := TDriverFetch.RuntimeAssetUrl(Platform, tag);
+    target := IncludeTrailingPathDelimiter(Dir) + asset;
+    expectSha := ReqStr(o, 'sha256');
+    if Length(LowerCase(Trim(expectSha))) <> 64 then
+      Fail('sha256 not published for platform ' + Platform + ' (manifest holds a placeholder token)');
+    WriteLn('runtime: ', asset);
+    WriteLn('tag: ', tag);
+    WriteLn('url: ', url);
+    WriteLn('file: ', target);
+    WriteLn('manifest-sha256: ', LowerCase(Trim(expectSha)));
+    if FileExists(target) then
+    begin
+      gotSha := Sha256OfFile(target);
+      WriteLn('actual-sha256: ', gotSha);
+      if gotSha <> LowerCase(Trim(expectSha)) then
+        Fail('checksum MISMATCH for ' + target);
+      WriteLn('checksum: VERIFIED (cache hit)');
+      Exit;
+    end;
+    WriteLn('cache: MISS, downloading...');
+    if not TDriverFetch.FetchFile(url, target) then
+      Fail('download failed: ' + url);
+    gotSha := Sha256OfFile(target);
+    WriteLn('actual-sha256: ', gotSha);
+    if gotSha <> LowerCase(Trim(expectSha)) then
+    begin
+      DeleteFile(target);
+      Fail('checksum MISMATCH for ' + target);
+    end;
+    WriteLn('checksum: VERIFIED (downloaded)');
+  finally
+    j.Free;
+  end;
+end;
+
 procedure CheckRuntimes(const Cfg: string);
 var
   j: TJSONData;
@@ -346,7 +407,7 @@ var
   i: Integer;
   o: TJSONObject;
   hx, c: Integer;
-  s, b: string;
+  s, b, t: string;
   up, pk: Int64;
 begin
   j := LoadJSON(Cfg);
@@ -394,6 +455,13 @@ begin
       if pk > 52428800 then
         Fail('runtime[' + o.Strings['platform'] + '] trimmed packedBytes over 50MB budget');
       ReqStr(o, 'verifiedNote');
+      { releaseTag is empty until the first runtime Release is published;
+        once set it must name a runtime/ tag on this repo's Releases. }
+      t := '';
+      if o.Find('releaseTag') <> nil then
+        t := o.Strings['releaseTag'];
+      if (Trim(t) <> '') and (Pos('runtime/', t) <> 1) then
+        Fail('runtime[' + o.Strings['platform'] + '] releaseTag must start with runtime/: ' + t);
     end;
     WriteLn('runtimes ok: ', arr.Count);
   finally
@@ -402,7 +470,7 @@ begin
 end;
 
 var
-  mode, cfg, id, outd, rcfg, sha, plat: string;
+  mode, cfg, id, outd, rcfg, sha, plat, tag: string;
   acceptLicense: Boolean;
   i: Integer;
 begin
@@ -413,6 +481,7 @@ begin
   outd := 'drivers';
   sha := '';
   plat := '';
+  tag := '';
   acceptLicense := False;
   i := 1;
   while i <= ParamCount do
@@ -430,6 +499,8 @@ begin
     else if ParamStr(i) = '--verify-manifests' then mode := 'verify'
     else if ParamStr(i) = '--verify-file' then mode := 'verifyfile'
     else if ParamStr(i) = '--verify-runtime' then mode := 'verifyruntime'
+    else if ParamStr(i) = '--fetch-runtime' then mode := 'fetchruntime'
+    else if ParamStr(i) = '--tag' then begin Inc(i); tag := ParamStr(i); end
     else if ParamStr(i) = '--platform' then begin Inc(i); plat := ParamStr(i); end;
     Inc(i);
   end;
@@ -446,5 +517,10 @@ begin
     if (plat = '') or (sha = '') then Fail('--verify-runtime needs --platform <p> --sha256 <hex> [--out <dir>]');
     CmdVerifyRuntime(rcfg, plat, outd, sha);
   end
-  else begin WriteLn('usage: mautool --list | --driver <id> --out <dir> | --fetch-driver <id> [--accept-license] | --verify-file --driver <id> --sha1 <hex> --out <dir> | --resolve-runtime --platform <p> --sha256 <hex> --out <dir> | --verify-runtime --platform <p> --sha256 <hex> --out <dir> | --verify-manifests'); Halt(2); end;
+  else if mode = 'fetchruntime' then
+  begin
+    if plat = '' then Fail('--fetch-runtime needs --platform <p> [--out <dir>] [--tag <tag>]');
+    CmdFetchRuntime(rcfg, plat, outd, tag);
+  end
+  else begin WriteLn('usage: mautool --list | --driver <id> --out <dir> | --fetch-driver <id> [--accept-license] | --verify-file --driver <id> --sha1 <hex> --out <dir> | --resolve-runtime --platform <p> --sha256 <hex> --out <dir> | --verify-runtime --platform <p> --sha256 <hex> --out <dir> | --fetch-runtime --platform <p> [--out <dir>] [--tag <tag>] | --verify-manifests'); Halt(2); end;
 end.

@@ -32,6 +32,16 @@ begin
   Result := 'test-results/bin/mautool.exe';
 end;
 
+function ZipsDir: string;
+begin
+  { Runtime zips cache: bootstrap once with
+    Copy-Item D:\Projects\TyFPJDBC-Runtimes\zips\*.zip here (same bytes),
+    then mautool --fetch-runtime keeps it filled from the Release. }
+  Result := GetEnvironmentVariable('TYFPJDBC_ZIPS');
+  if Trim(Result) = '' then
+    Result := GetEnvironmentVariable('USERPROFILE') + '\.tyfpjdbc\runtimes';
+end;
+
 function Run(const Args: string; out Outp: string; out Code: Integer): Boolean;
 var
   P: TProcess;
@@ -69,6 +79,7 @@ begin
   Ok('bsd-open', not TDriverFetch.IsGplLicense('BSD-2-Clause'));
   Ok('maven-path', TDriverFetch.MavenPath('com.h2database:h2:2.2.224', g, a, v) =
     'com/h2database/h2/2.2.224/h2-2.2.224.jar');
+  Ok('fetch-url', TDriverFetch.RuntimeAssetUrl('win64', 'runtime/jre25.0.4.1-bridge0.9.0') = 'https://github.com/ACTom/TyFPJDBC/releases/download/runtime/jre25.0.4.1-bridge0.9.0/jre-25-tyfpjdbc-win64.zip');
   Ok('dlargs-curl', TDriverFetch.DownloadArgs('curl', 'https://x/y.jar',
     'C:\t\f.tmp') = '-sL "https://x/y.jar" -o "C:\t\f.tmp"');
   Ok('dlargs-ps', TDriverFetch.DownloadArgs('powershell', 'https://x/y.jar',
@@ -76,7 +87,7 @@ begin
     '-UseBasicParsing "https://x/y.jar" -OutFile "C:\t\f.tmp"');
   Run('--verify-manifests --config D:\Projects\TyFPJDBC\configs\drivers.json', outp, code);
   Ok('manifests', (code = 0) and (Pos('manifests verified', outp) > 0));
-  Run('--verify-runtime --platform win64 --sha256 bc04cdab23b4468829ca29a2fcff008b3ea7dd78de41a7636247c8774b486cec --out D:\Projects\TyFPJDBC-Runtimes\zips', outp, code);
+  Run('--verify-runtime --platform win64 --sha256 bc04cdab23b4468829ca29a2fcff008b3ea7dd78de41a7636247c8774b486cec --out ' + ZipsDir, outp, code);
   Ok('runtime-accept', (code = 0) and (Pos('VERIFIED', outp) > 0));
   Run('--verify-runtime --platform win64 --sha256 0000000000000000000000000000000000000000000000000000000000000000 --out D:\Projects\TyFPJDBC-Runtimes\zips', outp, code);
   Ok('runtime-reject', (code <> 0) and (Pos('MISMATCH', outp) > 0));

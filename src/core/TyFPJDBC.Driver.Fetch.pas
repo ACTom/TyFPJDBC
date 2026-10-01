@@ -21,8 +21,10 @@ type
     class procedure MarkLicenseAccepted(const DriverId: string); static;
     class function MavenPath(const Maven: string; out Group, Artifact, Ver: string): string; static;
     class function MavenURL(const Rel: string): string; static;
+    class function RuntimeAssetUrl(const Platform, Tag: string): string; static;
     class function Sha1OfFile(const P: string): string; static;
     class function DownloadArgs(const Exe, URL, OutTmp: string): string; static;
+    class function FetchFile(const URL, Target: string): Boolean; static;
     class function FetchText(const URL: string): string; static;
     class function FetchJar(const URL, ExpectSha, Target: string): TFetchResult; static;
   end;
@@ -122,6 +124,12 @@ begin
   Result := 'https://repo1.maven.org/maven2/' + Rel;
 end;
 
+class function TDriverFetch.RuntimeAssetUrl(const Platform, Tag: string): string;
+begin
+  Result := 'https://github.com/ACTom/TyFPJDBC/releases/download/' +
+    Tag + '/jre-25-tyfpjdbc-' + Platform + '.zip';
+end;
+
 class function TDriverFetch.Sha1OfFile(const P: string): string;
 begin
   Result := LowerCase(SHA1Print(SHA1File(P)));
@@ -183,6 +191,14 @@ begin
   if FileExists(final_) then
     DeleteFile(final_);
   Result := RenameFile(OutFile + '.tmp', final_);
+end;
+
+class function TDriverFetch.FetchFile(const URL, Target: string): Boolean;
+begin
+  { Thin public shell over the private RunDownload/RunGet plumbing so
+    mautool modes (fetch-runtime) reuse the same downloader selection,
+    poNoConsole execution, and atomic rename as FetchJar. }
+  Result := RunGet(Downloader, URL, Target);
 end;
 
 class function TDriverFetch.FetchText(const URL: string): string;

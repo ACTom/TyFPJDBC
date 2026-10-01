@@ -10,7 +10,10 @@ $ws = "D:\Projects\TyFPJDBC"
 $jh = "C:\Tools\ms-jdks\win64\jdk-25.0.4.1+1"
 if (-not (Test-Path "$jh\bin\java.exe")) { $jh = "C:\Tools\jdk25\jdk-25.0.4.1+1" }
 $libs = "C:\Tools\tyfpjdbc-libs"
-$rtZips = "D:\Projects\TyFPJDBC-Runtimes\zips"
+# Runtime zips cache. Bootstrap (one-time, same bytes, manifest sha256s still
+# match): New-Item -Force this dir, then Copy-Item <runtimes>\zips\*.zip here.
+# Afterwards mautool --fetch-runtime keeps it filled from the Release.
+$rtZips = if ($env:TYFPJDBC_ZIPS) { $env:TYFPJDBC_ZIPS } else { Join-Path $env:USERPROFILE '.tyfpjdbc\runtimes' }
 $bin = Join-Path $ws ($OutDir + "/bin")
 $work = Join-Path $ws ($OutDir + "/work")
 # Unit output (.o/.ppu) goes here, never next to sources: every fpc call
