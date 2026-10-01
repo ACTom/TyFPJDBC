@@ -1,0 +1,35 @@
+LazarusResources.Add('TMainForm','FORMDATA',[
+  'TPF0'#9'TMainForm'#8'MainForm'#4'Left'#2#0#6'Height'#3#224#1#3'Top'#2#0#5'Wi'
+  +'dth'#3#248#2#7'Caption'#6#27#233#128#154#232#174#175#229#189#149' '#226#128
+  +#148' TyFPJDBC Demo'#12'ClientHeight'#3#224#1#11'ClientWidth'#3#248#2#8'Posi'
+  +'tion'#7#14'poScreenCenter'#10'LCLVersion'#6#3'4.8'#8'OnCreate'#7#10'FormCre'
+  +'ate'#9'OnDestroy'#7#11'FormDestroy'#0#7'TDBGrid'#4'Grid'#4'Left'#2#0#6'Heig'
+  +'ht'#3#128#1#3'Top'#2#0#5'Width'#3#248#2#5'Align'#7#8'alClient'#5'Color'#7#8
+  +'clWindow'#8'TabOrder'#2#0#0#0#6'TPanel'#8'PanelBar'#4'Left'#2#0#6'Height'#2
+  +'`'#3'Top'#3#128#1#5'Width'#3#248#2#5'Align'#7#8'alBottom'#8'TabOrder'#2#1#0
+  +#6'TLabel'#7'LabFind'#4'Left'#2#12#6'Height'#2#20#3'Top'#2#14#5'Width'#2'('#7
+  +'Caption'#6#9#230#144#156#231#180#162#239#188#154#11'ParentColor'#8#0#0#5'TE'
+  +'dit'#8'EdSearch'#4'Left'#2'8'#6'Height'#2#28#3'Top'#2#10#5'Width'#3#4#1#8'T'
+  +'abOrder'#2#0#8'TextHint'#6#24#229#167#147#229#144#141' / '#231#148#181#232
+  +#175#157' / '#233#130#174#231#174#177#0#0#7'TButton'#9'BtnSearch'#4'Left'#3
+  +'H'#1#6'Height'#2#30#3'Top'#2#10#5'Width'#2'P'#7'Caption'#6#6#230#144#156#231
+  +#180#162#7'OnClick'#7#14'BtnSearchClick'#8'TabOrder'#2#1#0#0#7'TButton'#10'B'
+  +'tnRefresh'#4'Left'#3#160#1#6'Height'#2#30#3'Top'#2#10#5'Width'#2'P'#7'Capti'
+  +'on'#6#6#229#136#183#230#150#176#7'OnClick'#7#15'BtnRefreshClick'#8'TabOrder'
+  +#2#2#0#0#7'TButton'#6'BtnAdd'#4'Left'#2#12#6'Height'#2#30#3'Top'#2'4'#5'Widt'
+  +'h'#2'P'#7'Caption'#6#6#230#150#176#229#162#158#7'OnClick'#7#11'BtnAddClick'
+  +#8'TabOrder'#2#3#0#0#7'TButton'#7'BtnEdit'#4'Left'#2'd'#6'Height'#2#30#3'Top'
+  +#2'4'#5'Width'#2'P'#7'Caption'#6#6#228#191#174#230#148#185#7'OnClick'#7#12'B'
+  +'tnEditClick'#8'TabOrder'#2#4#0#0#7'TButton'#6'BtnDel'#4'Left'#3#188#0#6'Hei'
+  +'ght'#2#30#3'Top'#2'4'#5'Width'#2'P'#7'Caption'#6#6#229#136#160#233#153#164#7
+  +'OnClick'#7#11'BtnDelClick'#8'TabOrder'#2#5#0#0#6'TLabel'#9'LabStatus'#4'Lef'
+  +'t'#3' '#1#6'Height'#2#20#3'Top'#2':'#5'Width'#3#204#1#7'Anchors'#11#6'akLef'
+  +'t'#7'akRight'#8'akBottom'#0#7'Caption'#6#6#229#176#177#231#187#170#11'Paren'
+  +'tColor'#8#0#0#0#15'TJdbcConnection'#6'DbConn'#8'DriverId'#6#6'sqlite'#8'Dat'
+  +'abase'#6#11'contacts.db'#7'MaxPool'#2#4#7'MinIdle'#2#1#16'LoginTimeoutSecs'
+  +#2#15#4'Left'#2'8'#3'Top'#2#16#0#0#14'TJdbcConnQuery'#7'DbQuery'#7'SQLText'#6
+  +'9SELECT id,name,phone,email,note FROM contacts ORDER BY id'#8'KeyField'#6#2
+  +'id'#10'WindowSize'#3#200#0#10'Connection'#7#6'DbConn'#4'Left'#2'`'#3'Top'#2
+  +#16#0#0#11'TDataSource'#3'Src'#7'DataSet'#7#7'DbQuery'#4'Left'#2#16#3'Top'#2
+  +#16#0#0#0
+]);

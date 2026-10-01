@@ -1,0 +1,122 @@
+object MainForm: TMainForm
+  Left = 0
+  Height = 480
+  Top = 0
+  Width = 760
+  Caption = '通讯录 — TyFPJDBC Demo'
+  ClientHeight = 480
+  ClientWidth = 760
+  Position = poScreenCenter
+  LCLVersion = '4.8'
+  OnCreate = FormCreate
+  OnDestroy = FormDestroy
+  object Grid: TDBGrid
+    Left = 0
+    Height = 384
+    Top = 0
+    Width = 760
+    Align = alClient
+    Color = clWindow
+    TabOrder = 0
+  end
+  object PanelBar: TPanel
+    Left = 0
+    Height = 96
+    Top = 384
+    Width = 760
+    Align = alBottom
+    TabOrder = 1
+    object LabFind: TLabel
+      Left = 12
+      Height = 20
+      Top = 14
+      Width = 40
+      Caption = '搜索：'
+      ParentColor = False
+    end
+    object EdSearch: TEdit
+      Left = 56
+      Height = 28
+      Top = 10
+      Width = 260
+      TabOrder = 0
+      TextHint = '姓名 / 电话 / 邮箱'
+    end
+    object BtnSearch: TButton
+      Left = 328
+      Height = 30
+      Top = 10
+      Width = 80
+      Caption = '搜索'
+      OnClick = BtnSearchClick
+      TabOrder = 1
+    end
+    object BtnRefresh: TButton
+      Left = 416
+      Height = 30
+      Top = 10
+      Width = 80
+      Caption = '刷新'
+      OnClick = BtnRefreshClick
+      TabOrder = 2
+    end
+    object BtnAdd: TButton
+      Left = 12
+      Height = 30
+      Top = 52
+      Width = 80
+      Caption = '新增'
+      OnClick = BtnAddClick
+      TabOrder = 3
+    end
+    object BtnEdit: TButton
+      Left = 100
+      Height = 30
+      Top = 52
+      Width = 80
+      Caption = '修改'
+      OnClick = BtnEditClick
+      TabOrder = 4
+    end
+    object BtnDel: TButton
+      Left = 188
+      Height = 30
+      Top = 52
+      Width = 80
+      Caption = '删除'
+      OnClick = BtnDelClick
+      TabOrder = 5
+    end
+    object LabStatus: TLabel
+      Left = 288
+      Height = 20
+      Top = 58
+      Width = 460
+      Anchors = [akLeft, akRight, akBottom]
+      Caption = '就绪'
+      ParentColor = False
+    end
+  end
+  object DbConn: TJdbcConnection
+    DriverId = 'sqlite'
+    Database = 'contacts.db'
+    MaxPool = 4
+    MinIdle = 1
+    LoginTimeoutSecs = 15
+    Left = 56
+    Top = 16
+  end
+  object DbQuery: TJdbcConnQuery
+    SQLText = 'SELECT id,name,phone,email,note FROM contacts ORDER BY id'
+    KeyField = 'id'
+    WindowSize = 200
+    Connection = DbConn
+    Left = 96
+    Top = 16
+  end
+  object Src: TDataSource
+    DataSet = DbQuery
+    Left = 16
+    Top = 16
+  end
+end

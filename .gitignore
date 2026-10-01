@@ -7,6 +7,15 @@
 lib/
 backup/
 
+# Example runtime triples (fetched via mautool, never committed)
+examples/ex20_contacts/jre/
+examples/ex20_contacts/bridge/
+examples/ex20_contacts/drivers/
+examples/ex20_contacts/lib/
+examples/ex20_contacts/*.db
+examples/ex20_contacts/*.log
+examples/ex20_contacts/backup/
+
 # Java / Gradle
 build/
 .gradle/

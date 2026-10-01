@@ -11,6 +11,7 @@ Java 示例用 `javac -cp <bridge jars>` 编译。
 | 代码优先（建池建表批量插入窗口查询） | `ex11_code_first.lpr` | `TJVMManager` + `TBridge` + `TJdbcEngine` + `TJdbcCommand` + `TJdbcQuery`，H2 回环 `inserted=3 rows=3 handles=0` |
 | 网格绑定（浏览编辑新增落库重查） | `ex12_dbgrid.lpr` | `TJdbcQuery` 绑 `TDataSource` 按网格方式浏览，编辑一行直写，新增两行经 `ApplyUpdates2` 落库，重查 `requery-rows=4 handles=0` |
 | 配置复用只读演示 | `ex10_json_config.lpr` | 读同一份 `configs/drivers.json` + `configs/runtimes.json`，列出驱动/运行时并解析 sqlite 条目到本地 jar |
+| 图形通讯录（LCL 拖控件完整应用） | `ex20_contacts/` | `TJdbcConnection` + `TJdbcConnQuery` + `TDataSource` + `DBGrid`，搜索/新增/修改/删除，`--selftest`/`--verifyform` 双归零 |
 
 ```powershell
 # 单个示例
