@@ -188,8 +188,21 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          BV="$(grep -oP 'VERSION = "\K[^"]+' java/bridge/src/main/java/tyfpjdbc/Bridge.java)"
+          test -n "$BV"
+          echo "bridge version: $BV"
           rm -rf bridgedir && mkdir -p bridgedir
-          cp classes/tyfpjdbc/Bridge.class bridgedir/
+          # Real bridge jar with tree paths (tyfpjdbc/...) so
+          # -Djava.class.path lookup finds the classes; BridgeSmoke is
+          # test-only and stays out of the artifact.
+          (cd classes && jar --create --file "../bridgedir/tyfpjdbc-bridge-${BV}.jar" \
+            tyfpjdbc/Bridge.class tyfpjdbc/'Bridge$'*.class tyfpjdbc/PoolCfg.class)
+          jar --list --file "bridgedir/tyfpjdbc-bridge-${BV}.jar"
+          jar --list --file "bridgedir/tyfpjdbc-bridge-${BV}.jar" | grep -q '^tyfpjdbc/Bridge\.class$'
+          jar --list --file "bridgedir/tyfpjdbc-bridge-${BV}.jar" | grep -q '^tyfpjdbc/PoolCfg\.class$'
+          if jar --list --file "bridgedir/tyfpjdbc-bridge-${BV}.jar" | grep -q 'BridgeSmoke'; then
+            echo "bridge jar must not contain BridgeSmoke"; exit 1
+          fi
           cp libs/HikariCP-5.1.0.jar libs/slf4j-api-2.0.9.jar bridgedir/
 
       - name: jlink trim (native for this platform)
@@ -202,6 +215,25 @@ jobs:
             -WindowsJavaHome $env:JAVA_HOME -TargetJdkHome $env:JAVA_HOME `
             -OutRoot dist -BridgeDir bridgedir
 
+      - name: artifact smoke (stage jar)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Consumer view: tyfpjdbc.Bridge/PoolCfg resolve from the STAGE
+          # bridge jar FIRST, never from classes/. BridgeSmoke itself rides
+          # in last from an isolated dir, so a PoolCfg missing from the
+          # artifact still fails loudly instead of hiding behind classes/.
+          SEP=':'; if [ "${RUNNER_OS}" = 'Windows' ]; then SEP=';'; fi
+          STAGE="dist/jre-25-tyfpjdbc-${{ matrix.platform }}"
+          BV="$(grep -oP 'VERSION = "\K[^"]+' java/bridge/src/main/java/tyfpjdbc/Bridge.java)"
+          test -n "$BV"
+          rm -rf smoke-classes && mkdir -p smoke-classes/tyfpjdbc
+          cp classes/tyfpjdbc/BridgeSmoke.class smoke-classes/tyfpjdbc/
+          CP="${STAGE}/bridge/tyfpjdbc-bridge-${BV}.jar${SEP}${STAGE}/bridge/HikariCP-5.1.0.jar${SEP}${STAGE}/bridge/slf4j-api-2.0.9.jar${SEP}libs/h2-2.2.224.jar${SEP}smoke-classes"
+          OUT="$(java -Dfile.encoding=UTF-8 -cp "$CP" tyfpjdbc.BridgeSmoke)"
+          echo "$OUT"
+          echo "$OUT" | grep -q "TOTAL fails=0"
+
       - name: verify layout, budgets, hash
         id: verify
         shell: pwsh
@@ -213,9 +245,9 @@ jobs:
           if (-not (Test-Path (Join-Path $stage '${{ matrix.jvm_rel }}'))) {
             throw "jvm missing: ${{ matrix.jvm_rel }}"
           }
-          # 2. bridge/ carries exactly Bridge.class + the 2 shipped jars.
+          # 2. bridge/ carries exactly the bridge jar + the 2 shipped jars.
           $bridge = @(Get-ChildItem (Join-Path $stage 'bridge') -File | ForEach-Object { $_.Name } | Sort-Object)
-          $want = @('Bridge.class', 'HikariCP-5.1.0.jar', 'slf4j-api-2.0.9.jar')
+          $want = @("tyfpjdbc-bridge-${{ needs.setup.outputs.bridge_version }}.jar", 'HikariCP-5.1.0.jar', 'slf4j-api-2.0.9.jar')
           if (($bridge -join ',') -ne ($want -join ',')) { throw "bridge/ content wrong: $($bridge -join ',')" }
           # 3. Budgets (same numbers mautool CheckRuntimes enforces).
           $u = (Get-ChildItem $stage -Recurse -File | Measure-Object Length -Sum).Sum
