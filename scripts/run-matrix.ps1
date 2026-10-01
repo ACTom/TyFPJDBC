@@ -239,10 +239,10 @@ Check "runtime-reject" ($rej -match "checksum MISMATCH")
 
 Section "deterministic-proof"
 $da = Join-Path $work "det-a.zip"
-$logA = & pwsh -NoProfile -File "$ws\scripts\build-runtime-zip.ps1" -StageDir "D:\Projects\TyFPJDBC-Runtimes\stages\jre-25-tyfpjdbc-win64" -OutZip $da 2>&1 | Out-String
+$logA = & pwsh -NoProfile -File "$ws\scripts\runtime\build-runtime-zip.ps1" -StageDir "D:\Projects\TyFPJDBC-Runtimes\stages\jre-25-tyfpjdbc-win64" -OutZip $da 2>&1 | Out-String
 Write-Output $logA
 $db = Join-Path $work "det-b.zip"
-$logB = & pwsh -NoProfile -File "$ws\scripts\build-runtime-zip.ps1" -StageDir "D:\Projects\TyFPJDBC-Runtimes\stages\jre-25-tyfpjdbc-win64" -OutZip $db 2>&1 | Out-String
+$logB = & pwsh -NoProfile -File "$ws\scripts\runtime\build-runtime-zip.ps1" -StageDir "D:\Projects\TyFPJDBC-Runtimes\stages\jre-25-tyfpjdbc-win64" -OutZip $db 2>&1 | Out-String
 Write-Output $logB
 $ha = (Get-FileHash $da -Algorithm SHA256).Hash.ToLower()
 $hb = (Get-FileHash $db -Algorithm SHA256).Hash.ToLower()
