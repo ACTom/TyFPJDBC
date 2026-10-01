@@ -104,13 +104,38 @@ begin
   end;
 end;
 
+procedure DeployCopy(const Src, Dst, ExpectSha: string);
+var
+  s, d: TFileStream;
+begin
+  { --out deploys a verified copy next to the caller (e.g. an example's
+    drivers/); the cache stays the source of truth. }
+  ForceDirectories(ExtractFilePath(Dst));
+  s := TFileStream.Create(Src, fmOpenRead or fmShareDenyWrite);
+  try
+    d := TFileStream.Create(Dst, fmCreate);
+    try
+      d.CopyFrom(s, s.Size);
+    finally
+      d.Free;
+    end;
+  finally
+    s.Free;
+  end;
+  if TDriverFetch.Sha1OfFile(Dst) <> LowerCase(Trim(ExpectSha)) then
+  begin
+    DeleteFile(Dst);
+    Fail('checksum MISMATCH for deployed ' + Dst);
+  end;
+end;
+
 procedure CmdDriver(const Cfg, Id, OutDir: string; AcceptLicense: Boolean);
 var
   j: TJSONData;
   arr: TJSONArray;
   i: Integer;
   o: TJSONObject;
-  maven, grp, art, ver, rel, url, target, expectSha, gotSha: string;
+  maven, grp, art, ver, rel, url, cacheTarget, deployTarget, expectSha, gotSha: string;
 begin
   j := LoadJSON(Cfg);
   try
@@ -127,14 +152,18 @@ begin
     if rel = '' then
       Fail('bad maven coordinate ' + maven);
     url := TDriverFetch.MavenURL(rel);
-    target := IncludeTrailingPathDelimiter(OutDir) + art + '-' + ver + '.jar';
-    if (OutDir = 'drivers') or (Trim(OutDir) = '') then
-      target := TDriverFetch.CacheDir + PathDelim + art + '-' + ver + '.jar';
+    { Cache first (verified source of truth), then deploy a copy to --out
+      so an example's drivers/ actually receives the jar. Only a truly
+      empty --out stays cache-only. }
+    cacheTarget := TDriverFetch.CacheDir + PathDelim + art + '-' + ver + '.jar';
+    deployTarget := cacheTarget;
+    if Trim(OutDir) <> '' then
+      deployTarget := IncludeTrailingPathDelimiter(OutDir) + art + '-' + ver + '.jar';
     WriteLn('driver: ', ReqStr(o, 'id'));
-    WriteLn('cache: ', target);
+    WriteLn('cache: ', cacheTarget);
     WriteLn('maven: ', maven);
     WriteLn('url: ', url);
-    WriteLn('expected-path: ', target);
+    WriteLn('expected-path: ', deployTarget);
     WriteLn('driverClass: ', ReqStr(o, 'driverClass'));
     WriteLn('urlTemplate: ', ReqStr(o, 'urlTemplate'));
     WriteLn('testQuery: ', ReqStr(o, 'testQuery'));
@@ -148,14 +177,14 @@ begin
     end
     else
       WriteLn('manifest-sha1: ', expectSha);
-    if FileExists(target) then
+    if FileExists(cacheTarget) then
     begin
-      gotSha := TDriverFetch.Sha1OfFile(target);
+      gotSha := TDriverFetch.Sha1OfFile(cacheTarget);
       WriteLn('local-sha1: ', gotSha);
       if gotSha = LowerCase(Trim(expectSha)) then
         WriteLn('checksum: VERIFIED (cache hit)')
       else
-        Fail('checksum MISMATCH for ' + target);
+        Fail('checksum MISMATCH for ' + cacheTarget);
     end
     else
     begin
@@ -163,7 +192,7 @@ begin
         environment (https_proxy) via curl/powershell defaults. }
       WriteLn('cache: MISS, downloading...');
       try
-        if TDriverFetch.FetchJar(url, expectSha, target) = frDownloaded then
+        if TDriverFetch.FetchJar(url, expectSha, cacheTarget) = frDownloaded then
           WriteLn('checksum: VERIFIED (downloaded)')
         else
           WriteLn('checksum: VERIFIED (cache hit)');
@@ -171,9 +200,16 @@ begin
         on E: Exception do
           Fail(E.Message);
       end;
-      gotSha := TDriverFetch.Sha1OfFile(target);
+      gotSha := TDriverFetch.Sha1OfFile(cacheTarget);
       WriteLn('local-sha1: ', gotSha);
     end;
+    if ExpandFileName(deployTarget) <> ExpandFileName(cacheTarget) then
+    begin
+      DeployCopy(cacheTarget, deployTarget, expectSha);
+      WriteLn('deployed: ', deployTarget);
+    end
+    else
+      WriteLn('deployed: (cache only)');
   finally
     j.Free;
   end;

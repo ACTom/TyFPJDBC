@@ -5,7 +5,7 @@ program TestDistrib;
 { Distribution tests: mautool behaviors against the shipped tool.
   Drives the real binary at test-results/bin or the path in MAUTOOL_EXE:
   manifests verify, runtime accept + reject, driver file accept + reject,
-  cache-dir + license-flag surface in help/usage. }
+  fetch-driver deploy copy, cache-dir + license-flag surface in help/usage. }
 
 uses
   SysUtils, Classes, process, TyFPJDBC.Driver.Fetch;
@@ -114,7 +114,7 @@ begin
   RemoveDir(tmpD);
   Run('--verify-manifests --config D:\Projects\TyFPJDBC\configs\drivers.json', outp, code);
   Ok('manifests', (code = 0) and (Pos('manifests verified', outp) > 0));
-  Run('--verify-runtime --platform win64 --sha256 20b4e27b4001b59a568c5dfbeac52db0a775368031e8afee08e621a6b70bc05c --out ' + ZipsDir, outp, code);
+  Run('--verify-runtime --platform win64 --sha256 b08cfe453b036c6bee48499b50a5f4805d0b529de0f82125854d5b5b3124884b --out ' + ZipsDir, outp, code);
   Ok('runtime-accept', (code = 0) and (Pos('VERIFIED', outp) > 0));
   Run('--verify-runtime --platform win64 --sha256 0000000000000000000000000000000000000000000000000000000000000000 --out ' + ZipsDir, outp, code);
   Ok('runtime-reject', (code <> 0) and (Pos('MISMATCH', outp) > 0));
@@ -124,6 +124,11 @@ begin
   Ok('driver-reject', (code <> 0) and (Pos('MISMATCH', outp) > 0));
   Run('--driver nosuch --out C:\Users\Tom\AppData\Local\Temp\grok-goal-6d502cf3dd66\implementer', outp, code);
   Ok('driver-unknown', (code <> 0) and (Pos('unknown driver', outp) > 0));
+  Run('--fetch-driver h2 --out ' + tmpD + PathDelim + 'deploy', outp, code);
+  Ok('driver-deploy', (code = 0) and (Pos('deployed:', outp) > 0) and
+    FileExists(tmpD + PathDelim + 'deploy' + PathDelim + 'h2-2.2.224.jar'));
+  DeleteFile(tmpD + PathDelim + 'deploy' + PathDelim + 'h2-2.2.224.jar');
+  RemoveDir(tmpD + PathDelim + 'deploy');
   WriteLn('TOTAL fails=', Fails);
   if Fails > 0 then Halt(1);
 end.

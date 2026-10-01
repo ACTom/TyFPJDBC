@@ -116,7 +116,9 @@ mautool.exe --verify-manifests --config configs/drivers.json
 行为（`src/tools/mautool.lpr`，`TestDistrib` 全断言）：
 缓存命中先验 `sha1`；缺失则下载到临时文件、验 `sha1` 后原子改名；
 `sha1` 不一致删除下载件并报 `MISMATCH`；未知驱动报 `unknown driver`。
-缓存目录：`%TYFPJDBC_CACHE%`，缺省 `%USERPROFILE%\.tyfpjdbc\cache`。
+验过缓存后把同名 jar 再落一份到 `--out <dir>` 并复验（`deployed:` 行）；
+`--out` 为空时只写缓存。缓存目录：`%TYFPJDBC_CACHE%`，缺省
+`%USERPROFILE%\.tyfpjdbc\cache`。
 
 ## 运行时分发
 
