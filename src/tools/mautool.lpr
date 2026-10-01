@@ -81,10 +81,16 @@ begin
   Output := '';
   P := TProcess.Create(nil);
   try
-    P.Executable := Exe;
-    P.Parameters.DelimitedText := Args;
-    P.Options := [poWaitOnExit, poUsePipes];
-    P.Execute;
+    try
+      P.Executable := Exe;
+      P.Parameters.DelimitedText := Args;
+      P.Options := [poWaitOnExit, poUsePipes];
+      P.Execute;
+    except
+      on E: Exception do
+        Exit; { missing executable (e.g. certutil/powershell off Windows):
+                caller falls through to the next hasher }
+    end;
     sl := TStringList.Create;
     try
       sl.LoadFromStream(P.Output);
