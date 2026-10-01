@@ -257,6 +257,23 @@ jobs:
           path: dist
           merge-multiple: true
 
+      - name: flatten downloaded zips to dist
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Each uploaded artifact preserves its workspace-relative paths
+          # (dist/<asset>.zip + meta-<platform>.json), so merge-multiple
+          # lands the zips one level down at dist/dist/. mautool
+          # --verify-runtime --out and gh release create glob non-recursively,
+          # so hoist the zips up to dist/.
+          shopt -s nullglob
+          nested=(dist/dist/jre-25-tyfpjdbc-*.zip)
+          if [ "${#nested[@]}" -gt 0 ]; then
+            mv "${nested[@]}" dist/
+            rmdir dist/dist
+          fi
+          ls dist
+
       - name: refresh manifest from fresh build values
         shell: pwsh
         env:
