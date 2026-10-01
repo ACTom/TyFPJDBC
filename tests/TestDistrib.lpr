@@ -89,7 +89,7 @@ begin
   Ok('manifests', (code = 0) and (Pos('manifests verified', outp) > 0));
   Run('--verify-runtime --platform win64 --sha256 bc04cdab23b4468829ca29a2fcff008b3ea7dd78de41a7636247c8774b486cec --out ' + ZipsDir, outp, code);
   Ok('runtime-accept', (code = 0) and (Pos('VERIFIED', outp) > 0));
-  Run('--verify-runtime --platform win64 --sha256 0000000000000000000000000000000000000000000000000000000000000000 --out D:\Projects\TyFPJDBC-Runtimes\zips', outp, code);
+  Run('--verify-runtime --platform win64 --sha256 0000000000000000000000000000000000000000000000000000000000000000 --out ' + ZipsDir, outp, code);
   Ok('runtime-reject', (code <> 0) and (Pos('MISMATCH', outp) > 0));
   Run('--verify-file --driver h2 --sha1 7bdade27d8cd197d9b5ce9dc251f41d2edc5f7ad --out C:\Tools\tyfpjdbc-libs', outp, code);
   Ok('driver-accept', (code = 0) and (Pos('VERIFIED', outp) > 0));
