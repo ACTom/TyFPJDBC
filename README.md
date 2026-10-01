@@ -1,78 +1,93 @@
-# TyFPJDBC（0.9.0）
+# TyFPJDBC
 
-经由 JNI 的通用 JDBC 桥：Java `Bridge` 是唯一状态机，Pascal 只拿 `Int64`
-句柄。25 驱动注册 + 通用方言（分页/引用/主键回填按驱动描述配出）+
-类型真值表 + 四库绑定矩阵。版本握手恒为 `0.9.0`，`JniVersionUsed = $00010006`。
+[English](README_EN.md)
 
-## 最快体验：通讯录 Demo（双击即跑）
+给 Free Pascal / Lazarus 用的通用 JDBC 桥：一套代码连 25 种数据库，写法不变；拖控件和纯代码两种用法都支持。
+
+Java `Bridge` 是唯一状态机（池、连接、语句、游标全在它里面），Pascal 侧只拿 `Int64` 句柄，不直连 JNI。
+
+## 特性
+
+- 25 个驱动注册表（PostgreSQL/MySQL/MSSQL/Oracle/SQLite/H2 等），未知驱动直接报错，不静默兜底
+- 通用方言：分页、标识符引用、主键回填按驱动描述配出，加新库不用改源码
+- 连接池（HikariCP）与直连双模式，可开关
+- LCL 设计时组件：`TJdbcConnection` + `TJdbcConnQuery`，拖上窗体设属性即用
+- 类型真值表：整数/浮点/字符串（含 CJK）/日期/布尔/BLOB 按契约来，空与 NULL 分开
+- mautool：驱动 jar 与 JRE运行时 的下载、校验、分发
+
+## 快速开始
 
 ```powershell
-cd D:\Projects\ContactsDemo
-.\contacts.exe                # 图形通讯录：搜索 / 新增 / 修改 / 删除
-.\contacts.exe --selftest     # 无界面自检
-Get-Content selftest.log      # 期望 TOTAL fails=0
+cd examples\ex20_contacts
+lazbuild contacts.lpi
+..\..\test-results\bin\mautool.exe --fetch-runtime --platform win64 --out runtime
+..\..\test-results\bin\mautool.exe --fetch-driver sqlite --out drivers
+.\contacts.exe --selftest
 ```
 
-`ContactsDemo/` 自带 `jre/` + `bridge/` + `drivers/`（exe 旁三件套），
-不装 JDK、不配环境变量、不读系统 JRE。首次运行自动建 `contacts.db`。
-详情见 `D:\Projects\ContactsDemo\README.md`。
+`--selftest` 打印 `TOTAL fails=0` 即通。图形通讯录直接双击 `contacts.exe`。
 
-## Howto（给使用者）
+## 前置要求
 
-**前置要求**：Windows 64 位 + Lazarus 4.8（FPC 3.2.2）。JDK 不需要装，
-跟着 exe 走。
+Windows 64 位 + Lazarus（FPC 3.2.2）。JDK 不需要装：裁剪好的 JRE 跟着程序走（`mautool --fetch-runtime` 拉取，exe 旁 `jre/`）。
 
-**1. 拿 runtime（三件套进你的 exe 目录）**
-
-```text
-YourApp/
-  YourApp.exe
-  jre/        # 从 TyFPJDBC-Runtimes 取 jre-25-tyfpjdbc-win64.zip，解压后把内层目录改名为 jre/
-  bridge/     # tyfpjdbc-bridge-0.9.0.jar + HikariCP-5.1.0.jar + slf4j-api-2.0.9.jar
-  drivers/    # sqlite-jdbc-3.46.1.0.jar（换库就换 jar）
-```
-
-注意 zip 里是 `jre-25-tyfpjdbc-win64/...` 单层目录，解压后把内层改名为
-`jre/`（程序找的是 `exe旁/jre/bin/server/jvm.dll`，不是 zip 名那层）。
-
-**2. 代码里三行启动（抄 `ContactsDemo/contactsmain.pas` 的 `OpenDatabase`）**
+## 最小用法
 
 ```pascal
+uses TyFPJDBC.JVM.Manager, TyFPJDBC.JNI.Bridge, TyFPJDBC.Engine,
+  TyFPJDBC.Command, TyFPJDBC.Query;
+
 TJVMManager.EnsureStarted(TJVMManager.FindLibJvm(''),
   TJVMManager.BuildDesktopArgs);
-FBridge := TBridge.Create;
-FEng := TJdbcEngine.Create(FBridge);
-cfg := DefaultPoolCfg('jdbc:sqlite:' + UTF8String(DbPath), 'org.sqlite.JDBC');
-FPool := FEng.OpenPool(cfg);
-FConn := FEng.Borrow(FPool);
+eng := TJdbcEngine.Create(TBridge.Create);
+pool := eng.OpenPool(DefaultPoolCfg('jdbc:sqlite:' + DbPath, 'org.sqlite.JDBC'));
+conn := eng.Borrow(pool);
+
+q := TJdbcQuery.Create(nil);   // 读：窗口查询
+q.OpenQuery(eng, conn, 't', 'SELECT id,name FROM t ORDER BY id', 200);
+
+cmd := TJdbcCommand.Create(eng, conn);   // 写：命名参数
+cmd.SetSQL('INSERT INTO t(name) VALUES(:n)');
+SetLength(r, 1); r[0] := BStr('hi');     // r: TBoundRow
+cmd.ExecUpdate(r);
 ```
 
-读用 `TJdbcQuery.OpenQuery(eng, conn, '表名', 'SELECT ...', 窗口大小)` 绑
-`TDataSource` 给 DBGrid；写用 `TJdbcCommand.SetSQL('... :name ...')` +
-`BStr/BInt64/BBool/...` 命名参数。字段读写一律 `AsUTF8String`
-（`AsString` 走 ANSI 会在 GBK 控制台下坏 CJK）。
+字段读写一律 `AsUTF8String`。完整可跑的例子见 `examples/`。
 
-**3. 换数据库**：`drivers/` 里换 JDBC jar，改 URL + DriverClass 即可
-（PG：`jdbc:postgresql://host:5432/db` + `org.postgresql.Driver`；
-MySQL：`jdbc:mysql://host:3306/db` + `com.mysql.cj.jdbc.Driver`）。
-新库加驱动描述即可，不改库源码（`docs/DRIVER.md` 有 `Register` 示例）。
+## 示例
 
-**4. 出问题先看**：`docs/TROUBLESHOOTING.md`（错误分类/JVM/乱码/泄漏），
-`docs/DIALECT-MATRIX.md`（分页/引用/大小写折叠/绑定契约）。
+| 目录 | 说明 |
+|---|---|
+| `examples/ex20_contacts/` | 图形通讯录（LCL 拖控件完整应用，含自检） |
+| `examples/ex11_code_first.lpr` | 纯代码：建池建表批量插入窗口查询 |
+| `examples/ex12_dbgrid.lpr` | 网格绑定：浏览编辑新增落库重查 |
+| `examples/ex10_json_config.lpr` | 读配置列出驱动与运行时 |
+| `examples/ex01_connect_select.lpr` | Lazarus 自带 `sqlite3conn` 对照（非本库） |
 
-## 性能与边界（先说清楚）
+## 文档地图
 
-- 按行插入比 Lazarus 自带 `sqlite3conn` 慢约 3.4 倍（JNI 逐行开销）；
-  扫描/分页相当或更快。插入密集型请用 `ExecBatch`。
-- 批量上限 `Exec_BatchLimit=10000`（硬上限 `100000`）；窗口默认 1000。
-- 0.9 含义：API 未冻结，升级可能 break；只验证过 Win64 + JDK 25.0.4.1。
+- 加新驱动/换库：`docs/DRIVER.md`
+- 分页/引用/回填/绑定契约：`docs/DIALECT-MATRIX.md`
+- 报错/SQLError/乱码/泄漏：`docs/TROUBLESHOOTING.md`
+- 发版设计：`docs/superpowers/specs/`
 
-## 开发者（本仓库）
+## 发版
+
+runtime（裁剪 JRE + bridge jars）随 GitHub Release 发版：`runtime/*` tag
+（或 Actions 手动触发）自动构建 5 平台包并回填 `configs/runtimes.json`
+（含各平台 sha256 与所属 tag）。`mautool --fetch-runtime` 按清单校验下载；
+`mautool --verify-manifests` 校验清单自洽。
+
+## 开发
 
 ```powershell
-pwsh -NoProfile -File scripts/guard.ps1          # 门禁
-pwsh -NoProfile -File scripts/run-matrix.ps1     # 完整矩阵（需 PG 5432 + MySQL 3306）
+pwsh -NoProfile -File scripts/guard.ps1          # 门禁：无 UI 引用进 core、无源码旁产物
+pwsh -NoProfile -File scripts/run-matrix.ps1     # 全矩阵（部分段需本地 PG/MySQL，无则 SKIP）
 ```
 
-`.o`/`.ppu` 只进 `test-results/work/units`，`exe` 只进 `test-results/bin`。
-`Bridge.java` 是状态机唯一真源，Pascal 侧不许旁路 JNI 直连。
+构建产物约定：`.o`/`.ppu` 只进 `test-results/work/units`，
+`exe` 只进 `test-results/bin`；`zips/` 永不进 git。
+
+## 许可
+
+MPL-2.0
