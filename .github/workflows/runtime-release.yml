@@ -162,10 +162,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          CP="libs/HikariCP-5.1.0.jar:libs/slf4j-api-2.0.9.jar:libs/h2-2.2.224.jar"
-          # setup-java puts javac first on PATH; separators are ':' on every
-          # runner here because this step always runs under bash (git-bash on
-          # windows-latest included).
+          # javac is native per-OS: the classpath separator is ';' on
+          # Windows (even under git-bash) and ':' everywhere else.
+          SEP=':'; if [ "${RUNNER_OS}" = 'Windows' ]; then SEP=';'; fi
+          CP="libs/HikariCP-5.1.0.jar${SEP}libs/slf4j-api-2.0.9.jar${SEP}libs/h2-2.2.224.jar"
           javac -encoding UTF-8 -cp "$CP" -d classes \
             java/bridge/src/main/java/tyfpjdbc/PoolCfg.java \
             java/bridge/src/main/java/tyfpjdbc/Bridge.java \
@@ -175,7 +175,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          CP="classes:libs/HikariCP-5.1.0.jar:libs/slf4j-api-2.0.9.jar:libs/h2-2.2.224.jar"
+          SEP=':'; if [ "${RUNNER_OS}" = 'Windows' ]; then SEP=';'; fi
+          CP="classes${SEP}libs/HikariCP-5.1.0.jar${SEP}libs/slf4j-api-2.0.9.jar${SEP}libs/h2-2.2.224.jar"
           OUT="$(java -Dfile.encoding=UTF-8 -cp "$CP" tyfpjdbc.BridgeSmoke)"
           echo "$OUT"
           echo "$OUT" | grep -q "TOTAL fails=0"
