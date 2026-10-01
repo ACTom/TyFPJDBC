@@ -13,6 +13,8 @@ uses
 var
   Fails: Integer = 0;
   g, a, v: string;
+  tmpD, srcSha, srcUrl: string;
+  sl: TStringList;
 
 procedure Ok(const N: string; C: Boolean);
 begin
@@ -85,6 +87,31 @@ begin
   Ok('dlargs-ps', TDriverFetch.DownloadArgs('powershell', 'https://x/y.jar',
     'C:\t\f.tmp') = '-NoProfile -Command Invoke-WebRequest ' +
     '-UseBasicParsing "https://x/y.jar" -OutFile "C:\t\f.tmp"');
+  tmpD := IncludeTrailingPathDelimiter(GetTempDir) + 'tjfetchjar';
+  ForceDirectories(tmpD);
+  sl := TStringList.Create;
+  try
+    sl.Text := 'fetch-jar-fixture';
+    sl.SaveToFile(tmpD + PathDelim + 'src.txt');
+    srcSha := TDriverFetch.Sha1OfFile(tmpD + PathDelim + 'src.txt');
+    srcUrl := 'file:///' + StringReplace(tmpD + PathDelim + 'src.txt',
+      '\', '/', [rfReplaceAll]);
+    try
+      Ok('dl-mkdir', TDriverFetch.FetchJar(srcUrl, srcSha,
+        tmpD + PathDelim + 'missing' + PathDelim + 'dst.txt') = frDownloaded);
+    except
+      on E: Exception do
+        Ok('dl-mkdir(' + E.Message + ')', False);
+    end;
+    sl.LoadFromFile(tmpD + PathDelim + 'missing' + PathDelim + 'dst.txt');
+    Ok('dl-mkdir-content', Trim(sl.Text) = 'fetch-jar-fixture');
+  finally
+    sl.Free;
+  end;
+  DeleteFile(tmpD + PathDelim + 'missing' + PathDelim + 'dst.txt');
+  DeleteFile(tmpD + PathDelim + 'src.txt');
+  RemoveDir(tmpD + PathDelim + 'missing');
+  RemoveDir(tmpD);
   Run('--verify-manifests --config D:\Projects\TyFPJDBC\configs\drivers.json', outp, code);
   Ok('manifests', (code = 0) and (Pos('manifests verified', outp) > 0));
   Run('--verify-runtime --platform win64 --sha256 20b4e27b4001b59a568c5dfbeac52db0a775368031e8afee08e621a6b70bc05c --out ' + ZipsDir, outp, code);

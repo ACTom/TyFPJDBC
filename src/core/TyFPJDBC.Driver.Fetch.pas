@@ -183,6 +183,9 @@ begin
   if OutFile = '' then
     Exit(RunDownload(Exe, TDriverFetch.DownloadArgs(Exe, URL,
       GetTempFileName('', 'mauout'))));
+  { Downloaders never create directories; ensure the target dir so a fresh
+    --out path (e.g. first fetch-runtime into a new folder) just works. }
+  ForceDirectories(ExtractFilePath(OutFile));
   if not RunDownload(Exe, TDriverFetch.DownloadArgs(Exe, URL,
     OutFile + '.tmp')) then
     Exit(False);
