@@ -109,11 +109,11 @@ jobs:
           python3 - <<'EOF' >> "$GITHUB_OUTPUT"
           import json, os
           runners = {
-            "win64":       {"runs-on": "windows-latest", "jvm_rel": "jre/bin/server/jvm.dll"},
-            "linux-x64":   {"runs-on": "ubuntu-latest",  "jvm_rel": "jre/lib/server/libjvm.so"},
-            "linux-arm64": {"runs-on": "ubuntu-24.04-arm","jvm_rel": "jre/lib/server/libjvm.so"},
-            "macos-x64":   {"runs-on": "macos-15-intel", "jvm_rel": "jre/lib/server/libjvm.dylib"},
-            "macos-arm64": {"runs-on": "macos-15",       "jvm_rel": "jre/lib/server/libjvm.dylib"},
+            "win64":       {"runs-on": "windows-latest", "jvm_rel": "bin/server/jvm.dll"},
+            "linux-x64":   {"runs-on": "ubuntu-latest",  "jvm_rel": "lib/server/libjvm.so"},
+            "linux-arm64": {"runs-on": "ubuntu-24.04-arm","jvm_rel": "lib/server/libjvm.so"},
+            "macos-x64":   {"runs-on": "macos-15-intel", "jvm_rel": "lib/server/libjvm.dylib"},
+            "macos-arm64": {"runs-on": "macos-15",       "jvm_rel": "lib/server/libjvm.dylib"},
           }
           want = (os.environ.get("PLATFORMS_INPUT") or "").strip()
           if not want:
