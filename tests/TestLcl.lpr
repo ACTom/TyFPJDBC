@@ -196,6 +196,22 @@ begin
       Ok('designjvm-missing', TJdbcDriverWizard.JvmDllInDir(tmpJ + '-nope') = '');
       DeleteFile(tmpJ + PathDelim + 'jre' + PathDelim + 'bin' +
         PathDelim + 'server' + PathDelim + 'jvm.dll');
+      tmpJ := IncludeTrailingPathDelimiter(GetTempDir) + 'tjtestcp';
+      ForceDirectories(tmpJ + PathDelim + 'bridge');
+      ForceDirectories(tmpJ + PathDelim + 'drivers');
+      with TFileStream.Create(tmpJ + PathDelim + 'bridge' + PathDelim +
+        'b.jar', fmCreate) do
+        Free;
+      with TFileStream.Create(tmpJ + PathDelim + 'drivers' + PathDelim +
+        'd.jar', fmCreate) do
+        Free;
+      Ok('testcp-found', TJdbcDriverWizard.DriverTestClassPath(tmpJ) =
+        tmpJ + PathDelim + 'bridge' + PathDelim + 'b.jar;' +
+        tmpJ + PathDelim + 'drivers' + PathDelim + 'd.jar');
+      Ok('testcp-missing', TJdbcDriverWizard.DriverTestClassPath(
+        tmpJ + '-nope') = '');
+      DeleteFile(tmpJ + PathDelim + 'bridge' + PathDelim + 'b.jar');
+      DeleteFile(tmpJ + PathDelim + 'drivers' + PathDelim + 'd.jar');
     finally
       wiz0.Free;
     end;

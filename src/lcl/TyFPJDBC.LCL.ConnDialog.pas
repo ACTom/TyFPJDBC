@@ -37,6 +37,7 @@ type
     procedure UpdatePreview;
     procedure InputChanged(Sender: TObject);
     function ResolveDesignJvm: string;
+    function ProjectDir: string;
     function GetTestedOk: Boolean;
     function GetOnTest: TTestFunc;
     procedure SetOnTest(V: TTestFunc);
@@ -430,6 +431,18 @@ begin
   RefreshState;
 end;
 
+function TJdbcConnDialog.ProjectDir: string;
+begin
+  { Active Lazarus project directory (where the exe-side layout lives).
+    Empty when no project is open — callers fall back gracefully. }
+  Result := '';
+  if not Assigned(LazarusIDE) then
+    Exit;
+  if not Assigned(LazarusIDE.ActiveProject) then
+    Exit;
+  Result := ExtractFilePath(LazarusIDE.ActiveProject.ProjectInfoFile);
+end;
+
 function TJdbcConnDialog.ResolveDesignJvm: string;
 var
   proj: TLazProject;
@@ -488,6 +501,7 @@ var
   pool, conn, stmt, cur: Int64;
   rows: TJdbcRows;
   e: TDriverEntry;
+  cp, root: string;
 begin
   Result := False;
   try
@@ -498,6 +512,20 @@ begin
         StatusLbl.Caption := 'jvm not found: bundle jre/ next to the project';
       Exit;
     end;
+    { Test classpath comes from the jars deployed beside the project
+      (bridge/*.jar + drivers/*.jar), NOT the IDE directory. NOTE: once
+      started, a JVM keeps its first classpath for the IDE session. }
+    root := FWizard.Root;
+    if root = '' then
+      root := ProjectDir;
+    cp := TJdbcDriverWizard.DriverTestClassPath(root);
+    if cp = '' then
+    begin
+      StatusLbl.Caption := 'no jars under ' + root +
+        '/bridge|drivers — download the driver first';
+      Exit;
+    end;
+    TJVMManager.SetClassPath(cp);
     TJVMManager.EnsureStarted(jvm, TJVMManager.BuildDesktopArgs);
     bridge := TBridge.Create;
     try
@@ -561,6 +589,8 @@ begin
   PassEdit.Text := AConn.Password;
   TimeoutEdit.Text := IntToStr(AConn.LoginTimeoutSecs);
   MaxPoolEdit.Text := IntToStr(AConn.MaxPool);
+  if ProjectDir <> '' then
+    FWizard.Root := ProjectDir; { downloads + test share the project layout }
   PullFromEdits;
   MavenEdit.Text := FWizard.EffectiveMaven(FWizard.DriverId);
   StatusLbl.Caption := '';

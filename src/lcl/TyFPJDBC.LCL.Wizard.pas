@@ -43,6 +43,7 @@ type
     function MavenOverrideValid: Boolean;
     function EffectiveMaven(const Id: string): string;
     class function JvmDllInDir(const Dir: string): string; static;
+    class function DriverTestClassPath(const ProjectDir: string): string; static;
     property OnFetch: TFetchFunc read FOnFetch write FOnFetch;
     property OnTest: TTestFunc read FOnTest write FOnTest;
     property TestedOk: Boolean read FTestedOk;
@@ -115,6 +116,52 @@ begin
   end;
   TDriverFetch.MavenPath(maven, grp, art, ver);
   Result := dir + art + '-' + ver + '.jar';
+end;
+
+class function TJdbcDriverWizard.DriverTestClassPath(const ProjectDir: string): string;
+
+  function JarList(const Sub: string): string;
+  var
+    base: string;
+    sr: TSearchRec;
+  begin
+    Result := '';
+    if Trim(ProjectDir) = '' then
+      Exit;
+    base := IncludeTrailingPathDelimiter(Trim(ProjectDir)) + Sub + PathDelim;
+    if FindFirst(base + '*.jar', faAnyFile, sr) <> 0 then
+      Exit;
+    try
+      repeat
+        if (sr.Attr and faDirectory) = 0 then
+        begin
+          if Result <> '' then
+            Result := Result + ';';
+          Result := Result + base + sr.Name;
+        end;
+      until FindNext(sr) <> 0;
+    finally
+      FindClose(sr);
+    end;
+  end;
+
+var
+  b, d: string;
+begin
+  { Design-time Test classpath: the jars deployed beside the project
+    (bridge/*.jar + drivers/*.jar). Order within a dir is filesystem
+    order; callers needing determinism keep one jar per dir in tests. }
+  Result := '';
+  b := JarList('bridge');
+  d := JarList('drivers');
+  if b <> '' then
+    Result := b;
+  if d <> '' then
+  begin
+    if Result <> '' then
+      Result := Result + ';';
+    Result := Result + d;
+  end;
 end;
 
 class function TJdbcDriverWizard.JvmDllInDir(const Dir: string): string;
