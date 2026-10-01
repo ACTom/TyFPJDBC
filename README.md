@@ -18,9 +18,15 @@ Java `Bridge` 是唯一状态机（池、连接、语句、游标全在它里面
 ## 快速开始
 
 ```powershell
+mkdir test-results/bin
+fpc -Fusrc/core -otest-results/bin/mautool.exe src/tools/mautool.lpr
 cd examples\ex20_contacts
 lazbuild contacts.lpi
 ..\..\test-results\bin\mautool.exe --fetch-runtime --platform win64 --out runtime
+Expand-Archive runtime\jre-25-tyfpjdbc-win64.zip .
+Rename-Item jre-25-tyfpjdbc-win64 jre
+Move-Item jre\bridge .
+Move-Item jre\drivers .
 ..\..\test-results\bin\mautool.exe --fetch-driver sqlite --out drivers
 .\contacts.exe --selftest
 ```

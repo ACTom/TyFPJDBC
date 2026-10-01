@@ -8,6 +8,10 @@ LCL 图形通讯录：DBGrid 浏览 + 搜索 + 新增/修改/删除，SQLite 落
 cd examples\ex20_contacts
 lazbuild contacts.lpi
 ..\..\test-results\bin\mautool.exe --fetch-runtime --platform win64 --out runtime
+Expand-Archive runtime\jre-25-tyfpjdbc-win64.zip .
+Rename-Item jre-25-tyfpjdbc-win64 jre
+Move-Item jre\bridge .
+Move-Item jre\drivers .
 ..\..\test-results\bin\mautool.exe --fetch-driver sqlite --out drivers
 .\contacts.exe                # 图形界面：搜索 / 新增 / 修改 / 删除
 .\contacts.exe --selftest     # 无界面自检，结果写 selftest.log
@@ -16,8 +20,10 @@ Get-Content selftest.log      # 期望 TOTAL fails=0
 Get-Content verifyform.log    # 期望 TOTAL fails=0
 ```
 
-> mautool 本体先编出来：`fpc -Fusrc/core -otest-results/bin/mautool.exe src/tools/mautool.lpr`
-> （在仓库根执行）。GPL 许可的驱动（如 MySQL）下载时需另行确认，见输出提示。
+> mautool 本体先编出来（在仓库根执行）：先 `mkdir test-results/bin`
+> （干净克隆里没有这个目录），再
+> `fpc -Fusrc/core -otest-results/bin/mautool.exe src/tools/mautool.lpr`。
+> GPL 许可的驱动（如 MySQL）下载时需另行确认，见输出提示。
 
 `mautool` 会把运行时摆成程序要的样子（`jre/` + `bridge/` + `drivers/` 全在
 exe 旁边）：不装 JDK、不配环境变量、不读系统 JRE。首次运行自动建
