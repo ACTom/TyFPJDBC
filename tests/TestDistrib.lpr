@@ -87,7 +87,7 @@ begin
     '-UseBasicParsing "https://x/y.jar" -OutFile "C:\t\f.tmp"');
   Run('--verify-manifests --config D:\Projects\TyFPJDBC\configs\drivers.json', outp, code);
   Ok('manifests', (code = 0) and (Pos('manifests verified', outp) > 0));
-  Run('--verify-runtime --platform win64 --sha256 bc04cdab23b4468829ca29a2fcff008b3ea7dd78de41a7636247c8774b486cec --out ' + ZipsDir, outp, code);
+  Run('--verify-runtime --platform win64 --sha256 20b4e27b4001b59a568c5dfbeac52db0a775368031e8afee08e621a6b70bc05c --out ' + ZipsDir, outp, code);
   Ok('runtime-accept', (code = 0) and (Pos('VERIFIED', outp) > 0));
   Run('--verify-runtime --platform win64 --sha256 0000000000000000000000000000000000000000000000000000000000000000 --out ' + ZipsDir, outp, code);
   Ok('runtime-reject', (code <> 0) and (Pos('MISMATCH', outp) > 0));
