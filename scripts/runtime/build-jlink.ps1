@@ -17,9 +17,11 @@ $ErrorActionPreference = "Stop"
 #   --disable-plugin generate-jli-classes --vm server
 #   --strip-debug --no-man-pages --no-header-files --compress=zip-9
 #   --exclude-resources "**/classes*.jsa"   (drops ~45MB CDS archives)
-# Layout produced:
-#   jre-25-tyfpjdbc-<platform>/{bin,conf,legal,lib,release,bridge,drivers}
-# with bridge/ = Bridge.class + HikariCP + slf4j-api and drivers/ = README.
+# Layout produced (flat exe-side triple, no wrapper dir — unpack beside the
+# exe and run, no rename step):
+#   <stage>/{jre/{bin,conf,legal,lib,release},bridge,drivers}
+# with bridge/ = tyfpjdbc-bridge-<ver>.jar + HikariCP + slf4j-api
+# and drivers/ = README (JDBC jars land here via mautool --fetch-driver).
 
 $modules = "java.base,java.sql,java.naming,java.logging,java.management,java.xml,java.security.sasl,jdk.unsupported,java.transaction.xa"
 
@@ -36,19 +38,20 @@ if (-not [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([Syst
 $jlink = Join-Path (Join-Path $WindowsJavaHome "bin") $jlinkName
 if (-not (Test-Path $jlink)) { throw "jlink not found under $WindowsJavaHome" }
 
-$out = Join-Path $OutRoot ("jre-25-tyfpjdbc-" + $Platform)
-if (Test-Path $out) { Remove-Item -Recurse -Force $out }
+$stage = Join-Path $OutRoot ("tyfpjdbc-runtime-" + $Platform)
+if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
+$jreDir = Join-Path $stage "jre"
 Write-Output ("modules: " + $modules)
 Write-Output ("target-jmods: " + $targetJmods)
-Write-Output ("output: " + $out)
-& $jlink --disable-plugin generate-jli-classes --vm server --module-path $targetJmods --add-modules $modules --output $out --strip-debug --no-man-pages --no-header-files --compress=zip-9 --exclude-resources "**/classes*.jsa"
-$javaExe = Join-Path $out "bin/java.exe"
-if (-not (Test-Path $javaExe)) { $javaExe = Join-Path $out "bin/java" }
+Write-Output ("output: " + $jreDir)
+& $jlink --disable-plugin generate-jli-classes --vm server --module-path $targetJmods --add-modules $modules --output $jreDir --strip-debug --no-man-pages --no-header-files --compress=zip-9 --exclude-resources "**/classes*.jsa"
+$javaExe = Join-Path $jreDir "bin/java.exe"
+if (-not (Test-Path $javaExe)) { $javaExe = Join-Path $jreDir "bin/java" }
 if (($Platform -eq "win64") -and (Test-Path $javaExe)) { & $javaExe -version }
 if ($BridgeDir -ne "") {
-  New-Item -ItemType Directory -Force -Path (Join-Path $out "bridge"), (Join-Path $out "drivers") | Out-Null
-  Copy-Item (Join-Path $BridgeDir "*") (Join-Path $out "bridge")
-  "drivers are resolved at runtime: place JDBC driver jars here (e.g. h2-2.2.224.jar) and load via URLClassLoader; see configs/drivers.json" | Out-File -FilePath (Join-Path $out "drivers/README.txt") -Encoding utf8
+  New-Item -ItemType Directory -Force -Path (Join-Path $stage "bridge"), (Join-Path $stage "drivers") | Out-Null
+  Copy-Item (Join-Path $BridgeDir "*") (Join-Path $stage "bridge")
+  "drivers are resolved at runtime: place JDBC driver jars here (e.g. h2-2.2.224.jar) and load via URLClassLoader; see configs/drivers.json" | Out-File -FilePath (Join-Path $stage "drivers/README.txt") -Encoding utf8
 }
 # Deterministic packaging: sorted entries, fixed 2026-01-01 timestamp, Optimal.
 # Must run under PowerShell 7 (pwsh) so System.IO.Compression output is stable;
@@ -57,9 +60,9 @@ if ($BridgeDir -ne "") {
 # script under the same pwsh/.NET produces byte-identical zips.
 $zip = Join-Path $OutRoot ("jre-25-tyfpjdbc-" + $Platform + ".zip")
 $packer = Join-Path $PSScriptRoot "build-runtime-zip.ps1"
-& $packer -StageDir $out -OutZip $zip
+& $packer -StageDir $stage -OutZip $zip -NoTopFolder
 $h = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
-$u = (Get-ChildItem $out -Recurse -File | Measure-Object Length -Sum).Sum
+$u = (Get-ChildItem $stage -Recurse -File | Measure-Object Length -Sum).Sum
 $b = (Get-Item $zip).Length
 Write-Output ("packedBytes=" + $b)
 Write-Output ("unpackedBytes=" + $u)

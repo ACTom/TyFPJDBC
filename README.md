@@ -25,8 +25,9 @@ Java `Bridge` 是唯一状态机（池、连接、语句、游标全在它里面
    `Database` 填 db 文件路径。
 4. **下驱动**：右键 connection → `Connection setup...` → `Download` →
    `Test` → OK，全程点鼠标。
-5. **下 JRE**：去 `runtime/*` Release 下对应平台的 zip，解压，
-   把内层目录改名 `jre/` 放到 exe 输出目录旁。
+5. **下 JRE**：去 `runtime/*` Release 下对应平台的 zip，
+   在 exe 输出目录旁解压——包内即 `jre/` + `bridge/` + `drivers/`，
+   落定直接用。
 6. **F9 运行**。想看完整可跑的例子直接打开 `examples/ex20_contacts/`。
 
 ## 自动化用法（CI/脚本）
@@ -39,10 +40,7 @@ fpc "-Fusrc/core" "-otest-results/bin/mautool.exe" "src/tools/mautool.lpr"
 cd examples\ex20_contacts
 lazbuild contacts.lpi
 ..\..\test-results\bin\mautool.exe --fetch-runtime --platform win64 --out runtime --config ..\..\configs\drivers.json
-Expand-Archive runtime\jre-25-tyfpjdbc-win64.zip .
-Rename-Item jre-25-tyfpjdbc-win64 jre
-Move-Item jre\bridge .
-Move-Item jre\drivers .
+Expand-Archive runtime\jre-25-tyfpjdbc-win64.zip .   # 包内即 jre/+bridge/+drivers，直接落 exe 旁用
 ..\..\test-results\bin\mautool.exe --fetch-driver sqlite --out drivers --config ..\..\configs\drivers.json
 .\contacts.exe --selftest   # TOTAL fails=0 即通
 ```

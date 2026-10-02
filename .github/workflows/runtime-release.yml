@@ -224,7 +224,7 @@ jobs:
           # in last from an isolated dir, so a PoolCfg missing from the
           # artifact still fails loudly instead of hiding behind classes/.
           SEP=':'; if [ "${RUNNER_OS}" = 'Windows' ]; then SEP=';'; fi
-          STAGE="dist/jre-25-tyfpjdbc-${{ matrix.platform }}"
+          STAGE="dist/tyfpjdbc-runtime-${{ matrix.platform }}"
           BV="$(sed -n 's/.*VERSION = "\([^"]*\)".*/\1/p' java/bridge/src/main/java/tyfpjdbc/Bridge.java)"
           test -n "$BV"
           rm -rf smoke-classes && mkdir -p smoke-classes/tyfpjdbc
@@ -239,10 +239,13 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $stage = "dist/jre-25-tyfpjdbc-${{ matrix.platform }}"
-          $zip = "${stage}.zip"
+          $stage = "dist/tyfpjdbc-runtime-${{ matrix.platform }}"
+          $zip = "dist/jre-25-tyfpjdbc-${{ matrix.platform }}.zip"
+          # 0. Stage is the flat exe-side triple (no wrapper dir).
+          $top = @(Get-ChildItem $stage -Directory | ForEach-Object { $_.Name } | Sort-Object)
+          if (($top -join ',') -ne 'bridge,drivers,jre') { throw "stage top-level wrong: $($top -join ',')" }
           # 1. JVM binary for this platform exists.
-          if (-not (Test-Path (Join-Path $stage '${{ matrix.jvm_rel }}'))) {
+          if (-not (Test-Path (Join-Path $stage (Join-Path 'jre' '${{ matrix.jvm_rel }}')))) {
             throw "jvm missing: ${{ matrix.jvm_rel }}"
           }
           # 2. bridge/ carries exactly the bridge jar + the 2 shipped jars
