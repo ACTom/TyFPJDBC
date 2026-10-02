@@ -36,6 +36,7 @@ type
     procedure FillDrivers(const KeepId: string);
     procedure UpdatePreview;
     procedure InputChanged(Sender: TObject);
+    procedure MavenChanged(Sender: TObject);
     function ResolveDesignJvm: string;
     function ProjectDir: string;
     function GetTestedOk: Boolean;
@@ -142,6 +143,7 @@ begin
   MkLab(drvGroup, 'Maven', 104);
   MavenEdit := MkEdit(drvGroup, 104, 376);
   MavenEdit.TextHint := 'group:artifact:version (custom drivers)';
+  MavenEdit.OnChange := @MavenChanged;
   LicenseCheck := TCheckBox.Create(Self);
   LicenseCheck.Parent := drvGroup;
   LicenseCheck.Left := 12;
@@ -271,8 +273,6 @@ begin
 end;
 
 procedure TJdbcConnDialog.PullFromEdits;
-var
-  e: TDriverEntry;
 begin
   FWizard.DriverId := SelectedId;
   FWizard.Host := Trim(HostEdit.Text);
@@ -282,14 +282,28 @@ begin
   FWizard.Password := PassEdit.Text;
   FWizard.LoginTimeoutSecs := StrToIntDef(Trim(TimeoutEdit.Text), 15);
   FWizard.MaxPool := StrToIntDef(Trim(MaxPoolEdit.Text), FWizard.MaxPool);
-  FWizard.MavenOverride := '';
-  if SelectedId <> '' then
+  { NOTE: MavenOverride is maintained by MavenChanged (real user typing)
+    and cleared by SetDriverId on driver switch — never reaped from the
+    (possibly stale) edit text here. }
+end;
+
+procedure TJdbcConnDialog.MavenChanged(Sender: TObject);
+var
+  e: TDriverEntry;
+begin
   try
     e := TDriverRegistry.Find(SelectedId);
-    if (Trim(MavenEdit.Text) <> '') and (Trim(MavenEdit.Text) <> e.Maven) then
-      FWizard.MavenOverride := Trim(MavenEdit.Text);
   except
+    Exit;
   end;
+  if Trim(MavenEdit.Text) = e.Maven then
+    FWizard.MavenOverride := ''
+  else
+    FWizard.MavenOverride := Trim(MavenEdit.Text);
+  if FWizard.MavenOverrideValid then
+    MavenEdit.Color := clWindow
+  else
+    MavenEdit.Color := clCream;
 end;
 
 procedure TJdbcConnDialog.RefreshState;

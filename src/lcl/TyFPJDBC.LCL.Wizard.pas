@@ -88,6 +88,9 @@ begin
   begin
     FDriverId := V;
     FTestedOk := False;
+    { A manual maven override belongs to the previous selection; never let
+      a stale edit box poison the new driver (designer bug 2026-10-01). }
+    FMavenOverride := '';
   end;
 end;
 

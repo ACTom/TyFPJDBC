@@ -181,6 +181,11 @@ begin
         (wiz0.JarTarget('testwizdb') =
         'C:\tmp\wizz\drivers' + PathDelim + 'testwizdb.jar'));
       wiz0.MavenOverride := '';
+      wiz0.DriverId := 'testwizdb';
+      wiz0.MavenOverride := 'com.example:mydb-jdbc:9.9.9';
+      wiz0.DriverId := 'h2';
+      Ok('wiz-override-reset', (wiz0.MavenOverride = '') and
+        (wiz0.EffectiveMaven('h2') = 'com.h2database:h2:2.2.224'));
       code := TJdbcDriverWizard.BuildRegisterCode(ce);
       Ok('wiz-codegen', (Pos('testwizdb', code) > 0) and
         (Pos('com.example.JdbcDriver', code) > 0) and
