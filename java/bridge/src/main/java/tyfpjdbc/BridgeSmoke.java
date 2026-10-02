@@ -12,7 +12,7 @@ public class BridgeSmoke {
 
   public static void main(String[] args) throws Exception {
     Bridge b = new Bridge();
-    ok("version", "0.9.0".equals(b.getVersion()));
+    ok("version", "0.9.1".equals(b.getVersion()));
 
     PoolCfg h2 = new PoolCfg("jdbc:h2:mem:smoke;DB_CLOSE_DELAY=-1", "", "", "org.h2.Driver", 4, 1);
     long pool = b.createPool(h2);

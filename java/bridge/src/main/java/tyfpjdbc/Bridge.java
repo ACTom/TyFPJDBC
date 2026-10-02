@@ -18,7 +18,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * canonical forms, JDBC always uses the typed accessor matching the column.
  */
 public class Bridge {
-  public static final String VERSION = "0.9.0";
+  public static final String VERSION = "0.9.1";
 
   private final AtomicLong ids = new AtomicLong(0);
   private final Map<Long, HikariDataSource> pools = new ConcurrentHashMap<>();

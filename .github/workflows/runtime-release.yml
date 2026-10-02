@@ -8,9 +8,9 @@ on:
   workflow_dispatch:
     inputs:
       jdk_version:
-        description: 'JDK version (tag is runtime/jre<jdkVersion>-bridge<bridgeVersion>)'
+        description: 'JDK major version (tag is runtime/jre<jdkVersion>-bridge<bridgeVersion>)'
         required: false
-        default: '25.0.4.1'
+        default: '25'
       bridge_ref:
         description: 'Bridge source ref (commit SHA; empty = triggering SHA)'
         required: false
@@ -265,7 +265,10 @@ jobs:
           # Per-platform meta file: the release job reads packed/unpacked/sha
           # from here (the unpacked stage no longer exists there).
           $plat = '${{ matrix.platform }}'
-          $meta = @{ platform = $plat; asset = "jre-25-tyfpjdbc-$plat.zip"; sha256 = $h; packedBytes = $b; unpackedBytes = $u } | ConvertTo-Json -Compress
+          $jvRaw = ((& java -version 2>&1) | Select-Object -First 1).ToString()
+          $jv = $jvRaw -replace '.*"([^"]+)".*', '$1'
+          if ([string]::IsNullOrWhiteSpace($jv)) { throw "cannot parse java -version: $jvRaw" }
+          $meta = @{ platform = $plat; asset = "jre-25-tyfpjdbc-$plat.zip"; sha256 = $h; packedBytes = $b; unpackedBytes = $u; jdkVersion = $jv } | ConvertTo-Json -Compress
           $meta | Out-File -FilePath "meta-$plat.json" -Encoding utf8NoBOM
           Write-Output "packed=$b unpacked=$u sha256=$h"
 
@@ -331,7 +334,7 @@ jobs:
             # Manifest records fresh values, never asserts equality with old ones.
             ./scripts/runtime/update-manifest.ps1 -ManifestPath configs/runtimes.json `
               -Platform $p -PackedBytes $meta.packedBytes -UnpackedBytes $meta.unpackedBytes `
-              -Sha256 $meta.sha256 -JdkVersion $env:JDK_VERSION -BridgeVersion $env:BRIDGE_VERSION `
+              -Sha256 $meta.sha256 -JdkVersion $meta.jdkVersion -BridgeVersion $env:BRIDGE_VERSION `
               -ReleaseTag $env:TAG `
               -AssetUrl "https://github.com/$repo/releases/download/$env:TAG/$asset"
           }

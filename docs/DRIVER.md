@@ -2,7 +2,7 @@
 
 规则：Java `Bridge` 是唯一状态机，Pascal 只拿 `Int64` 句柄。
 任何 JDBC 驱动都走同一注册表接入，未知驱动直接报错（`08000`），不静默兜底。
-版本握手恒为 `0.9.0`（`Bridge.VERSION` = `TBridge` 强校验 =
+版本握手恒为 `0.9.1`（`Bridge.VERSION` = `TBridge` 强校验 =
 `configs/runtimes.json` 五处 `bridgeVersion`）。
 
 ## 内置驱动
@@ -128,4 +128,4 @@ mautool.exe --verify-runtime --platform win64 --sha256 <hex> --out <dir>
 mautool.exe --verify-runtime --platform win64 --sha256 000... --out <dir>  # 必 MISMATCH
 ```
 
-`configs/runtimes.json` 固定 5 平台、`bridgeVersion 0.9.0`、`sha256` 64 位 hex。
+`configs/runtimes.json` 固定 5 平台、`bridgeVersion 0.9.1`、`sha256` 64 位 hex。

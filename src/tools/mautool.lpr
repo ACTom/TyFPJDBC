@@ -461,7 +461,7 @@ begin
       o := arr.Objects[i];
       ReqStr(o, 'platform');
       ReqStr(o, 'jdkVersion');
-      if o.Strings['bridgeVersion'] <> '0.9.0' then
+      if o.Strings['bridgeVersion'] <> '0.9.1' then
         Fail('bridgeVersion mismatch');
       ReqStr(o, 'url');
       s := ReqStr(o, 'sha256');

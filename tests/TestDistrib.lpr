@@ -175,7 +175,7 @@ begin
   Ok('bsd-open', not TDriverFetch.IsGplLicense('BSD-2-Clause'));
   Ok('maven-path', TDriverFetch.MavenPath('com.h2database:h2:2.2.224', g, a, v) =
     'com/h2database/h2/2.2.224/h2-2.2.224.jar');
-  Ok('fetch-url', TDriverFetch.RuntimeAssetUrl('win64', 'runtime/jre25.0.4.1-bridge0.9.0') = 'https://github.com/ACTom/TyFPJDBC/releases/download/runtime/jre25.0.4.1-bridge0.9.0/jre-25-tyfpjdbc-win64.zip');
+  Ok('fetch-url', TDriverFetch.RuntimeAssetUrl('win64', 'runtime/jre25-bridge0.9.1') = 'https://github.com/ACTom/TyFPJDBC/releases/download/runtime/jre25-bridge0.9.1/jre-25-tyfpjdbc-win64.zip');
   Ok('dlargs-curl', TDriverFetch.DownloadArgs('curl', 'https://x/y.jar',
     'C:\t\f.tmp') = '-sL "https://x/y.jar" -o "C:\t\f.tmp"');
   Ok('dlargs-ps', TDriverFetch.DownloadArgs('powershell', 'https://x/y.jar',

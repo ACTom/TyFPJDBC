@@ -267,7 +267,7 @@ begin
     attachBase := TJVMManager.AttachedCount;
     SharedBridge := TBridge.Create;
     try
-      Ok('bridge-version', SharedBridge.GetVersion = '0.9.0');
+      Ok('bridge-version', SharedBridge.GetVersion = '0.9.1');
       mainEng := TJdbcEngine.Create(SharedBridge);
       try
         cfg := DefaultPoolCfg('jdbc:h2:mem:tjsoak;DB_CLOSE_DELAY=-1',

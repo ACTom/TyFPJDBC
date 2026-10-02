@@ -761,9 +761,9 @@ begin
   FMHeapUsed := Mid('heapUsedBytes', '()J');
   FMHeapMax := Mid('heapMaxBytes', '()J');
   FMErrorChain := Mid('getErrorChain', '()Ljava/lang/String;');
-  if GetVersion <> '0.9.0' then
+  if GetVersion <> '0.9.1' then
     raise EJDBCError.CreateChain('bridge version mismatch', 'HY000', 99,
-      'expected 0.9.0 got ' + string(GetVersion) + '; ' + ErrAdvice(ecConfig));
+      'expected 0.9.1 got ' + string(GetVersion) + '; ' + ErrAdvice(ecConfig));
 end;
 
 destructor TBridge.Destroy;
