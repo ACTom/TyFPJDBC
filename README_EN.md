@@ -23,17 +23,41 @@ handles and never touches JNI directly.
   BLOBs behave per contract, empty kept distinct from NULL
 - mautool: download, verify, and distribute driver jars and JRE runtimes
 
-## Quickstart
+## Quickstart (no scripts)
+
+1. **Download**: source zip from the Releases page (or `git clone`).
+2. **Install the design package**: Lazarus → `Package` → `Open Package File` →
+   pick `tyfpjdbc_design.lpk` → `Install` (rebuilds the IDE once).
+3. **New project**: drop `TJdbcConnection` + `TJdbcConnQuery`
+   (plus `TDataSource` + `DBGrid` wired up); set `DriverId` to `sqlite`,
+   `Database` to your db file path.
+4. **Driver jar**: right-click the connection → `Connection setup...` →
+   `Download` → `Test` → OK, all mouse.
+5. **JRE**: grab the platform zip from a `runtime/*` Release, unpack it,
+   rename the inner directory to `jre/` beside the exe output folder.
+6. **Press F9**. See `examples/ex20_contacts/` for a complete runnable app.
+
+## Automation (CI/scripts)
+
+Prefer commands over clicks (Windows shown, same idea everywhere):
 
 ```powershell
+mkdir test-results/bin
+fpc "-Fusrc/core" "-otest-results/bin/mautool.exe" "src/tools/mautool.lpr"
 cd examples\ex20_contacts
 lazbuild contacts.lpi
-..\..\test-results\bin\mautool.exe --fetch-runtime --platform win64 --out runtime
-..\..\test-results\bin\mautool.exe --fetch-driver sqlite --out drivers
-.\contacts.exe --selftest
+..\..\test-results\bin\mautool.exe --fetch-runtime --platform win64 --out runtime --config ..\..\configs\drivers.json
+Expand-Archive runtime\jre-25-tyfpjdbc-win64.zip .
+Rename-Item jre-25-tyfpjdbc-win64 jre
+Move-Item jre\bridge .
+Move-Item jre\drivers .
+..\..\test-results\bin\mautool.exe --fetch-driver sqlite --out drivers --config ..\..\configs\drivers.json
+.\contacts.exe --selftest   # TOTAL fails=0 means green
 ```
 
-`TOTAL fails=0` means green. Double-click `contacts.exe` for the GUI contacts app.
+Build mautool itself: `fpc -Fusrc/core -otest-results/bin/mautool.exe src/tools/mautool.lpr`
+(run at repo root; `mkdir test-results/bin` first). GPL-licensed drivers ask
+for separate confirmation on download.
 
 ## Prerequisites
 

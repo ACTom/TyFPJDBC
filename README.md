@@ -15,7 +15,23 @@ Java `Bridge` 是唯一状态机（池、连接、语句、游标全在它里面
 - 类型真值表：整数/浮点/字符串（含 CJK）/日期/布尔/BLOB 按契约来，空与 NULL 分开
 - mautool：驱动 jar 与 JRE运行时 的下载、校验、分发
 
-## 快速开始
+## 快速开始（不用脚本）
+
+1. **下载**：Releases 页下源码包解压（或 `git clone`）。
+2. **安装设计包**：Lazarus → `Package` → `Open Package File` →
+   选 `tyfpjdbc_design.lpk` → `Install`（重编一次 IDE）。
+3. **新建项目**：拖 `TJdbcConnection` + `TJdbcConnQuery`
+   （再加 `TDataSource` + `DBGrid` 照连）；`DriverId` 选 `sqlite`，
+   `Database` 填 db 文件路径。
+4. **下驱动**：右键 connection → `Connection setup...` → `Download` →
+   `Test` → OK，全程点鼠标。
+5. **下 JRE**：去 `runtime/*` Release 下对应平台的 zip，解压，
+   把内层目录改名 `jre/` 放到 exe 输出目录旁。
+6. **F9 运行**。想看完整可跑的例子直接打开 `examples/ex20_contacts/`。
+
+## 自动化用法（CI/脚本）
+
+上面全程手点嫌慢就走命令行：
 
 ```powershell
 mkdir test-results/bin
@@ -28,10 +44,8 @@ Rename-Item jre-25-tyfpjdbc-win64 jre
 Move-Item jre\bridge .
 Move-Item jre\drivers .
 ..\..\test-results\bin\mautool.exe --fetch-driver sqlite --out drivers --config ..\..\configs\drivers.json
-.\contacts.exe --selftest
+.\contacts.exe --selftest   # TOTAL fails=0 即通
 ```
-
-`--selftest` 打印 `TOTAL fails=0` 即通。图形通讯录直接双击 `contacts.exe`。
 
 ## 前置要求
 
