@@ -6,7 +6,7 @@
     <Author Value="TyFPJDBC"/>
     <Description Value="TyFPJDBC generic JDBC design-time components"/>
     <License Value="MPL-2.0"/>
-    <Version Major="0" Minor="9" Release="0" Build="0"/>
+    <Version Major="0" Minor="9" Release="1" Build="0"/>
     <CompilerOptions>
       <Version Value="11"/>
       <SearchPaths>
